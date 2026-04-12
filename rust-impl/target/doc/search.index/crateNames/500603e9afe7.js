@@ -1,1 +1,0 @@
-rd_("irand_corekrustversionmunicode_ident")

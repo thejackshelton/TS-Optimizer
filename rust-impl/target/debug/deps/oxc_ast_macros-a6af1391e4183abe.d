@@ -1,8 +1,0 @@
-/Users/jackshelton/dev/open-source/qwik-optimizer-ts/rust-impl/target/debug/deps/oxc_ast_macros-a6af1391e4183abe.d: /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/lib.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/ast.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/generated/derived_traits.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/generated/structs.rs
-
-/Users/jackshelton/dev/open-source/qwik-optimizer-ts/rust-impl/target/debug/deps/liboxc_ast_macros-a6af1391e4183abe.dylib: /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/lib.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/ast.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/generated/derived_traits.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/generated/structs.rs
-
-/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/lib.rs:
-/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/ast.rs:
-/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/generated/derived_traits.rs:
-/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_ast_macros-0.72.3/src/generated/structs.rs:
