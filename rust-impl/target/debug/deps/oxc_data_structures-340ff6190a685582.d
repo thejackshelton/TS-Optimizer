@@ -1,0 +1,8 @@
+/Users/jackshelton/dev/open-source/qwik-optimizer-ts/rust-impl/target/debug/deps/oxc_data_structures-340ff6190a685582.d: /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/lib.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/assert_unchecked.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/inline_string.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/pointer_ext.rs
+
+/Users/jackshelton/dev/open-source/qwik-optimizer-ts/rust-impl/target/debug/deps/liboxc_data_structures-340ff6190a685582.rmeta: /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/lib.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/assert_unchecked.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/inline_string.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/pointer_ext.rs
+
+/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/lib.rs:
+/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/assert_unchecked.rs:
+/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/inline_string.rs:
+/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/oxc_data_structures-0.72.3/src/pointer_ext.rs:

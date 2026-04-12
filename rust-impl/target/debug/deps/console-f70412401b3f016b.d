@@ -1,0 +1,10 @@
+/Users/jackshelton/dev/open-source/qwik-optimizer-ts/rust-impl/target/debug/deps/console-f70412401b3f016b.d: /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/lib.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/common_term.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/kb.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/term.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/unix_term.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/utils.rs
+
+/Users/jackshelton/dev/open-source/qwik-optimizer-ts/rust-impl/target/debug/deps/libconsole-f70412401b3f016b.rmeta: /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/lib.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/common_term.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/kb.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/term.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/unix_term.rs /Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/utils.rs
+
+/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/lib.rs:
+/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/common_term.rs:
+/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/kb.rs:
+/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/term.rs:
+/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/unix_term.rs:
+/Users/jackshelton/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/console-0.16.3/src/utils.rs:
