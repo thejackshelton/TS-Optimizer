@@ -676,3 +676,207 @@ fn test_e2e_hash_mismatch_diagnosis() {
         println!("{}", m);
     }
 }
+
+/// Normalize code for comparison: strip whitespace variations, normalize quotes.
+fn normalize_code(code: &str) -> String {
+    code.lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// ACTUAL SNAPSHOT MATCHING TEST
+/// This compares generated code output (parent + segments) against snapshot expected code.
+/// This is equivalent to what the TS optimizer tests do.
+#[test]
+fn test_actual_snapshot_code_matching() {
+    let cases = load_snapshots(&snap_dir());
+    let mut total_tested = 0;
+    let mut parent_matches = 0;
+    let mut segment_matches = 0;
+    let mut full_matches = 0; // both parent + all segments match
+    let mut total_segments = 0;
+    let mut parent_fail_examples: Vec<String> = Vec::new();
+
+    for case in &cases {
+        // Need both parent module and segments to compare
+        let has_parent = case.parent_module.is_some();
+        let has_segments = !case.segments.is_empty();
+        if !has_parent && !has_segments { continue; }
+
+        // Get metadata for transpile inference
+        let expected_meta: Vec<serde_json::Value> = case.segments.iter()
+            .filter_map(|s| s.metadata.as_ref())
+            .filter_map(|m| serde_json::from_str(m).ok())
+            .collect();
+
+        let file_path = expected_meta.first()
+            .and_then(|m| m.get("origin").and_then(|o| o.as_str()))
+            .unwrap_or("test.tsx")
+            .to_string();
+
+        let expected_ext: Vec<_> = expected_meta.iter()
+            .filter_map(|v| v.get("extension").and_then(|e| e.as_str()).map(|s| s.to_string()))
+            .collect();
+        let needs_transpile_ts = expected_ext.iter().any(|e| e == "js" || e == "jsx");
+        let needs_transpile_jsx = expected_ext.iter().any(|e| e == "js" || e == "ts");
+
+        let options = TransformModulesOptions {
+            input: vec![TransformModuleInput {
+                path: file_path.clone(), code: case.input.clone(), dev_path: None,
+            }],
+            src_dir: ".".to_string(), root_dir: None, entry_strategy: None,
+            minify: None, source_maps: None,
+            transpile_ts: Some(needs_transpile_ts), transpile_jsx: Some(needs_transpile_jsx),
+            preserve_filenames: None, explicit_extensions: None, mode: None,
+            scope: None, strip_exports: None, reg_ctx_name: None,
+            strip_ctx_name: None, strip_event_handlers: None, is_server: None,
+        };
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| transform_modules(&options)));
+        let output = match result {
+            Ok(o) => o,
+            Err(_) => continue,
+        };
+
+        total_tested += 1;
+        let mut this_parent_ok = false;
+        let mut this_all_segments_ok = true;
+
+        // Compare parent module code
+        if let Some(ref expected_parent) = case.parent_module {
+            let actual_parent = output.modules.iter().find(|m| m.segment.is_none());
+            if let Some(actual) = actual_parent {
+                let exp_norm = normalize_code(&expected_parent.code);
+                let act_norm = normalize_code(&actual.code);
+                if exp_norm == act_norm {
+                    parent_matches += 1;
+                    this_parent_ok = true;
+                } else if parent_fail_examples.len() < 5 {
+                    parent_fail_examples.push(format!(
+                        "{}:\n  EXPECTED (first 120): {}\n  ACTUAL   (first 120): {}",
+                        case.name,
+                        &exp_norm[..exp_norm.len().min(120)],
+                        &act_norm[..act_norm.len().min(120)]
+                    ));
+                }
+            }
+        }
+
+        // Compare segment module code
+        for expected_seg in &case.segments {
+            total_segments += 1;
+            // Find matching actual segment by path or name
+            let actual_seg = output.modules.iter().find(|m| {
+                if let Some(ref seg) = m.segment {
+                    // Match by hash from metadata
+                    if let Some(ref meta_str) = expected_seg.metadata {
+                        if let Ok(meta) = serde_json::from_str::<serde_json::Value>(meta_str) {
+                            if let Some(exp_hash) = meta.get("hash").and_then(|v| v.as_str()) {
+                                return seg.hash == exp_hash;
+                            }
+                        }
+                    }
+                }
+                false
+            });
+
+            if let Some(actual) = actual_seg {
+                let exp_norm = normalize_code(&expected_seg.code);
+                let act_norm = normalize_code(&actual.code);
+                if exp_norm == act_norm {
+                    segment_matches += 1;
+                } else {
+                    this_all_segments_ok = false;
+                }
+            } else {
+                this_all_segments_ok = false;
+            }
+        }
+
+        if this_parent_ok && this_all_segments_ok && !case.segments.is_empty() {
+            full_matches += 1;
+        }
+    }
+
+    println!("\n=== ACTUAL SNAPSHOT CODE MATCHING ===");
+    println!("Total snapshots tested: {}", total_tested);
+    println!("Parent module code matches: {}/{}", parent_matches, total_tested);
+    println!("Segment code matches: {}/{}", segment_matches, total_segments);
+    println!("FULL matches (parent + all segments): {}/{}", full_matches, total_tested);
+    println!(
+        "Full match rate: {:.1}%",
+        if total_tested > 0 { full_matches as f64 / total_tested as f64 * 100.0 } else { 0.0 }
+    );
+
+    if !parent_fail_examples.is_empty() {
+        println!("\nParent mismatch examples:");
+        for ex in &parent_fail_examples {
+            println!("  {}", ex);
+        }
+    }
+}
+
+#[test]
+fn test_parent_output_should_work() {
+    let code = r#"
+		import { component$ } from "@qwik.dev/core";
+		import { globalAction$ } from "@qwik.dev/router";
+
+		export const useSecretAction = globalAction$(
+			async (payload) => console.log(payload) || 'hi'
+		);
+
+		export const SecretForm = component$(() => {
+			const action = useSecretAction();
+			return <div>{action.value}</div>
+		});
+		"#;
+    let options = TransformModulesOptions {
+        input: vec![TransformModuleInput {
+            path: "test.tsx".to_string(),
+            code: code.to_string(),
+            dev_path: None,
+        }],
+        src_dir: ".".to_string(),
+        root_dir: None,
+        entry_strategy: None,
+        minify: None,
+        source_maps: None,
+        transpile_ts: Some(true),
+        transpile_jsx: Some(true),
+        preserve_filenames: None,
+        explicit_extensions: None,
+        mode: None,
+        scope: None,
+        strip_exports: None,
+        reg_ctx_name: None,
+        strip_ctx_name: None,
+        strip_event_handlers: None,
+        is_server: None,
+    };
+    
+    let output = transform_modules(&options);
+    let parent = &output.modules[0];
+    eprintln!("=== PARENT MODULE OUTPUT ===");
+    for (i, line) in parent.code.lines().enumerate() {
+        eprintln!("{:3}: {}", i+1, line);
+    }
+    
+    // Check key features
+    assert!(parent.code.contains(r#"import { globalActionQrl } from "@qwik.dev/router";"#),
+        "Should have globalActionQrl import");
+    assert!(parent.code.contains(r#"import { qrl } from "@qwik.dev/core";"#),
+        "Should have qrl import");
+    assert!(parent.code.contains(r#"import { componentQrl } from "@qwik.dev/core";"#),
+        "Should have componentQrl import");
+    assert!(parent.code.contains("/*#__PURE__*/ componentQrl(q_"),
+        "Should have PURE componentQrl call");
+    assert!(parent.code.contains("globalActionQrl(q_"),
+        "Should have globalActionQrl call");
+    assert!(!parent.code.contains(r#"import { component$ }"#),
+        "Should not have original component$ import");
+    assert!(!parent.code.contains(r#"import { globalAction$ }"#),
+        "Should not have original globalAction$ import");
+}
