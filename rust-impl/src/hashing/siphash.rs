@@ -33,6 +33,22 @@ pub fn qwik_hash(scope: Option<&str>, rel_path: &str, display_name: &str) -> Str
     encoded.replace(['-', '_'], "0")
 }
 
+/// Compute the file hash for JSX key prefix generation.
+/// This matches SWC's file_hash: SipHash13(scope + rel_path) only.
+/// Returns the full base64url string (first 2 chars used as key prefix).
+pub fn file_hash_base64(scope: Option<&str>, rel_path: &str) -> String {
+    let mut hasher = SipHasher13::new_with_keys(0, 0);
+    if let Some(s) = scope {
+        hasher.write(s.as_bytes());
+    }
+    hasher.write(rel_path.as_bytes());
+
+    let hash = hasher.finish();
+    let bytes = hash.to_le_bytes();
+    let encoded = URL_SAFE_NO_PAD.encode(bytes);
+    encoded.replace(['-', '_'], "0")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,6 +79,13 @@ mod tests {
         // From snapshot: test.tsx, useSecretAction_globalAction → Cbn41AEUQ0Q
         let hash = qwik_hash(None, "test.tsx", "useSecretAction_globalAction");
         assert_eq!(hash, "Cbn41AEUQ0Q");
+    }
+
+    #[test]
+    fn test_file_hash_key_prefix() {
+        // Key prefix for test.tsx should be "u6" (from snapshots)
+        let hash = file_hash_base64(None, "test.tsx");
+        assert_eq!(&hash[..2], "u6", "Key prefix for test.tsx should be 'u6', got '{}'", &hash[..2]);
     }
 
     #[test]

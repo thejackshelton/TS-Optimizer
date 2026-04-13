@@ -74,12 +74,21 @@ pub fn parse_snapshot(name: &str, content: &str) -> SnapshotTestCase {
                         source_map: source_map.clone(),
                         metadata: metadata.clone(),
                     });
-                } else {
-                    // Non-entry module is the parent module
+                } else if is_parent_module_path(path) {
+                    // Parent module has a simple path like "test.tsx" (no underscore-hash suffix)
                     parent_module = Some(SnapshotParentModule {
                         path: path.clone(),
                         code: code.clone(),
                         source_map: source_map.clone(),
+                    });
+                } else {
+                    // Non-entry, non-parent modules are intermediate segment modules
+                    segments.push(SnapshotSegment {
+                        path: path.clone(),
+                        is_entry: false,
+                        code: code.clone(),
+                        source_map: source_map.clone(),
+                        metadata: metadata.clone(),
                     });
                 }
             }
@@ -251,6 +260,19 @@ fn parse_module_header(line: &str) -> (String, bool) {
     let path = stripped.trim().to_string();
 
     (path, is_entry)
+}
+
+/// Returns true if the path looks like a parent module (e.g., "test.tsx" or "[[...slug]].js")
+/// rather than a segment module (e.g., "test.tsx_slug_component_0AM8HPnkNs4.js").
+/// Segment modules embed the original file extension in their filename followed by an underscore,
+/// producing patterns like ".tsx_", ".ts_", ".js_", ".jsx_" in the filename portion.
+fn is_parent_module_path(path: &str) -> bool {
+    // Get just the filename (last path component)
+    let filename = path.rsplit('/').next().unwrap_or(path);
+    // Segment modules contain an embedded source extension followed by underscore
+    // e.g., "[[...slug]].tsx_slug_component_0AM8HPnkNs4.js"
+    let segment_patterns = [".tsx_", ".ts_", ".jsx_", ".js_"];
+    !segment_patterns.iter().any(|pat| filename.contains(pat))
 }
 
 #[cfg(test)]

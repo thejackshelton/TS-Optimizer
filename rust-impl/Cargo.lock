@@ -40,6 +40,9 @@ name = "bitflags"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "843867be96c8daad0d758b57df9392b6d8d271134fce549de6ce169ff98a92af"
+dependencies = [
+ "serde_core",
+]
 
 [[package]]
 name = "bstr"
@@ -86,6 +89,7 @@ dependencies = [
  "itoa",
  "rustversion",
  "ryu",
+ "serde",
  "static_assertions",
 ]
 
@@ -338,7 +342,9 @@ dependencies = [
  "bumpalo",
  "hashbrown 0.15.5",
  "oxc_data_structures",
+ "oxc_estree",
  "rustc-hash",
+ "serde",
 ]
 
 [[package]]
@@ -408,12 +414,20 @@ name = "oxc_estree"
 version = "0.72.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68bb8e3cedd84c69241a0438d14ca09294ab95049b52dc7813bba017554c96fb"
+dependencies = [
+ "itoa",
+ "oxc_data_structures",
+ "ryu-js",
+]
 
 [[package]]
 name = "oxc_index"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "967ae797e1f284bd1385f2d8e8ab94293ad27f623c76839ecf66827521365f5b"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "oxc_parser"
@@ -465,6 +479,7 @@ dependencies = [
  "oxc_allocator",
  "oxc_ast_macros",
  "oxc_estree",
+ "serde",
 ]
 
 [[package]]
@@ -485,6 +500,7 @@ dependencies = [
  "phf",
  "rustc-hash",
  "ryu-js",
+ "serde",
  "unicode-id-start",
 ]
 
@@ -567,6 +583,7 @@ dependencies = [
  "oxc_allocator",
  "oxc_ast",
  "oxc_diagnostics",
+ "oxc_estree",
  "oxc_parser",
  "oxc_span",
  "oxc_syntax",

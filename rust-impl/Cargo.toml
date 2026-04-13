@@ -9,7 +9,7 @@ path = "src/lib.rs"
 
 [dependencies]
 oxc_parser = "0.72"
-oxc_ast = "0.72"
+oxc_ast = { version = "0.72", features = ["serialize"] }
 oxc_span = "0.72"
 oxc_allocator = "0.72"
 oxc_syntax = "0.72"
@@ -21,3 +21,4 @@ serde_json = "1"
 
 [dev-dependencies]
 insta = { version = "1", features = ["glob"] }
+oxc_estree = { version = "0.72", features = ["serialize"] }

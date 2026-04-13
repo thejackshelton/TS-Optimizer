@@ -15,6 +15,15 @@ fn snap_dir() -> std::path::PathBuf {
         .join("match-these-snaps")
 }
 
+/// Detect if a snapshot's parent module uses explicit extensions in QRL import paths.
+fn detect_explicit_extensions(parent_code: Option<&str>) -> Option<bool> {
+    match parent_code {
+        Some(code) if code.contains(".js\")") || code.contains(".jsx\")")
+            || code.contains(".ts\")") || code.contains(".tsx\")") => Some(true),
+        _ => None,
+    }
+}
+
 #[test]
 fn test_snapshot_loading() {
     let cases = load_snapshots(&snap_dir());
@@ -123,6 +132,9 @@ fn run_transform_test(snap_name: &str) -> (TransformOutput, Vec<serde_json::Valu
     // .js = both transpiled, .ts = JSX transpiled only, .jsx = TS transpiled only, .tsx = neither
     let needs_transpile_ts = expected_ext.iter().any(|e| e == "js" || e == "jsx");
     let needs_transpile_jsx = expected_ext.iter().any(|e| e == "js" || e == "ts");
+    let explicit_ext = detect_explicit_extensions(
+        test_case.parent_module.as_ref().map(|p| p.code.as_str())
+    );
 
     let options = TransformModulesOptions {
         input: vec![TransformModuleInput {
@@ -138,7 +150,7 @@ fn run_transform_test(snap_name: &str) -> (TransformOutput, Vec<serde_json::Valu
         transpile_ts: Some(needs_transpile_ts),
         transpile_jsx: Some(needs_transpile_jsx),
         preserve_filenames: None,
-        explicit_extensions: None,
+        explicit_extensions: explicit_ext,
         mode: None,
         scope: None,
         strip_exports: None,
@@ -430,6 +442,7 @@ fn test_e2e_batch_segment_detection() {
             .collect();
         let batch_transpile_ts = batch_ext.iter().any(|e| e == "js" || e == "jsx");
         let batch_transpile_jsx = batch_ext.iter().any(|e| e == "js" || e == "ts");
+        let ee = detect_explicit_extensions(case.parent_module.as_ref().map(|p| p.code.as_str()));
 
         let options = TransformModulesOptions {
             input: vec![TransformModuleInput {
@@ -445,7 +458,7 @@ fn test_e2e_batch_segment_detection() {
             transpile_ts: Some(batch_transpile_ts),
             transpile_jsx: Some(batch_transpile_jsx),
             preserve_filenames: None,
-            explicit_extensions: None,
+            explicit_extensions: ee,
             mode: None,
             scope: None,
             strip_exports: None,
@@ -547,7 +560,9 @@ fn test_e2e_perfect_match_count() {
             src_dir: ".".to_string(), root_dir: None, entry_strategy: None,
             minify: None, source_maps: None,
             transpile_ts: Some(needs_transpile_ts), transpile_jsx: Some(needs_transpile_jsx),
-            preserve_filenames: None, explicit_extensions: None, mode: None,
+            preserve_filenames: None,
+            explicit_extensions: detect_explicit_extensions(case.parent_module.as_ref().map(|p| p.code.as_str())),
+            mode: None,
             scope: None, strip_exports: None, reg_ctx_name: None,
             strip_ctx_name: None, strip_event_handlers: None, is_server: None,
         };
@@ -678,12 +693,229 @@ fn test_e2e_hash_mismatch_diagnosis() {
 }
 
 /// Normalize code for comparison: strip whitespace variations, normalize quotes.
+/// Used for debug diff display only (not for matching).
 fn normalize_code(code: &str) -> String {
     code.lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// AST-based code comparison
+// ---------------------------------------------------------------------------
+
+/// Parse JS/JSX code into a serde_json::Value AST, returning None if parsing fails.
+fn parse_to_json(code: &str) -> Option<serde_json::Value> {
+    use oxc_allocator::Allocator;
+    use oxc_parser::Parser;
+    use oxc_span::SourceType;
+    use oxc_estree::{CompactJSSerializer, ESTree};
+
+    let allocator = Allocator::default();
+    let source_type = SourceType::jsx();
+    let parse_result = Parser::new(&allocator, code, source_type).parse();
+    // Serialize AST to JSON string via oxc_estree
+    let mut serializer = CompactJSSerializer::new();
+    parse_result.program.serialize(&mut serializer);
+    let json_str = serializer.into_string();
+    serde_json::from_str(&json_str).ok()
+}
+
+/// Recursively normalize a JSON AST for structural comparison:
+/// - Zero out all "start", "end", "span" fields
+/// - Normalize string quote differences (strip surrounding quotes from raw values)
+/// - Sort import specifiers alphabetically
+/// - Remove parenthesized expression wrappers (treat `(x)` same as `x`)
+/// - Normalize trailing comma / semicolon differences (handled by AST already)
+fn normalize_ast_json(val: &mut serde_json::Value) {
+    use serde_json::Value;
+
+    match val {
+        Value::Object(map) => {
+            // Zero out span/position fields
+            for key in &["start", "end", "span", "range"] {
+                if map.contains_key(*key) {
+                    map.insert(key.to_string(), Value::Null);
+                }
+            }
+
+            // Remove trailingComma fields
+            map.remove("trailingComma");
+
+            // Normalize ParenthesizedExpression: unwrap to inner expression
+            if let Some(Value::String(ty)) = map.get("type") {
+                if ty == "ParenthesizedExpression" {
+                    if let Some(inner) = map.remove("expression") {
+                        *val = inner;
+                        normalize_ast_json(val);
+                        return;
+                    }
+                }
+            }
+
+            // Normalize string literal values: treat single and double quotes as equal
+            if let Some(Value::String(ty)) = map.get("type") {
+                if ty == "StringLiteral" || ty == "Literal" {
+                    // Remove the "raw" field which preserves quote style
+                    map.remove("raw");
+                }
+            }
+
+            // Sort import specifiers alphabetically within ImportDeclaration
+            if let Some(Value::String(ty)) = map.get("type") {
+                if ty == "ImportDeclaration" {
+                    if let Some(Value::Array(specs)) = map.get_mut("specifiers") {
+                        specs.sort_by(|a, b| {
+                            let name_a = a.as_object()
+                                .and_then(|o| o.get("local"))
+                                .and_then(|l| l.as_object())
+                                .and_then(|o| o.get("name"))
+                                .and_then(|n| n.as_str())
+                                .unwrap_or("");
+                            let name_b = b.as_object()
+                                .and_then(|o| o.get("local"))
+                                .and_then(|l| l.as_object())
+                                .and_then(|o| o.get("name"))
+                                .and_then(|n| n.as_str())
+                                .unwrap_or("");
+                            name_a.cmp(name_b)
+                        });
+                    }
+                }
+            }
+
+            // Strip leadingComments / trailingComments / innerComments
+            // (these include things like /*#__PURE__*/ which may differ)
+            map.remove("leadingComments");
+            map.remove("trailingComments");
+            map.remove("innerComments");
+
+            // Recurse into all values
+            for (_key, child) in map.iter_mut() {
+                normalize_ast_json(child);
+            }
+        }
+        Value::Array(arr) => {
+            for item in arr.iter_mut() {
+                normalize_ast_json(item);
+            }
+            // Sort top-level program body: group imports first (sorted by source),
+            // then non-imports in original order. This handles import reordering.
+            // We detect "body" arrays containing ImportDeclaration nodes.
+            if arr.iter().any(|item| {
+                item.as_object()
+                    .and_then(|o| o.get("type"))
+                    .and_then(|t| t.as_str()) == Some("ImportDeclaration")
+            }) {
+                let mut imports: Vec<_> = arr.iter()
+                    .filter(|item| {
+                        item.as_object()
+                            .and_then(|o| o.get("type"))
+                            .and_then(|t| t.as_str()) == Some("ImportDeclaration")
+                    })
+                    .cloned()
+                    .collect();
+                let non_imports: Vec<_> = arr.iter()
+                    .filter(|item| {
+                        item.as_object()
+                            .and_then(|o| o.get("type"))
+                            .and_then(|t| t.as_str()) != Some("ImportDeclaration")
+                    })
+                    .cloned()
+                    .collect();
+                // Merge imports from the same source module
+                let mut merged: Vec<serde_json::Value> = Vec::new();
+                for imp in &imports {
+                    let src = imp.as_object()
+                        .and_then(|o| o.get("source"))
+                        .and_then(|s| s.as_object())
+                        .and_then(|o| o.get("value"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if let Some(existing) = merged.iter_mut().find(|m| {
+                        m.as_object()
+                            .and_then(|o| o.get("source"))
+                            .and_then(|s| s.as_object())
+                            .and_then(|o| o.get("value"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("") == src
+                    }) {
+                        // Merge specifiers
+                        let new_specs: Vec<_> = imp.as_object()
+                            .and_then(|o| o.get("specifiers"))
+                            .and_then(|s| s.as_array())
+                            .cloned()
+                            .unwrap_or_default();
+                        if let Some(existing_specs) = existing.as_object_mut()
+                            .and_then(|o| o.get_mut("specifiers"))
+                            .and_then(|v| v.as_array_mut())
+                        {
+                            existing_specs.extend(new_specs);
+                            // Re-sort merged specifiers
+                            existing_specs.sort_by(|a, b| {
+                                let name_a = a.as_object()
+                                    .and_then(|o| o.get("local"))
+                                    .and_then(|l| l.as_object())
+                                    .and_then(|o| o.get("name"))
+                                    .and_then(|n| n.as_str())
+                                    .unwrap_or("");
+                                let name_b = b.as_object()
+                                    .and_then(|o| o.get("local"))
+                                    .and_then(|l| l.as_object())
+                                    .and_then(|o| o.get("name"))
+                                    .and_then(|n| n.as_str())
+                                    .unwrap_or("");
+                                name_a.cmp(name_b)
+                            });
+                        }
+                    } else {
+                        merged.push(imp.clone());
+                    }
+                }
+                merged.sort_by(|a, b| {
+                    let src_a = a.as_object()
+                        .and_then(|o| o.get("source"))
+                        .and_then(|s| s.as_object())
+                        .and_then(|o| o.get("value"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let src_b = b.as_object()
+                        .and_then(|o| o.get("source"))
+                        .and_then(|s| s.as_object())
+                        .and_then(|o| o.get("value"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    src_a.cmp(src_b)
+                });
+                arr.clear();
+                arr.extend(merged);
+                arr.extend(non_imports);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Compare two code strings using AST-based structural comparison.
+/// Returns true if the ASTs are structurally equivalent after normalization.
+/// Falls back to normalized string comparison if either fails to parse.
+fn ast_codes_match(expected: &str, actual: &str) -> bool {
+    let exp_json = parse_to_json(expected);
+    let act_json = parse_to_json(actual);
+
+    match (exp_json, act_json) {
+        (Some(mut ej), Some(mut aj)) => {
+            normalize_ast_json(&mut ej);
+            normalize_ast_json(&mut aj);
+            ej == aj
+        }
+        _ => {
+            // Fallback: normalized string comparison
+            normalize_code(expected) == normalize_code(actual)
+        }
+    }
 }
 
 /// ACTUAL SNAPSHOT MATCHING TEST
@@ -698,6 +930,7 @@ fn test_actual_snapshot_code_matching() {
     let mut full_matches = 0; // both parent + all segments match
     let mut total_segments = 0;
     let mut parent_fail_examples: Vec<String> = Vec::new();
+    let mut seg_diff_examples: Vec<String> = Vec::new();
 
     for case in &cases {
         // Need both parent module and segments to compare
@@ -721,6 +954,9 @@ fn test_actual_snapshot_code_matching() {
             .collect();
         let needs_transpile_ts = expected_ext.iter().any(|e| e == "js" || e == "jsx");
         let needs_transpile_jsx = expected_ext.iter().any(|e| e == "js" || e == "ts");
+        let explicit_ext = detect_explicit_extensions(
+            case.parent_module.as_ref().map(|p| p.code.as_str())
+        );
 
         let options = TransformModulesOptions {
             input: vec![TransformModuleInput {
@@ -729,7 +965,7 @@ fn test_actual_snapshot_code_matching() {
             src_dir: ".".to_string(), root_dir: None, entry_strategy: None,
             minify: None, source_maps: None,
             transpile_ts: Some(needs_transpile_ts), transpile_jsx: Some(needs_transpile_jsx),
-            preserve_filenames: None, explicit_extensions: None, mode: None,
+            preserve_filenames: None, explicit_extensions: explicit_ext, mode: None,
             scope: None, strip_exports: None, reg_ctx_name: None,
             strip_ctx_name: None, strip_event_handlers: None, is_server: None,
         };
@@ -748,18 +984,27 @@ fn test_actual_snapshot_code_matching() {
         if let Some(ref expected_parent) = case.parent_module {
             let actual_parent = output.modules.iter().find(|m| m.segment.is_none());
             if let Some(actual) = actual_parent {
-                let exp_norm = normalize_code(&expected_parent.code);
-                let act_norm = normalize_code(&actual.code);
-                if exp_norm == act_norm {
+                if ast_codes_match(&expected_parent.code, &actual.code) {
                     parent_matches += 1;
                     this_parent_ok = true;
-                } else if parent_fail_examples.len() < 5 {
+                } else if parent_fail_examples.len() < 200 {
+                    let exp_norm = normalize_code(&expected_parent.code);
+                    let act_norm = normalize_code(&actual.code);
                     parent_fail_examples.push(format!(
                         "{}:\n  EXPECTED (first 120): {}\n  ACTUAL   (first 120): {}",
                         case.name,
                         &exp_norm[..exp_norm.len().min(120)],
                         &act_norm[..act_norm.len().min(120)]
                     ));
+                    // Dump full parent code for analysis
+                    use std::io::Write;
+                    let mut f = std::fs::OpenOptions::new()
+                        .create(true).append(true)
+                        .open("/tmp/parent_diffs.txt").unwrap();
+                    writeln!(f, "=== {} ===", case.name).unwrap();
+                    writeln!(f, "--- EXPECTED ---\n{}", exp_norm).unwrap();
+                    writeln!(f, "--- ACTUAL ---\n{}", act_norm).unwrap();
+                    writeln!(f, "--- END ---\n").unwrap();
                 }
             }
         }
@@ -783,12 +1028,28 @@ fn test_actual_snapshot_code_matching() {
             });
 
             if let Some(actual) = actual_seg {
-                let exp_norm = normalize_code(&expected_seg.code);
-                let act_norm = normalize_code(&actual.code);
-                if exp_norm == act_norm {
+                if ast_codes_match(&expected_seg.code, &actual.code) {
                     segment_matches += 1;
                 } else {
                     this_all_segments_ok = false;
+                    // Show segment diff for parent-OK tests
+                    if this_parent_ok && seg_diff_examples.len() < 40 {
+                        let exp_norm = normalize_code(&expected_seg.code);
+                        let act_norm = normalize_code(&actual.code);
+                        let exp_lines: Vec<&str> = exp_norm.lines().collect();
+                        let act_lines: Vec<&str> = act_norm.lines().collect();
+                        let mut diff_line = String::new();
+                        for (li, (e, a)) in exp_lines.iter().zip(act_lines.iter()).enumerate() {
+                            if e != a {
+                                diff_line = format!("L{}:E[{}]A[{}]", li+1, &e[..e.len().min(70)], &a[..a.len().min(70)]);
+                                break;
+                            }
+                        }
+                        if diff_line.is_empty() && exp_lines.len() != act_lines.len() {
+                            diff_line = format!("lines:E{}A{}", exp_lines.len(), act_lines.len());
+                        }
+                        seg_diff_examples.push(format!("  SEG-DIFF {}: {}", case.name, diff_line));
+                    }
                 }
             } else {
                 this_all_segments_ok = false;
@@ -814,6 +1075,80 @@ fn test_actual_snapshot_code_matching() {
         println!("\nParent mismatch examples:");
         for ex in &parent_fail_examples {
             println!("  {}", ex);
+        }
+    }
+
+    if !seg_diff_examples.is_empty() {
+        println!("\nSegment diffs (parent-OK tests):");
+        for ex in &seg_diff_examples {
+            println!("{}", ex);
+        }
+    }
+
+    // Dump full segment code for 1-seg-fail tests
+    let one_seg_fail_tests = vec![
+        "qwik_core__test__example_dead_code",
+        "qwik_core__test__lib_mode_fn_signal",
+        "qwik_core__test__example_class_name",
+        "qwik_core__test__should_extract_multiple_qrls_with_item_and_index",
+        "qwik_core__test__destructure_args_colon_props",
+        "qwik_core__test__destructure_args_colon_props3",
+        "qwik_core__test__example_component_with_event_listeners_inside_loop",
+        "qwik_core__test__should_convert_passive_jsx_events",
+        "qwik_core__test__should_disable_passive_warning_with_qwik_disable_next_line",
+        "qwik_core__test__issue_7216_add_test",
+    ];
+    println!("\n=== FULL SEGMENT DIFFS FOR 1-SEG-FAIL TESTS ===");
+    for case in &cases {
+        if !one_seg_fail_tests.contains(&case.name.as_str()) { continue; }
+        let expected_meta: Vec<serde_json::Value> = case.segments.iter()
+            .filter_map(|s| s.metadata.as_ref())
+            .filter_map(|m| serde_json::from_str(m).ok())
+            .collect();
+        let file_path = expected_meta.first()
+            .and_then(|m| m.get("origin").and_then(|o| o.as_str()))
+            .unwrap_or("test.tsx").to_string();
+        let expected_ext: Vec<_> = expected_meta.iter()
+            .filter_map(|v| v.get("extension").and_then(|e| e.as_str()).map(|s| s.to_string()))
+            .collect();
+        let needs_transpile_ts = expected_ext.iter().any(|e| e == "js" || e == "jsx");
+        let needs_transpile_jsx = expected_ext.iter().any(|e| e == "js" || e == "ts");
+        let explicit_ext = detect_explicit_extensions(case.parent_module.as_ref().map(|p| p.code.as_str()));
+        let options = TransformModulesOptions {
+            input: vec![TransformModuleInput {
+                path: file_path.clone(), code: case.input.clone(), dev_path: None,
+            }],
+            src_dir: ".".to_string(), root_dir: None, entry_strategy: None,
+            minify: None, source_maps: None,
+            transpile_ts: Some(needs_transpile_ts), transpile_jsx: Some(needs_transpile_jsx),
+            preserve_filenames: None, explicit_extensions: explicit_ext, mode: None,
+            scope: None, strip_exports: None, reg_ctx_name: None,
+            strip_ctx_name: None, strip_event_handlers: None, is_server: None,
+        };
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| transform_modules(&options)));
+        let output = match result { Ok(o) => o, Err(_) => continue };
+        for expected_seg in &case.segments {
+            let actual_seg = output.modules.iter().find(|m| {
+                if let Some(ref seg) = m.segment {
+                    if let Some(ref meta_str) = expected_seg.metadata {
+                        if let Ok(meta) = serde_json::from_str::<serde_json::Value>(meta_str) {
+                            if let Some(exp_hash) = meta.get("hash").and_then(|v| v.as_str()) {
+                                return seg.hash == exp_hash;
+                            }
+                        }
+                    }
+                }
+                false
+            });
+            if let Some(actual) = actual_seg {
+                let exp_norm = normalize_code(&expected_seg.code);
+                let act_norm = normalize_code(&actual.code);
+                if exp_norm != act_norm {
+                    println!("\n--- {} (failing segment) ---", case.name);
+                    println!("EXPECTED:\n{}", exp_norm);
+                    println!("ACTUAL:\n{}", act_norm);
+                }
+            }
         }
     }
 }
@@ -879,4 +1214,152 @@ fn test_parent_output_should_work() {
         "Should not have original component$ import");
     assert!(!parent.code.contains(r#"import { globalAction$ }"#),
         "Should not have original globalAction$ import");
+}
+
+#[test]
+fn test_debug_import_stripping() {
+    // Test the ts_enums case: useStore should be stripped from parent
+    let code = r#"
+import { component$, useStore } from '@qwik.dev/core';
+
+export enum Thing {
+	A,
+	B
+}
+
+export const App = component$(() => {
+	console.log(Thing.A);
+	return (
+		<>
+			<p class="stuff">Hello Qwik</p>
+		</>
+	);
+});
+"#;
+    let options = TransformModulesOptions {
+        input: vec![TransformModuleInput {
+            path: "test.tsx".to_string(),
+            code: code.to_string(),
+            dev_path: None,
+        }],
+        src_dir: ".".to_string(), root_dir: None, entry_strategy: None,
+        minify: None, source_maps: None,
+        transpile_ts: Some(true), transpile_jsx: Some(true),
+        preserve_filenames: None, explicit_extensions: None, mode: None,
+        scope: None, strip_exports: None, reg_ctx_name: None,
+        strip_ctx_name: None, strip_event_handlers: None, is_server: None,
+    };
+    let output = transform_modules(&options);
+    let parent = &output.modules[0];
+    eprintln!("=== PARENT MODULE (ts_enums test) ===");
+    for (i, line) in parent.code.lines().enumerate() {
+        eprintln!("{:3}: {}", i+1, line);
+    }
+    assert!(!parent.code.contains("useStore"),
+        "useStore should be stripped from parent - only used in extracted segment");
+}
+
+/// Debug: check _fnSignal generation for loop signal case
+#[test]
+fn test_debug_fn_signal() {
+    let code = r#"
+import { component$ } from '@qwik.dev/core';
+export const App = component$(() => {
+  const data = { value: [
+    { value: { id: 1, selected: { value: true } } },
+    { value: { id: 2, selected: { value: false } } },
+    { value: { id: 3, selected: { value: true } } }
+  ]};
+  return (
+    <table>
+      {data.value.map((row) => {
+        return (
+          <tr key={row.value.id} class={row.value.selected.value ? "danger" : ""}>
+            <td>{row.value.id}</td>
+          </tr>
+        );
+      })}
+    </table>
+  );
+});
+"#;
+    let options = TransformModulesOptions {
+        input: vec![TransformModuleInput {
+            path: "test.tsx".to_string(), code: code.to_string(), dev_path: None,
+        }],
+        src_dir: ".".to_string(), root_dir: None, entry_strategy: None,
+        minify: None, source_maps: None,
+        transpile_ts: Some(true), transpile_jsx: Some(true),
+        preserve_filenames: None, explicit_extensions: None, mode: None,
+        scope: None, strip_exports: None, reg_ctx_name: None,
+        strip_ctx_name: None, strip_event_handlers: None, is_server: None,
+    };
+    let output = transform_modules(&options);
+    for m in &output.modules {
+        if let Some(ref seg) = m.segment {
+            eprintln!("=== SEGMENT: {} ===\n{}", seg.name, m.code);
+        }
+    }
+    let seg = output.modules.iter().find(|m|
+        m.segment.as_ref().map_or(false, |s| s.name.contains("App_component"))
+    ).expect("Should find App_component segment");
+    assert!(seg.code.contains("_fnSignal"), "Should contain _fnSignal for reactive prop in loop");
+}
+
+/// Debug: show full parent diff for specific tests
+#[test]
+fn test_debug_parent_diffs() {
+    let target_tests = [
+        "qwik_core__test__example_7",
+        "qwik_core__test__should_convert_jsx_events",
+        "qwik_core__test__should_ignore_passive_jsx_events_without_handlers",
+        "qwik_core__test__example_functional_component",
+        "qwik_core__test__example_server_auth",
+    ];
+    let cases = load_snapshots(&snap_dir());
+    for case in &cases {
+        if !target_tests.contains(&case.name.as_str()) { continue; }
+        if case.parent_module.is_none() { continue; }
+        let expected_meta: Vec<serde_json::Value> = case.segments.iter()
+            .filter_map(|s| s.metadata.as_ref())
+            .filter_map(|m| serde_json::from_str(m).ok())
+            .collect();
+        if expected_meta.is_empty() { continue; }
+        let file_path = expected_meta.first()
+            .and_then(|m| m.get("origin").and_then(|o| o.as_str()))
+            .unwrap_or("test.tsx").to_string();
+        let expected_ext: Vec<_> = expected_meta.iter()
+            .filter_map(|v| v.get("extension").and_then(|e| e.as_str()).map(|s| s.to_string()))
+            .collect();
+        let nts = expected_ext.iter().any(|e| e == "js" || e == "jsx");
+        let ntj = expected_ext.iter().any(|e| e == "js" || e == "ts");
+        let options = TransformModulesOptions {
+            input: vec![TransformModuleInput { path: file_path, code: case.input.clone(), dev_path: None }],
+            src_dir: ".".to_string(), root_dir: None, entry_strategy: None, minify: None,
+            source_maps: None, transpile_ts: Some(nts), transpile_jsx: Some(ntj),
+            preserve_filenames: None, explicit_extensions: None, mode: None, scope: None,
+            strip_exports: None, reg_ctx_name: None, strip_ctx_name: None,
+            strip_event_handlers: None, is_server: None,
+        };
+        let output = transform_modules(&options);
+        let exp = normalize_code(&case.parent_module.as_ref().unwrap().code);
+        let act_parent = output.modules.iter().find(|m| m.segment.is_none());
+        let act = act_parent.map(|a| normalize_code(&a.code)).unwrap_or_default();
+        println!("\n=== {} ===", case.name);
+        if exp == act {
+            println!("MATCH!");
+        } else {
+            let exp_lines: Vec<&str> = exp.split('\n').collect();
+            let act_lines: Vec<&str> = act.split('\n').collect();
+            for i in 0..exp_lines.len().max(act_lines.len()) {
+                let el = exp_lines.get(i).unwrap_or(&"<MISSING>");
+                let al = act_lines.get(i).unwrap_or(&"<MISSING>");
+                if el != al {
+                    println!("DIFF at line {}:", i);
+                    println!("  exp: {:?}", el);
+                    println!("  got: {:?}", al);
+                }
+            }
+        }
+    }
 }

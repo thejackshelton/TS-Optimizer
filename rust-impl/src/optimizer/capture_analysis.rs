@@ -55,6 +55,12 @@ pub fn analyze_captures(
     }
 }
 
+/// Public wrapper: collect all identifier references from a segment body.
+/// Used by transform.rs to determine which iteration vars are actually used.
+pub fn collect_body_references(code: &str) -> HashSet<String> {
+    collect_referenced_idents(code)
+}
+
 /// Collect all identifier references in a code fragment.
 /// Parses the code and walks the AST to find all Identifier nodes
 /// that are references (not declarations).
@@ -177,17 +183,19 @@ fn collect_idents_from_expr(expr: &Expression, refs: &mut HashSet<String>) {
             collect_idents_from_expr(&member.expression, refs);
         }
         Expression::ArrowFunctionExpression(arrow) => {
-            // Parameters are local to the arrow — don't collect as refs
+            // Parameters and local declarations are local to the arrow — don't collect as refs.
+            // Accumulate inner_decls across ALL statements so that a variable declared
+            // in one statement (e.g., `const handler = ...`) is recognized as local when
+            // referenced in a later statement (e.g., `return <div onKeyup$={handler}/>`).
+            let mut inner_decls = HashSet::new();
+            for p in &arrow.params.items {
+                collect_binding_names(&p.pattern, &mut inner_decls);
+            }
             for s in &arrow.body.statements {
-                let mut inner_decls = HashSet::new();
-                for p in &arrow.params.items {
-                    collect_binding_names(&p.pattern, &mut inner_decls);
-                }
                 collect_idents_from_statement(s, refs, &mut inner_decls);
-                // Remove arrow params from refs
-                for d in &inner_decls {
-                    refs.remove(d);
-                }
+            }
+            for d in &inner_decls {
+                refs.remove(d);
             }
         }
         Expression::FunctionExpression(fn_expr) => {
@@ -275,7 +283,82 @@ fn collect_idents_from_expr(expr: &Expression, refs: &mut HashSet<String>) {
                 }
             }
         }
+        Expression::JSXElement(jsx) => {
+            collect_idents_from_jsx_element(jsx, refs);
+        }
+        Expression::JSXFragment(frag) => {
+            for child in &frag.children {
+                collect_idents_from_jsx_child(child, refs);
+            }
+        }
+        Expression::YieldExpression(y) => {
+            if let Some(ref arg) = y.argument {
+                collect_idents_from_expr(arg, refs);
+            }
+        }
         _ => {}
+    }
+}
+
+fn collect_idents_from_jsx_element(jsx: &JSXElement, refs: &mut HashSet<String>) {
+    // Check if the tag name is a component (identifier reference)
+    if let JSXElementName::Identifier(id) = &jsx.opening_element.name {
+        let name = id.name.to_string();
+        // Uppercase first letter = component reference, not an HTML tag
+        if name.chars().next().map_or(false, |c| c.is_uppercase()) {
+            refs.insert(name);
+        }
+    } else if let JSXElementName::IdentifierReference(id) = &jsx.opening_element.name {
+        let name = id.name.to_string();
+        if name.chars().next().map_or(false, |c| c.is_uppercase()) {
+            refs.insert(name);
+        }
+    }
+    // Collect from attributes
+    for attr in &jsx.opening_element.attributes {
+        match attr {
+            JSXAttributeItem::Attribute(a) => {
+                if let Some(ref val) = a.value {
+                    match val {
+                        JSXAttributeValue::ExpressionContainer(container) => {
+                            if let Some(e) = container.expression.as_expression() {
+                                collect_idents_from_expr(e, refs);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            JSXAttributeItem::SpreadAttribute(spread) => {
+                collect_idents_from_expr(&spread.argument, refs);
+            }
+        }
+    }
+    // Collect from children
+    for child in &jsx.children {
+        collect_idents_from_jsx_child(child, refs);
+    }
+}
+
+fn collect_idents_from_jsx_child(child: &JSXChild, refs: &mut HashSet<String>) {
+    match child {
+        JSXChild::Element(el) => {
+            collect_idents_from_jsx_element(el, refs);
+        }
+        JSXChild::Fragment(frag) => {
+            for c in &frag.children {
+                collect_idents_from_jsx_child(c, refs);
+            }
+        }
+        JSXChild::ExpressionContainer(container) => {
+            if let Some(e) = container.expression.as_expression() {
+                collect_idents_from_expr(e, refs);
+            }
+        }
+        JSXChild::Spread(spread) => {
+            collect_idents_from_expr(&spread.expression, refs);
+        }
+        _ => {} // Text, etc.
     }
 }
 
