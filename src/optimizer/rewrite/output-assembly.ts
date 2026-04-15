@@ -28,6 +28,7 @@ import { isStrippedSegment } from '../strip-ctx.js';
 import { rewriteFunctionSignature } from '../segment-codegen.js';
 import { SignalHoister } from '../signal-analysis.js';
 import { isRelativePathInsideBase } from '../path-utils.js';
+import { isQwikPackageSource } from '../utils/qwik-packages.js';
 import { transformInlineSegmentBody } from './inline-body.js';
 import type { InlineSegmentJsxOptions } from './raw-props.js';
 import type { RewriteContext } from './rewrite-context.js';
@@ -387,6 +388,14 @@ export function filterUnusedImports(ctx: RewriteContext): void {
     for (const np of info.namedParts) {
       if (createRegExp(wordBoundary, exactly(np.local), wordBoundary).test(fullRefText)) {
         usedNamed.push(np);
+      }
+    }
+
+    if (isQwikPackageSource(info.source)) {
+      for (const np of info.namedParts) {
+        if (!np.imported.endsWith('$') && !usedNamed.some((used) => used.local === np.local)) {
+          usedNamed.push(np);
+        }
       }
     }
 

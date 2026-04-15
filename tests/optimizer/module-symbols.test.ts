@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSync } from 'oxc-parser';
+import { parseSync } from '../../src/parser.js';
 import { collectSameFileSymbolInfo } from '../../src/optimizer/utils/module-symbols.js';
 
 describe('module-symbols', () => {

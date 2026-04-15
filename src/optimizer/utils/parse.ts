@@ -1,4 +1,4 @@
-import { parseSync, type ParseResult } from 'oxc-parser';
+import { parseSync, type ParseResult } from '../../parser.js';
 import { RAW_TRANSFER_PARSER_OPTIONS } from '../../ast-types.js';
 
 export function parseWithRawTransfer(

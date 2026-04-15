@@ -1,4 +1,4 @@
-import type { EcmaScriptModule, ParseResult, ParserOptions } from 'oxc-parser';
+import type { EcmaScriptModule, ParseResult, ParserOptions } from './parser.js';
 
 export type {
   ArrayExpression,

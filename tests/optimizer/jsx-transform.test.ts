@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseSync } from 'oxc-parser';
+import { parseSync } from '../../src/parser.js';
 import {
   classifyConstness,
   computeJsxFlags,

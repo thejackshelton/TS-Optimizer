@@ -7,7 +7,7 @@
  */
 
 import MagicString from 'magic-string';
-import { parseSync } from 'oxc-parser';
+import { parseSync } from '../../parser.js';
 import { RAW_TRANSFER_PARSER_OPTIONS } from '../../ast-types.js';
 import type { ExtractionResult } from '../extract.js';
 import { transformEventPropName } from '../transform/event-handlers.js';

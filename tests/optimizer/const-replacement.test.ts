@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import MagicString from 'magic-string';
-import { parseSync } from 'oxc-parser';
+import { parseSync } from '../../src/parser.js';
 import { replaceConstants } from '../../src/optimizer/const-replacement.js';
 import { collectImports } from '../../src/optimizer/marker-detection.js';
 

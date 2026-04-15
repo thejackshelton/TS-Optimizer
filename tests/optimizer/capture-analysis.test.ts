@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseSync } from 'oxc-parser';
+import { parseSync } from '../../src/parser.js';
 import { walk } from 'oxc-walker';
 import {
   analyzeCaptures,
@@ -342,4 +342,3 @@ describe('analyzeCaptures', () => {
     expect(result.captures).toBe(false);
   });
 });
-
