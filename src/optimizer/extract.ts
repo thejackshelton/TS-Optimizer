@@ -7,7 +7,6 @@
  * and rewrite the parent module.
  */
 
-import { walk } from 'oxc-walker';
 import type {
   AstNode,
   AstParentNode,
@@ -16,6 +15,7 @@ import type {
   JSXAttributeItem,
   JSXElementName,
 } from '../ast-types.js';
+import { forEachAstChild } from './utils/ast.js';
 import { qwikHash } from '../hashing/siphash.js';
 import { parseWithRawTransfer } from './utils/parse.js';
 import { ContextStack } from './context-stack.js';
@@ -100,7 +100,7 @@ export interface ExtractionResult {
  */
 function determineExtension(argNode: AstNode, sourceExt: string): string {
   let hasJsx = false;
-  walk(argNode, {
+  walkAst(argNode, {
     enter(node: AstNode) {
       if (node.type === 'JSXElement' || node.type === 'JSXFragment') {
         hasJsx = true;
@@ -145,7 +145,7 @@ function getDirectWrapperContextName(
 
 function collectIdentifiers(node: AstNode): Set<string> {
   const ids = new Set<string>();
-  walk(node, {
+  walkAst(node, {
     enter(n: AstNode) {
       if (n.type === 'Identifier') {
         ids.add(n.name);
@@ -215,7 +215,7 @@ export function extractSegments(
   // Suppress JSX $-suffixed attribute extraction when a non-Qwik @jsxImportSource is set
   const hasNonQwikJsxImportSource = /\/\*\s*@jsxImportSource\s+(?!@qwik|@builder\.io\/qwik)\S+/.test(source);
 
-  walk(program, {
+  walkAst(program, {
     enter(node: AstNode, parent: AstParentNode) {
       if (parent) parentMap.set(node, parent);
 
@@ -651,6 +651,21 @@ export function extractSegments(
   disambiguateExtractions(results, fileStem, relPath, scope);
 
   return results;
+}
+
+function walkAst(
+  node: AstNode,
+  visitor: {
+    enter?: (node: AstNode, parent: AstParentNode) => void;
+    leave?: (node: AstNode, parent: AstParentNode) => void;
+  },
+  parent: AstParentNode = null,
+): void {
+  visitor.enter?.(node, parent);
+  forEachAstChild(node, (child) => {
+    walkAst(child as AstNode, visitor, node);
+  });
+  visitor.leave?.(node, parent);
 }
 
 /**

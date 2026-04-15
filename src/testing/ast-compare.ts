@@ -1,4 +1,4 @@
-import { parseSync } from 'oxc-parser';
+import { parseSync } from '../parser.js';
 import equal from 'fast-deep-equal';
 
 export interface AstCompareResult {

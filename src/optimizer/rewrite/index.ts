@@ -16,7 +16,7 @@
 
 import MagicString from 'magic-string';
 import { createRegExp, exactly, wordBoundary } from 'magic-regexp';
-import { parseSync } from 'oxc-parser';
+import { parseSync } from '../../parser.js';
 import type { ExtractionResult } from '../extract.js';
 import type { ImportInfo } from '../marker-detection.js';
 import type { MigrationDecision, ModuleLevelDecl } from '../variable-migration.js';
@@ -275,15 +275,6 @@ function processImports(ctx: RewriteContext): void {
     const isQwikSource = rewrittenSource.startsWith('@qwik.dev/') ||
       rewrittenSource.startsWith('@builder.io/qwik');
     let preserveAll = false;
-    if (isQwikSource && quoteChar === "'" && minify === 'none') {
-      const hasNonDollarSurvivor = specifiers.some((spec: ImportDeclarationSpecifier, i: number) => {
-        if (toRemove.includes(i)) return false;
-        if (spec.type !== 'ImportSpecifier') return true;
-        const importedName = ((spec as ImportSpecifier).imported as IdentifierName)?.name ?? spec.local.name;
-        return !importedName.endsWith('$');
-      });
-      if (hasNonDollarSurvivor) preserveAll = true;
-    }
 
     let defaultPart = '';
     let nsPart = '';
