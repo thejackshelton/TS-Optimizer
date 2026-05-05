@@ -18,29 +18,27 @@ export const Issue3742 = component$(({description = '', other}: any) => {
 	});
 ============================= test.tsx ==
 import { _noopQrl } from "@qwik.dev/core";
-import { componentQrl } from "@qwik.dev/core";
 import { _jsxSorted } from "@qwik.dev/core";
 import { _fnSignal } from "@qwik.dev/core";
 import { useSignal } from "@qwik.dev/core";
 //
-const _hf0 = (p0, p1) => (p0.description ?? "") && "description" in p0.other ? `Hello ${p1.value}` : `Bye ${p1.value}`;
-const _hf0_str = "(p0.description??\"\")&&\"description\"in p0.other?`Hello ${p1.value}`:`Bye ${p1.value}`";
+const _hf0 = (p0, p1, p2) => p1 && "description" in p2 ? `Hello ${p0.value}` : `Bye ${p0.value}`;
+const _hf0_str = "p1&&\"description\"in p2?`Hello ${p0.value}`:`Bye ${p0.value}`";
 //
-const q_Issue3742_component_div_button_q_e_click_95Hlm8WgsYY = /* @__PURE__ */ _noopQrl("Issue3742_component_div_button_q_e_click_95Hlm8WgsYY");
-const q_Issue3742_component_svSy0PlWTAw = /* @__PURE__ */ _noopQrl("Issue3742_component_svSy0PlWTAw");
+const q_div_button_q_e_click_eHWmo2tZFB8 = /* @__PURE__ */ _noopQrl("div_button_q_e_click_eHWmo2tZFB8");
 //
-const Issue3742_component_div_button_q_e_click_95Hlm8WgsYY = (_, _1, counter) => counter.value++;
-q_Issue3742_component_div_button_q_e_click_95Hlm8WgsYY.s(Issue3742_component_div_button_q_e_click_95Hlm8WgsYY);
-const Issue3742_component_svSy0PlWTAw = (_rawProps) => {
+export const Issue3742 = component$(({ description = "", other }) => {
 	const counter = useSignal(0);
-	return /* @__PURE__ */ _jsxSorted("div", { title: _fnSignal(_hf0, [_rawProps, counter], _hf0_str) }, null, ["Issue3742", /* @__PURE__ */ _jsxSorted("button", { "q:p": counter }, { "q-e:click": q_Issue3742_component_div_button_q_e_click_95Hlm8WgsYY }, "Increment", 7, null)], 1, "u6_0");
-};
-q_Issue3742_component_svSy0PlWTAw.s(Issue3742_component_svSy0PlWTAw);
-export const Issue3742 = /* @__PURE__ */ componentQrl(q_Issue3742_component_svSy0PlWTAw);
+	const div_button_q_e_click_eHWmo2tZFB8 = (_, _1, counter) => counter.value++;
+	q_div_button_q_e_click_eHWmo2tZFB8.s(div_button_q_e_click_eHWmo2tZFB8);
+	return /* @__PURE__ */ _jsxSorted("div", { title: _fnSignal(_hf0, [
+		counter,
+		description,
+		other
+	], _hf0_str) }, null, ["Issue3742", /* @__PURE__ */ _jsxSorted("button", null, { "q-e:click": () => counter.value++ }, "Increment", 3, null)], 3, "u6_0");
+});
 
-============================= test.tsx_Issue3742_component_div_button_q_e_click_95Hlm8WgsYY.js (ENTRY POINT)==
-
-============================= test.tsx_Issue3742_component_svSy0PlWTAw.js (ENTRY POINT)==
+============================= test.tsx_div_button_q_e_click_eHWmo2tZFB8.js (ENTRY POINT)==
 
 == DIAGNOSTICS ==
 

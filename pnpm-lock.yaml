@@ -48,7 +48,6 @@ importers:
       yuku-parser:
         specifier: ^0.5.0
         version: 0.5.0
-
 packages:
 
   '@emnapi/core@1.9.2':

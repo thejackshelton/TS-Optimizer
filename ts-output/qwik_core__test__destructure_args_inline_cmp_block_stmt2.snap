@@ -20,7 +20,7 @@ import { _jsxSorted } from "@qwik.dev/core";
 const _hf0 = (p0) => p0.selectedOutputDetail === "options";
 const _hf0_str = "p0.selectedOutputDetail===\"options\"";
 //
-const q_test_div_q_e_click_pFqTss400MA = /* @__PURE__ */ qrl(() => import("./test.tsx_test_div_q_e_click_pFqTss400MA"), "test_div_q_e_click_pFqTss400MA");
+const q_div_q_e_click_belH9LIyH4c = /* @__PURE__ */ qrl(() => import("./test.tsx_div_q_e_click_belH9LIyH4c"), "div_q_e_click_belH9LIyH4c");
 //
 export default (props) => {
 	const { data } = props;
@@ -28,11 +28,15 @@ export default (props) => {
 		data.selectedOutputDetail = "options";
 	} }, null, 3, "u6_0");
 };
+export { data as _auto_data };
 
-============================= test.tsx_test_div_q_e_click_pFqTss400MA.js (ENTRY POINT)==
-export const test_div_q_e_click_pFqTss400MA = (_, _1, data) => {
-                data.selectedOutputDetail = 'options';
-              };
+============================= test.tsx_div_q_e_click_belH9LIyH4c.js (ENTRY POINT)==
+import { _auto_data as data } from "./test";
+//
+export const div_q_e_click_belH9LIyH4c = (_, _1, data) => {
+	data.selectedOutputDetail = "options";
+};
+
 == DIAGNOSTICS ==
 
 []

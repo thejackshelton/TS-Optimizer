@@ -31,8 +31,6 @@ export enum Thing {
 
 export const App = /*#__PURE__*/ componentQrl(q_App_component_ckEPmXZlub0);
 ============================= test.tsx_App_component_ckEPmXZlub0.tsx (ENTRY POINT)==
-import { Thing } from "./test";
-//
 export const App_component_ckEPmXZlub0 = () => {
 	console.log(Thing.A);
 	return (
