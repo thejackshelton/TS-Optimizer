@@ -40,6 +40,7 @@ export const PANELS = [
 import { useStore } from "@qwik.dev/core";
 import { _fnSignal } from "@qwik.dev/core";
 import { _jsxSorted } from "@qwik.dev/core";
+import { PANELS } from "./test";
 //
 const _hf0 = (p0) => p0.active ? "yes" : "no";
 const _hf0_str = "p0.active?\"yes\":\"no\"";

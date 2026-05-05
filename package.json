@@ -26,6 +26,6 @@
     "oxc-walker": "^0.7.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.4",
-    "yuku-parser": "^0.4.6"
+    "yuku-parser": "^0.5.0"
   }
 }

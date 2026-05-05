@@ -22,29 +22,35 @@ export const FieldInput = component$(
 );
 ============================= test.tsx ==
 import { qrl } from "@qwik.dev/core";
+import { componentQrl } from "@qwik.dev/core";
+//
+const q_FieldInput_component_V4XAtJSTRKg = /* @__PURE__ */ qrl(() => import("./test.tsx_FieldInput_component_V4XAtJSTRKg"), "FieldInput_component_V4XAtJSTRKg");
+//
+export const FieldInput = /* @__PURE__ */ componentQrl(q_FieldInput_component_V4XAtJSTRKg);
+
+============================= test.tsx_FieldInput_component_input_q_e_click_fZgZHYZXt60.js (ENTRY POINT)==
+export const FieldInput_component_input_q_e_click_fZgZHYZXt60 = () => {
+			console.log('clicked');
+		};
+============================= test.tsx_FieldInput_component_V4XAtJSTRKg.js (ENTRY POINT)==
+import { destructureBindings } from "./destructure-bindings";
+import { qrl } from "@qwik.dev/core";
 import { _jsxSplit } from "@qwik.dev/core";
 import { _getVarProps } from "@qwik.dev/core";
 import { _getConstProps } from "@qwik.dev/core";
-import { destructureBindings } from "./destructure-bindings";
 //
-const q_input_q_e_click_04hAoavminw = /* @__PURE__ */ qrl(() => import("./test.tsx_input_q_e_click_04hAoavminw"), "input_q_e_click_04hAoavminw");
+const q_FieldInput_component_input_q_e_click_fZgZHYZXt60 = /*#__PURE__*/ qrl(() => import("./test.tsx_FieldInput_component_input_q_e_click_fZgZHYZXt60"), "FieldInput_component_input_q_e_click_fZgZHYZXt60");
 //
-export const FieldInput = component$((props) => {
+export const FieldInput_component_V4XAtJSTRKg = (props) => {
 	const initialValues = { value: undefined };
 	const rest = destructureBindings(props, initialValues);
-	return /* @__PURE__ */ _jsxSplit("input", {
+	return /*#__PURE__*/ _jsxSplit("input", {
 		..._getVarProps(rest),
 		..._getConstProps(rest),
 		"bind:value": finalValue
-	}, { "q-e:click": () => {
-		console.log("clicked");
-	} }, null, 0, "u6_0");
-});
+	}, { "q-e:click": q_FieldInput_component_input_q_e_click_fZgZHYZXt60 }, null, 0, "u6_0");
+};
 
-============================= test.tsx_input_q_e_click_04hAoavminw.js (ENTRY POINT)==
-export const input_q_e_click_04hAoavminw = () => {
-			console.log('clicked');
-		};
 == DIAGNOSTICS ==
 
 []
