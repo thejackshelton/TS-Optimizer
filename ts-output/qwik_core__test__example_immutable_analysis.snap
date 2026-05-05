@@ -92,12 +92,6 @@ export const App_component_ckEPmXZlub0 = (props) => {
 			1
 		)
 		};
-============================= test.tsx_Fragment_Div_onEvent_lvYQZ8b7FtM.js (ENTRY POINT)==
-export const Fragment_Div_onEvent_lvYQZ8b7FtM = () => console.log('stuff');
-============================= test.tsx_Fragment_Div_transparent_CgtVz30uKLg.js (ENTRY POINT)==
-export const Fragment_Div_transparent_CgtVz30uKLg = () => {console.log('stuff')};
-============================= test.tsx_Fragment_Div_immutable4_ISGLxo6Xf7w.js (ENTRY POINT)==
-export const Fragment_Div_immutable4_ISGLxo6Xf7w = (ev) => console.log(state.count);
 == DIAGNOSTICS ==
 
 []
