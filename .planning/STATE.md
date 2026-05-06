@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-05-06T16:00:32.133Z"
+last_updated: "2026-05-06T19:00:00.000Z"
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 6
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 2.4
 ---
 
 # State: Qwik Optimizer (TypeScript)
 
-**Last Updated:** 2026-05-05
-**Status:** Ready to execute
+**Last Updated:** 2026-05-06
+**Status:** Executing Phase 1 (Plan 01-01 complete; Wave 1 next)
 
 ## Project Reference
 
@@ -26,10 +26,10 @@ progress:
 ## Current Position
 
 **Milestone:** Convergence to 212/212
-**Phase:** Phase 1 — Path normalization parity (context gathered)
-**Plan:** None (no plans created yet — next step is `/gsd-plan-phase 1`)
-**Resume file:** `.planning/phases/01-path-normalization-parity/01-CONTEXT.md`
-**Status:** planning
+**Phase:** Phase 1 — Path normalization parity (executing)
+**Plan:** 01-02 (Wave 1, next) — SegmentAnalysis.path public-API field
+**Resume file:** `.planning/phases/01-path-normalization-parity/01-02-PLAN.md`
+**Status:** executing
 **Mode:** interactive (manual diff review before each commit)
 
 **Progress:**
@@ -50,7 +50,7 @@ Phase 7: [ ] not started
 
 - Baseline (2026-05-05): 178/212 passing, 34 failing.
 - Target: 212/212 passing.
-- Current: 178/212 (no work landed yet).
+- Current: 178/212 (Plan 01-01 landed at `48e560d` — foundation only; D-06 baseline preserved via two cross-plan shims that Plan 01-03 will remove).
 
 ## Performance Metrics
 
@@ -97,14 +97,16 @@ None.
 
 **What was last accomplished:**
 
-- 2026-05-05: `/gsd-new-project` initialization complete. PROJECT.md, REQUIREMENTS.md, codebase maps (ARCHITECTURE.md, CONCERNS.md), research triage (CONVERGENCE-TRIAGE.md, 523 lines), config.json all in place. Roadmap created — 7 phases, one per CONV-* cluster, with goal-backward success criteria and 100% requirement coverage.
-- 2026-05-05: `/gsd-discuss-phase 1` complete. Phase 1 CONTEXT.md captures D-01..D-07 (mirror Rust `PathData`, opportunistic Cluster 7 closure, researcher-verified extension rule, parsePath unit tests, locked operating constraints). DISCUSSION-LOG.md preserves the alternatives.
+- 2026-05-05: `/gsd-new-project` initialization complete. PROJECT.md, REQUIREMENTS.md, codebase maps, research triage, config.json all in place. Roadmap: 7 phases, one per CONV-* cluster.
+- 2026-05-05: `/gsd-discuss-phase 1` — CONTEXT D-01..D-07 captured; DISCUSSION-LOG preserved alternatives.
+- 2026-05-05: `/gsd-plan-phase 1` — decomposed into 6 plans across 5 waves.
+- 2026-05-06: Plan 01-01 landed at `48e560d`. parsePath + PathData + matrix computeOutputExtension. D-06 (178/212) preserved. Two cross-plan shims (computeRelPath; computeOutputExtension typeof branch) carried forward — Plan 01-03 must delete both.
 
 **What's next:**
 
-- `/gsd-plan-phase 1` — decompose Phase 1 (Path normalization parity, CONV-01) into an executable plan.
-- After plan approval, execute, run `pnpm vitest convergence`, manually review diffs, commit.
-- Repeat for Phases 2 → 7 in order.
+- Plan 01-02 (Wave 1) — add `path: string` to `SegmentAnalysis` in `src/optimizer/types.ts`. Parallel-eligible with 01-03.
+- Plan 01-03 (Wave 1) — thread `pathData` through `transformModule` + `segment-generation`; **MUST delete the two shims and the migrated test** introduced by Plan 01-01.
+- Plans 01-04 → 01-06 — extract.ts migration, segment metadata emission, phase verification gate.
 
 **Useful commands:**
 

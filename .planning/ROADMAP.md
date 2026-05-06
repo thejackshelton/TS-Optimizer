@@ -52,7 +52,7 @@ respected by the order below.
 **Plans:** 6 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Foundation: `parsePath` + `PathData` interface + Wave 0 unit tests (D-04 boundary cases + D-07 hash byte-parity + D-03 matrix)
+- [x] 01-01-PLAN.md — Foundation: `parsePath` + `PathData` interface + Wave 0 unit tests (D-04 boundary cases + D-07 hash byte-parity + D-03 matrix) — `48e560d`
 - [ ] 01-02-PLAN.md — Public type addition: `SegmentAnalysis.path: string` + smoke convergence (Open Q3 disposition)
 - [ ] 01-03-PLAN.md — Compute & thread `PathData` through `transformModule`; replace `computeRelPath`/`getExtension` callers; delete downgrade loop; did_transform-gated parent path; SegmentGenerationContext.pathData
 - [ ] 01-04-PLAN.md — Migrate `extract.ts` to consume PathData + qrlOutputExt; delete `determineExtension`; uniform extension assignment across all push sites

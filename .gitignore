@@ -5,5 +5,3 @@ rust-impl/target/
 .pnpm-store/
 isolate-*.log
 .logs/subtask2.log
-.planning/
-
