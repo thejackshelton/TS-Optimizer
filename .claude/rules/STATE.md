@@ -2,7 +2,7 @@
 
 Snapshot of where the active workstream stands. Read at the start of a session to rehydrate context fast. **Update aggressively** as meaningful progress lands — see "Maintenance" at the bottom.
 
-Last updated: 2026-05-07 (refactor track v2 kickoff — OSS-344 starting)
+Last updated: 2026-05-07 (OSS-344 implementation done; PR open)
 
 ## Goal
 
@@ -45,14 +45,14 @@ Helpful local commands:
 |---|---|---|---|---|
 | `main` | latest post-OSS-340 merge | ✅ | baseline | All v1 refactor track work + CI infrastructure landed |
 | `ast-parity/F2` | `a644c16` (stale) | ❌ local-only | parked | F2 cluster paused; will need rebase onto current `main` (which now contains F1 const-declarator fix, F4 MIG-05a refactor, body-transforms cleanup, predicates module, and CI gate) before resuming |
-| `refactor/predicates-followup` | (just created) | ❌ local-only | baseline | **active workstream** — OSS-344 |
+| `refactor/predicates-followup` | `0586182` | ✅ | baseline | **active workstream** — OSS-344 PR open |
 
 ## Refactor track v2 ([OSS-343](https://linear.app/kunai/issue/OSS-343))
 
 | Ticket | Title | Branch | Status |
 |---|---|---|---|
 | [OSS-343](https://linear.app/kunai/issue/OSS-343) | Refactor track v2 — segment generation cleanup *(parent)* | (no branch) | Backlog (auto-rolls up) |
-| [OSS-344](https://linear.app/kunai/issue/OSS-344) | Consolidate `isStrippedSegment` + `isAnyComponentCtx` into `rewrite/predicates.ts` | `refactor/predicates-followup` | **In Progress** (assigned scott.t.weaver) |
+| [OSS-344](https://linear.app/kunai/issue/OSS-344) | Consolidate `isStrippedSegment` + `isAnyComponentCtx` into `rewrite/predicates.ts` | `refactor/predicates-followup` | **In Review** (PR open; assigned scott.t.weaver) |
 | [OSS-345](https://linear.app/kunai/issue/OSS-345) | Pre-compute field maps in `segment-generation.ts` | `refactor/precompute-field-maps` (not yet created) | Backlog |
 | [OSS-346](https://linear.app/kunai/issue/OSS-346) | Refactor `generateSegmentCode` 8-phase sequencer | `refactor/generate-segment-code-phases` (not yet created) | Backlog |
 | [OSS-347](https://linear.app/kunai/issue/OSS-347) | Discovery + plan for `generateAllSegmentModules` refactor *(planning ticket — produces SPEC + sub-tickets, not direct code)* | `refactor/generate-all-segment-modules-spec` (not yet created) | Backlog |
@@ -94,6 +94,7 @@ Full feature analysis: `CONVERGENCE_FAILURES.md`.
 
 Most recent first. Trim entries older than ~10 to keep this file from bloating.
 
+- **2026-05-07** — [OSS-344](https://linear.app/kunai/issue/OSS-344) implementation done; PR opened. Adds `isComponentCtx` (two-arm) + `isAnyComponentCtx` (three-arm) to `rewrite/predicates.ts`; moves `isStrippedSegment` here from `strip-ctx.ts` (now codegen-only). 5 imports repointed; 2 inline OR-chains replaced. Convergence 33/212 + full-suite 56/696 unchanged from main.
 - **2026-05-07** — Refactor track v2 kicked off. Parent [OSS-343](https://linear.app/kunai/issue/OSS-343) + 4 sub-issues created (OSS-344/345/346/347). OSS-344 is the active branch, picking up the predicates-consolidation thread from OSS-340.
 - **2026-05-07** — [OSS-340](https://linear.app/kunai/issue/OSS-340) merged via PR #11. Closes refactor track v1. New module `src/optimizer/rewrite/predicates.ts` consolidates 3 predicates × 9 inline call sites.
 - **2026-05-07** — [OSS-339](https://linear.app/kunai/issue/OSS-339) merged via PR #10. `body-transforms.ts` cleanup: named `OUTERMOST_BODY_THRESHOLD`, `formatWCall`, `spliceWithinBody`. First PR to validate the CI gate end-to-end.
@@ -107,9 +108,11 @@ Most recent first. Trim entries older than ~10 to keep this file from bloating.
 
 ## What to do next
 
-**Active: [OSS-344](https://linear.app/kunai/issue/OSS-344) / `refactor/predicates-followup`** — consolidate `isStrippedSegment` (currently in `strip-ctx.ts`) plus add `isComponentCtx` (two-arm) and `isAnyComponentCtx` (three-arm) to `rewrite/predicates.ts`. Replace inline checks at all call sites. Smallest blast radius in the v2 track; cleanest entry point.
+**Awaiting review:** [OSS-344](https://linear.app/kunai/issue/OSS-344) PR. Once merged, refresh STATE.md to point at OSS-345.
 
-After OSS-344 lands, queue is OSS-345 → OSS-346 → OSS-347. OSS-347 is discovery-only — its output is a SPEC plus follow-up implementation tickets, not direct code.
+**Next up: [OSS-345](https://linear.app/kunai/issue/OSS-345) / `refactor/precompute-field-maps`** — pre-compute field maps in `segment-generation.ts` so per-segment generation is no longer O(N·M) on field/segment counts. Branch not yet created.
+
+After OSS-345, queue is OSS-346 → OSS-347. OSS-347 is discovery-only — its output is a SPEC plus follow-up implementation tickets, not direct code.
 
 When the v2 track wraps, parity work resumes by rebasing `ast-parity/F2` onto current `main`. The F2 cluster bugs (path normalisation, hash, key prefix, extra empty segment file) will then have access to the foundation built by tracks v1+v2: predicates module, named thresholds, helpers, immutable field maps, named phase functions.
 
