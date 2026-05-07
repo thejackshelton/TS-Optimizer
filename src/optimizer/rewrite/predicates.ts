@@ -34,7 +34,7 @@ export function matchesRegCtxName(ext: ExtractionResult, regCtxName?: string[]):
  * QRL-as-attribute output shape, so most rewriting code paths treat
  * them identically.
  */
-export function isEventHandlerOrJsxProp(ctxKind: string | undefined): boolean {
+export function isEventHandlerOrJsxProp(ctxKind: ExtractionResult['ctxKind'] | undefined): boolean {
   return ctxKind === 'eventHandler' || ctxKind === 'jSXProp';
 }
 

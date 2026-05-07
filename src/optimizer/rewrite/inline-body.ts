@@ -112,9 +112,9 @@ function walkAstForQp(
 
 /**
  * Transform an inline segment body through nine sequential phases:
- * nested-call rewriting, const-literal inlining (own + parent), capture
- * unpacking, _rawProps, props-field captures, body const propagation,
- * JSX, and dead-const removal.
+ * nested-call rewriting, own const-literal inlining, parent const-literal
+ * inlining, capture unpacking, _rawProps, props-field captures, body const
+ * propagation, JSX, and dead-const removal.
  *
  * `additionalImports` is collected incrementally as transforms run —
  * each phase decides what symbols it needs and adds them to the map.
