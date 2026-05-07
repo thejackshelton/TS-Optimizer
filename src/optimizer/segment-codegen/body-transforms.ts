@@ -145,7 +145,7 @@ function formatWCall(qrlVar: string, captures: string[], innerIndent: string, cl
 }
 
 /**
- * Replace `bodyText[start..end]` with `replacement`. Returns the body
+ * Replace `bodyText[start, end)` with `replacement`. Returns the body
  * unchanged when the range is out of bounds — defensive guard against
  * stale positions from upstream rewriting.
  */
