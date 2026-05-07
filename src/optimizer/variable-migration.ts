@@ -474,10 +474,7 @@ function decideMigration(
     return { action: 'reexport', varName: decl.name, reason: MIG_REASON.REEXPORT_SHARED_DESTRUCTURE };
   }
   if (usingSegments.length === 1) {
-    // SMOKE TEST INTENTIONAL BREAK: returning 'keep' instead of 'move' to
-    // verify the CI regression gate catches a flipped test. Will be reverted
-    // in the next commit.
-    return { action: 'keep', varName: decl.name, reason: MIG_REASON.MOVE_SINGLE_SEGMENT };
+    return { action: 'move', varName: decl.name, targetSegment: usingSegments[0], reason: MIG_REASON.MOVE_SINGLE_SEGMENT };
   }
   return { action: 'keep', varName: decl.name, reason: MIG_REASON.KEEP_UNUSED };
 }
