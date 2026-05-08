@@ -2,7 +2,7 @@
 
 Snapshot of where the active workstream stands. Read at the start of a session to rehydrate context fast. **Update aggressively** as meaningful progress lands — see "Maintenance" at the bottom.
 
-Last updated: 2026-05-08 (OSS-346 starting on `refactor/generate-segment-code-phases`)
+Last updated: 2026-05-08 (OSS-346 implementation done; PR #14 open)
 
 ## Goal
 
@@ -45,7 +45,7 @@ Helpful local commands:
 |---|---|---|---|---|
 | `main` | `9fc30c3` (post OSS-345 merge) | ✅ | baseline | All v1 + OSS-344/345 of v2 landed |
 | `ast-parity/F2` | `a644c16` (stale) | ❌ local-only | parked | F2 cluster paused; will need rebase onto current `main` (which now contains F1 const-declarator fix, F4 MIG-05a refactor, body-transforms cleanup, predicates module, predicates v2, immutable field maps, and CI gate) before resuming |
-| `refactor/generate-segment-code-phases` | (just created) | ❌ local-only | baseline | **active workstream** — OSS-346 |
+| `refactor/generate-segment-code-phases` | `7243375` | ✅ | baseline | **active workstream** — OSS-346 PR #14 open |
 
 ## Refactor track v2 ([OSS-343](https://linear.app/kunai/issue/OSS-343))
 
@@ -54,7 +54,7 @@ Helpful local commands:
 | [OSS-343](https://linear.app/kunai/issue/OSS-343) | Refactor track v2 — segment generation cleanup *(parent)* | (no branch) | Backlog (auto-rolls up) |
 | [OSS-344](https://linear.app/kunai/issue/OSS-344) | Consolidate `isStrippedSegment` + `isAnyComponentCtx` into `rewrite/predicates.ts` | `refactor/predicates-followup` (merged) | **Done** (PR #12) |
 | [OSS-345](https://linear.app/kunai/issue/OSS-345) | Pre-compute field maps in `segment-generation.ts` | `refactor/precompute-field-maps` (merged) | **Done** (PR #13) |
-| [OSS-346](https://linear.app/kunai/issue/OSS-346) | Refactor `generateSegmentCode` 8-phase sequencer | `refactor/generate-segment-code-phases` | **In Progress** (assigned scott.t.weaver) |
+| [OSS-346](https://linear.app/kunai/issue/OSS-346) | Refactor `generateSegmentCode` 8-phase sequencer | `refactor/generate-segment-code-phases` | **In Review** (PR #14 open; assigned scott.t.weaver) |
 | [OSS-347](https://linear.app/kunai/issue/OSS-347) | Discovery + plan for `generateAllSegmentModules` refactor *(planning ticket — produces SPEC + sub-tickets, not direct code)* | `refactor/generate-all-segment-modules-spec` (not yet created) | Backlog |
 
 Each implementation sub-issue has explicit acceptance criteria including convergence + full-suite no-regression bounds. Per-PR commit messages follow the four-question format from `METHODOLOGIES.md` "Refactoring" section.
@@ -94,7 +94,7 @@ Full feature analysis: `CONVERGENCE_FAILURES.md`.
 
 Most recent first. Trim entries older than ~10 to keep this file from bloating.
 
-- **2026-05-08** — [OSS-346](https://linear.app/kunai/issue/OSS-346) started on `refactor/generate-segment-code-phases`. Goal: extract per-phase helpers from the 87-line `generateSegmentCode` orchestrator (`segment-codegen.ts:444-530`) and consolidate redundant `captureInfo?` checks at lines 480/484/492.
+- **2026-05-08** — [OSS-346](https://linear.app/kunai/issue/OSS-346) implementation done; PR #14 open. Extracted `collectInitialImports` (Phases 1–3) and `applyBodyTransforms` (Phase 4) helpers from the 87-line `generateSegmentCode` orchestrator in `segment-codegen.ts`; orchestrator drops to 35 lines. Three redundant `captureInfo?` probes consolidate inside the body helper; non-null assertion gone. Phases 5–9 stay inline. Convergence 33/212 + full-suite 56/696 unchanged.
 - **2026-05-08** — [OSS-345](https://linear.app/kunai/issue/OSS-345) merged via PR #13. Replaced closure-mutated `fieldMapCache` in `segment-generation.ts` with an immutable `ReadonlyMap` built once before the per-extraction loop. Both call sites collapsed to single `Map.get`. Convergence 33/212 + full-suite 56/696 unchanged.
 - **2026-05-07** — [OSS-344](https://linear.app/kunai/issue/OSS-344) merged via PR #12. `rewrite/predicates.ts` gains `isComponentCtx` (two-arm) + `isAnyComponentCtx` (three-arm); `isStrippedSegment` moved here from `strip-ctx.ts` (now codegen-only). 5 imports repointed; 2 inline OR-chains replaced. Convergence 33/212 + full-suite 56/696 unchanged.
 - **2026-05-07** — Refactor track v2 kicked off. Parent [OSS-343](https://linear.app/kunai/issue/OSS-343) + 4 sub-issues created (OSS-344/345/346/347). OSS-344 is the active branch, picking up the predicates-consolidation thread from OSS-340.
@@ -108,9 +108,9 @@ Most recent first. Trim entries older than ~10 to keep this file from bloating.
 
 ## What to do next
 
-**Active: [OSS-346](https://linear.app/kunai/issue/OSS-346) / `refactor/generate-segment-code-phases`** — `generateSegmentCode` (`src/optimizer/segment-codegen.ts:444-530`) sequences 9 phases of segment code generation in 87 lines, with `captureInfo` checked redundantly across three sites and `bodyText`/`parts[]` mutated in place. Plan: extract Phase 1+2+3 (initial imports) and Phase 4 (body transforms) into named helpers `collectInitialImports` and `applyBodyTransforms`; consolidate the redundant `captureInfo?` checks via local destructuring; keep Phases 5–9 as inline named blocks since they're already short. The OSS-345 pre-compute removed closure state that would have made cross-helper boundaries painful.
+**Awaiting review:** [OSS-346](https://linear.app/kunai/issue/OSS-346) PR #14. Once merged, refresh STATE.md to point at OSS-347.
 
-After OSS-346, OSS-347 is discovery-only — its output is a SPEC plus follow-up implementation tickets, not direct code.
+**Next up: [OSS-347](https://linear.app/kunai/issue/OSS-347) / `refactor/generate-all-segment-modules-spec`** — discovery-only ticket. Output is a SPEC for refactoring `generateAllSegmentModules` plus follow-up implementation tickets, not direct code. Branch not yet created.
 
 When the v2 track wraps, parity work resumes by rebasing `ast-parity/F2` onto current `main`. The F2 cluster bugs (path normalisation, hash, key prefix, extra empty segment file) will then have access to the foundation built by tracks v1+v2: predicates module, named thresholds, helpers, immutable field maps, named phase functions.
 
