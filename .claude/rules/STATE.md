@@ -2,7 +2,7 @@
 
 Snapshot of where the active workstream stands. Read at the start of a session to rehydrate context fast. **Update aggressively** as meaningful progress lands — see "Maintenance" at the bottom.
 
-Last updated: 2026-05-08 (OSS-345 starting on `refactor/precompute-field-maps`)
+Last updated: 2026-05-08 (OSS-345 implementation done; PR #13 open)
 
 ## Goal
 
@@ -45,7 +45,7 @@ Helpful local commands:
 |---|---|---|---|---|
 | `main` | `a6f8fd1` (post OSS-344 merge) | ✅ | baseline | All v1 + OSS-344 of v2 landed |
 | `ast-parity/F2` | `a644c16` (stale) | ❌ local-only | parked | F2 cluster paused; will need rebase onto current `main` (which now contains F1 const-declarator fix, F4 MIG-05a refactor, body-transforms cleanup, predicates module, predicates v2, and CI gate) before resuming |
-| `refactor/precompute-field-maps` | (just created) | ❌ local-only | baseline | **active workstream** — OSS-345 |
+| `refactor/precompute-field-maps` | `6065a0f` | ✅ | baseline | **active workstream** — OSS-345 PR #13 open |
 
 ## Refactor track v2 ([OSS-343](https://linear.app/kunai/issue/OSS-343))
 
@@ -53,7 +53,7 @@ Helpful local commands:
 |---|---|---|---|
 | [OSS-343](https://linear.app/kunai/issue/OSS-343) | Refactor track v2 — segment generation cleanup *(parent)* | (no branch) | Backlog (auto-rolls up) |
 | [OSS-344](https://linear.app/kunai/issue/OSS-344) | Consolidate `isStrippedSegment` + `isAnyComponentCtx` into `rewrite/predicates.ts` | `refactor/predicates-followup` (merged) | **Done** (PR #12) |
-| [OSS-345](https://linear.app/kunai/issue/OSS-345) | Pre-compute field maps in `segment-generation.ts` | `refactor/precompute-field-maps` | **In Progress** (assigned scott.t.weaver) |
+| [OSS-345](https://linear.app/kunai/issue/OSS-345) | Pre-compute field maps in `segment-generation.ts` | `refactor/precompute-field-maps` | **In Review** (PR #13 open; assigned scott.t.weaver) |
 | [OSS-346](https://linear.app/kunai/issue/OSS-346) | Refactor `generateSegmentCode` 8-phase sequencer | `refactor/generate-segment-code-phases` (not yet created) | Backlog |
 | [OSS-347](https://linear.app/kunai/issue/OSS-347) | Discovery + plan for `generateAllSegmentModules` refactor *(planning ticket — produces SPEC + sub-tickets, not direct code)* | `refactor/generate-all-segment-modules-spec` (not yet created) | Backlog |
 
@@ -94,7 +94,7 @@ Full feature analysis: `CONVERGENCE_FAILURES.md`.
 
 Most recent first. Trim entries older than ~10 to keep this file from bloating.
 
-- **2026-05-08** — [OSS-345](https://linear.app/kunai/issue/OSS-345) started on `refactor/precompute-field-maps`. Goal: replace closure-mutated `fieldMapCache` in `segment-generation.ts:300-311` with an immutable `ReadonlyMap` built once before the per-extraction loop. Two call sites at lines 336 and 464.
+- **2026-05-08** — [OSS-345](https://linear.app/kunai/issue/OSS-345) implementation done; PR #13 open. Replaced closure-mutated `fieldMapCache` in `segment-generation.ts:300-311` with an immutable `ReadonlyMap` built once before the per-extraction loop. Both call sites (lines 336, 464) drop their `extBySymbol → if (parentExt) → cachedFieldMap` round-trip. Convergence 33/212 + full-suite 56/696 unchanged.
 - **2026-05-07** — [OSS-344](https://linear.app/kunai/issue/OSS-344) merged via PR #12. `rewrite/predicates.ts` gains `isComponentCtx` (two-arm) + `isAnyComponentCtx` (three-arm); `isStrippedSegment` moved here from `strip-ctx.ts` (now codegen-only). 5 imports repointed; 2 inline OR-chains replaced. Convergence 33/212 + full-suite 56/696 unchanged.
 - **2026-05-07** — Refactor track v2 kicked off. Parent [OSS-343](https://linear.app/kunai/issue/OSS-343) + 4 sub-issues created (OSS-344/345/346/347). OSS-344 is the active branch, picking up the predicates-consolidation thread from OSS-340.
 - **2026-05-07** — [OSS-340](https://linear.app/kunai/issue/OSS-340) merged via PR #11. Closes refactor track v1. New module `src/optimizer/rewrite/predicates.ts` consolidates 3 predicates × 9 inline call sites.
@@ -107,9 +107,11 @@ Most recent first. Trim entries older than ~10 to keep this file from bloating.
 
 ## What to do next
 
-**Active: [OSS-345](https://linear.app/kunai/issue/OSS-345) / `refactor/precompute-field-maps`** — `segment-generation.ts:300-311` defines a closure `cachedFieldMap` that lazily mutates a per-call `fieldMapCache` keyed by parent symbolName. Replace it with a `ReadonlyMap<string, ReadonlyMap<string, string>>` built once before the per-extraction loop (line 313). Two call sites at lines 336 (inline-strategy `_rawProps` consolidation) and 464 (default-strategy `_rawProps` consolidation). `bodyText` is read-only across the loop, so pre-computation is behaviour-preserving.
+**Awaiting review:** [OSS-345](https://linear.app/kunai/issue/OSS-345) PR #13. Once merged, refresh STATE.md to point at OSS-346.
 
-After OSS-345, queue is OSS-346 → OSS-347. OSS-347 is discovery-only — its output is a SPEC plus follow-up implementation tickets, not direct code.
+**Next up: [OSS-346](https://linear.app/kunai/issue/OSS-346) / `refactor/generate-segment-code-phases`** — extract per-phase wrapper functions out of `generateSegmentCode`'s 8-phase sequencer in `segment-generation.ts`. Branch not yet created. The OSS-345 pre-compute is a precondition: closure state can't cleanly cross phase-function boundaries.
+
+After OSS-346, OSS-347 is discovery-only — its output is a SPEC plus follow-up implementation tickets, not direct code.
 
 When the v2 track wraps, parity work resumes by rebasing `ast-parity/F2` onto current `main`. The F2 cluster bugs (path normalisation, hash, key prefix, extra empty segment file) will then have access to the foundation built by tracks v1+v2: predicates module, named thresholds, helpers, immutable field maps, named phase functions.
 
