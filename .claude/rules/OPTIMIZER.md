@@ -1,0 +1,611 @@
+# Optimizer end-to-end walkthrough
+
+A spine for understanding what `transformModule` actually does to a Qwik source file. Use the example walkthrough as the entry point; drill into the deep-dive sections when you need to extend a phase.
+
+This is a **stable rule file** like `METHODOLOGIES.md` and `LINEAR.md` — not branch-scoped. Update it when the pipeline shape, phase numbering, or core extraction model changes; mid-investigation findings belong elsewhere.
+
+---
+
+## What the optimizer does, in one sentence
+
+It takes a Qwik source file, finds every `$()` closure, lifts each one into its own lazy-loadable module, and rewrites the original file so that the closures become `qrl(() => import(...))` references — the runtime then lazy-loads each chunk only when the user triggers it.
+
+---
+
+## Before / after — `example_1`
+
+**Input** (`match-these-snaps/qwik_core__test__example_1.snap` lines 9–19):
+
+```tsx
+import { $, component, onRender } from '@qwik.dev/core';
+
+export const renderHeader1 = $(() => {
+    return (
+        <div onClick={$((ctx) => console.log(ctx))}/>
+    );
+});
+const renderHeader2 = component($(() => {
+    console.log("mount");
+    return render;
+}));
+```
+
+**Output** — the optimizer emits **4 modules** for this one file:
+
+### 1. The rewritten parent `test.tsx` (snap lines 52–59)
+
+```ts
+import { qrl } from "@qwik.dev/core";
+import { component } from '@qwik.dev/core';
+//
+const q_renderHeader1_jMxQsjbyDss = /*#__PURE__*/ qrl(()=>import("./test.tsx_renderHeader1_jMxQsjbyDss"), "renderHeader1_jMxQsjbyDss");
+const q_renderHeader2_component_Ay6ibkfFYsw = /*#__PURE__*/ qrl(()=>import("./test.tsx_renderHeader2_component_Ay6ibkfFYsw"), "renderHeader2_component_Ay6ibkfFYsw");
+//
+export const renderHeader1 = q_renderHeader1_jMxQsjbyDss;
+component(q_renderHeader2_component_Ay6ibkfFYsw);
+```
+
+The two top-level `$()` calls became `q_<symbol>` references. The unused `$` and `onRender` imports got dropped. `qrl` got injected because we now use it.
+
+### 2. Segment for `renderHeader1`'s body — `test.tsx_renderHeader1_jMxQsjbyDss.tsx` (snap lines 65–71)
+
+```ts
+import { qrl } from "@qwik.dev/core";
+//
+const q_renderHeader1_div_onClick_USi8k1jUb40 = /*#__PURE__*/ qrl(()=>import("./test.tsx_renderHeader1_div_onClick_USi8k1jUb40"), "renderHeader1_div_onClick_USi8k1jUb40");
+//
+export const renderHeader1_jMxQsjbyDss = ()=>{
+    return <div onClick={q_renderHeader1_div_onClick_USi8k1jUb40}/>;
+};
+```
+
+The body of the original `$(() => { return <div ... /> })` becomes the named export. The nested `$((ctx) => ...)` got hoisted out and replaced with a `q_...` reference — and **this segment, not the parent, owns the `qrl()` declaration for the click handler**, because this is the only place that references it.
+
+### 3. Segment for the nested `onClick` handler — `test.tsx_renderHeader1_div_onClick_USi8k1jUb40.tsx` (snap line 23)
+
+```ts
+export const renderHeader1_div_onClick_USi8k1jUb40 = (ctx)=>console.log(ctx);
+```
+
+The leaf — no captures, no imports, just the closure body exported by name. The runtime only loads this chunk after the user clicks.
+
+### 4. Segment for `renderHeader2`'s body — `test.tsx_renderHeader2_component_Ay6ibkfFYsw.tsx` (snap lines 97–100)
+
+```ts
+export const renderHeader2_component_Ay6ibkfFYsw = ()=>{
+    console.log("mount");
+    return render;
+};
+```
+
+Note `render` is referenced but unresolved — the optimizer doesn't track that as a capture (it's not in any in-scope binding), so it's left as a free identifier. That's a separate-input runtime concern; the optimizer just preserves the reference.
+
+---
+
+The **chain of laziness** for this file:
+
+1. App boot pulls in `test.tsx` (parent only) — ~6 lines of QRL declarations and re-exports, no closure bodies.
+2. Some caller invokes `renderHeader1` → runtime resolves `q_renderHeader1_jMxQsjbyDss` → fetches segment #2.
+3. The user clicks the rendered `<div>` → runtime resolves `q_renderHeader1_div_onClick_USi8k1jUb40` → fetches segment #3.
+
+Each segment is ~1–3 lines of business logic. That granularity is the whole point.
+
+---
+
+## The pipeline
+
+Top-level entry is `transformModule` at `src/optimizer/transform/index.ts:90`. The header comment names six conceptual phases (`extract → analyze → migrate → rewrite parent → generate segments`), but in code there are 7 numbered phase markers.
+
+| Phase | Marker | What it does | Key code |
+|---|---|---|---|
+| 0 | `transform/index.ts:106` | Repair SWC-recoverable parse errors | `repairInput` |
+| 1 | `transform/index.ts:112` | Walk the AST, find every `$(...)` call, record loc + body text + initial metadata | `extractSegments` in `extract.ts` |
+| 2 | `transform/index.ts:135` | Re-parse each closure body, run scope analysis to determine which outer-scope vars each segment captures | `collectScopeIdentifiers`, `analyzeCaptures`, `computeSegmentUsage` |
+| 3 | `transform/index.ts:330` | For each module-level binding referenced inside a segment, decide: stay in parent (`keep`), move into segment (`move`), or re-export (`reexport`) | `decideMigration` in `variable-migration.ts` |
+| 4 | `transform/index.ts:432` | Rewrite the parent module — replace each `$(closure)` with a generated `q_<symbol>` `qrl(...)` reference; apply migration decisions | `rewriteOriginalModule` |
+| 5 | `transform/index.ts:542` | Emit one module per non-stripped segment | `generateAllSegmentModules` in `transform/segment-generation.ts` |
+| 6 | `transform/index.ts:610` | Apply diagnostic suppression directives | (lightweight cleanup) |
+
+Phase 5's per-segment work flows through `generateSegmentCode` (`segment-codegen.ts:444` — refactored in OSS-346 into a 9-phase sequencer with extracted helpers `collectInitialImports` and `applyBodyTransforms`) followed by `postProcessSegmentCode` (`transform/post-process.ts:163`).
+
+---
+
+## Tracing `example_1` through the phases
+
+### Phase 1 — extraction (`src/optimizer/extract.ts`)
+
+Walks the AST looking for `$(...)` calls. For `example_1` it finds 3:
+
+| symbolName (initial) | bodyText (closure source) | parent | location |
+|---|---|---|---|
+| `renderHeader1_jMxQsjbyDss` | `() => { return <div onClick={...}/>; }` | `null` | line 11 of input |
+| `renderHeader1_div_onClick_USi8k1jUb40` | `(ctx) => console.log(ctx)` | `renderHeader1_jMxQsjbyDss` | line 13 |
+| `renderHeader2_component_Ay6ibkfFYsw` | `() => { console.log("mount"); return render; }` | `null` | line 16 |
+
+The hash suffix (`jMxQsjbyDss`) is content-addressed via SipHash-1-3 (`hashing/siphash.ts:21`), so it's stable across builds. The symbol naming convention encodes call-site context: `<exportName>_<jsxAttrName>_<hash>` for nested, `<exportName>_<hash>` for top-level. See `getExtractionName` in `extract.ts`.
+
+### Phase 2 — capture analysis (`transform/index.ts:135–328`)
+
+For each closure body, parses it again (`parseWithRawTransfer`), collects identifiers in scope, and walks the body looking for free variables that resolve to outer scope. None of the `example_1` closures actually capture anything — `ctx` is an inner param, `render` is referenced but unbound (not tracked), `console` is global. The metadata block at snap line 40 confirms: `"captures": false`.
+
+For a richer demo of this phase, see the **capture analysis** deep dive below.
+
+### Phase 3 — migration (`variable-migration.ts:decideMigration`)
+
+For each module-level declaration, check whether it's referenced from any segment. The decisions:
+
+- `renderHeader1` — declared and referenced at module level only → **keep** (parent keeps it).
+- `renderHeader2` — same → **keep**.
+- The `onRender` and `$` imports — never used in any segment body → **drop** (you can see them gone from the parent rewrite at snap line 53).
+
+For a richer demo, see the **migration policy** deep dive below.
+
+### Phase 4 — parent rewrite (`rewriteOriginalModule`)
+
+Now we rewrite `test.tsx`:
+
+1. **Replace each `$(closure)` with `q_<symbol>`** — the original `$(() => { return <div ... /> })` becomes just `q_renderHeader1_jMxQsjbyDss`. This produces snap line 58.
+2. **Inject `qrl()` declarations** for each top-level segment — produces snap lines 55–56. The nested onClick segment doesn't appear here because its `qrl()` lives in `renderHeader1`'s segment file (it's only referenced from there).
+3. **Inject `import { qrl } from "@qwik.dev/core"`** — produces snap line 52.
+4. **Strip unused imports** — `$` and `onRender` from the original import, leaving just `component`.
+5. **Apply migration decisions** — for `example_1`, all decisions are KEEP, so nothing to move/re-export.
+
+### Phase 5 — segment generation (`segment-generation.ts:generateAllSegmentModules` → `segment-codegen.ts:generateSegmentCode`)
+
+For each segment, `generateSegmentCode` runs the 9-phase sequencer at `segment-codegen.ts:444`. Walking through the renderHeader1 segment:
+
+| Sub-phase | Effect on this segment |
+|---|---|
+| 1–3 (`collectInitialImports`) | Build initial `parts[]`. For renderHeader1: emits `import { qrl } from "@qwik.dev/core"`. No captures so no `_captures` import. |
+| 4 (`applyBodyTransforms`) | Take the body text `() => { return <div onClick={$((ctx) => ...)}/>; }` and rewrite the nested call site: `$((ctx) => ...)` becomes a reference to `q_renderHeader1_div_onClick_USi8k1jUb40` (and emits the matching `qrl()` declaration into `parts`). |
+| 5 (JSX) | If JSX transpilation is enabled, this is where `<div ... />` becomes `_jsxSorted("div", ...)`. For example_1's snap, JSX is preserved because the test runs without `transpileJsx`. |
+| 6 (core imports + sync$) | No `sync$` calls, no-op for example_1. |
+| 7 (normalize separators) | The `//` markers in snap output are sentinel separators from this pass. |
+| 8 (post-transform import re-collection) | Walks the final body for unreferenced symbols to drop and any newly-needed imports to add. |
+| 9 (DCE + emit) | `parts.push("export const renderHeader1_jMxQsjbyDss = () => { ... };")` and join. |
+
+For the leaf onClick segment, the same pipeline runs — but the body is just `(ctx) => console.log(ctx)`: no captures, no nested call sites, no imports. It comes out as the one-liner at snap line 23.
+
+### Phase 6 — post-process per segment (`transform/post-process.ts:postProcessSegmentCode`)
+
+Each emitted segment string then goes through `postProcessSegmentCode` (called from `transform/segment-generation.ts:761`):
+
+1. TypeScript strip via `oxc-transform`.
+2. Const replacement (`applySegmentConstReplacement`).
+3. Dead-code elimination (`applySegmentDCE`).
+4. Side-effect simplification.
+5. HMR `useHmr()` injection — only fires for `component$` segments via `isAnyComponentCtx` from `rewrite/predicates.ts`.
+6. **`removeUnusedImports`** (`module-cleanup.ts:281`) — strips imports that downstream transforms made unreferenced. This is what upholds the per-segment "only contains referenced imports" invariant in the face of upstream over-emission.
+
+---
+
+## Deep dive: capture analysis
+
+A "capture" is an identifier referenced inside a segment closure that resolves to a binding in the enclosing scope (parent function or module). Captures cross the lazy-load boundary, so the optimizer has to thread them explicitly via the `_captures` array.
+
+### What gets captured (and what doesn't)
+
+A name is a capture iff:
+- It's referenced inside the closure body.
+- It resolves to a binding declared in a parent scope (not a local, not an import).
+- It's not classified as a function or class declaration (`classifyDeclarationType` in capture-analysis.ts filters those out — they don't get serialised).
+- It's not a closure parameter that shadows the outer name.
+
+Globals (`console`, `Math`, `window`) are not captured because they aren't declared anywhere in source. Imports aren't captured because they're re-imported in the segment file directly.
+
+### Algorithm
+
+Two functions, both in `src/optimizer/capture-analysis.ts`:
+
+- **`collectScopeIdentifiers`** (`capture-analysis.ts:68`) — recursively walks a container (Program, BlockStatement, FunctionBody, Function). Returns a `Set<string>` of every name that's declared inside it: var/const/let bindings (including destructure patterns), function and class names, function parameters.
+- **`analyzeCaptures`** (`capture-analysis.ts:35`) — for one closure: calls `getUndeclaredIdentifiersInFunction()` (from oxc-walker) to find free variables, intersects with the parent scope's identifiers (so we keep only outer-scope refs, not globals), filters out imports, filters out function/class declaration names. Returns sorted, deduplicated `string[]`.
+
+The orchestration lives in `transform/index.ts:135–328`. For each extraction it:
+
+1. Re-parses the closure body inside a `(...)` wrapper to get a function AST.
+2. Picks the right parent scope: if the closure is nested inside another extraction, the parent is the outer extraction's body scope; otherwise it's the module scope.
+3. Calls `analyzeCaptures` to populate `extraction.captureNames`.
+4. Sets `extraction.captures = captureNames.length > 0`.
+
+Two distinct populating paths: regular `$()` extractions go through `analyzeCaptures` (`transform/index.ts:228–247`); `inlinedQrl(fn, [varA, varB])` extractions parse the explicit captures string directly (`transform/index.ts:206–225`) and skip the analysis.
+
+`computeSegmentUsage` (`variable-migration.ts:341`) is a separate pass that walks the program once and produces a map of `segmentName → Set<moduleName>` plus a `rootUsage` set. This drives migration (Phase 3); it overlaps conceptually with `captureNames` but operates at module-decl granularity, not closure-scope granularity.
+
+### Worked example — `example_multi_capture`
+
+Input (`match-these-snaps/qwik_core__test__example_multi_capture.snap` lines 11–21):
+
+```tsx
+export const Foo = component$(({foo}) => {
+    const arg0 = 20;
+    return $(() => {
+        const fn = ({aaa}) => aaa;
+        return (
+            <div>
+                {foo}{fn()}{arg0}
+            </div>
+        )
+    });
+})
+```
+
+The inner `$()` closure references three free identifiers: `foo` (parent's destructured prop), `fn` (local — not a capture), `arg0` (parent's const).
+
+Output segment (`Foo_component_1_DvU6FitWglY`, snap lines 122–130):
+
+```jsx
+import { _captures } from "@qwik.dev/core";
+//
+export const Foo_component_1_DvU6FitWglY = ()=>{
+    const _rawProps = _captures[0];
+    const fn = ({ aaa })=>aaa;
+    return <div>
+                {_rawProps.foo}{fn()}{20}
+            </div>;
+};
+```
+
+Three things happened:
+
+1. **`foo` got consolidated to `_rawProps`.** When a parent's destructured prop is captured, the optimizer rewrites both sides — the parent passes `_rawProps` (the un-destructured object), and the segment reaches into `_rawProps.foo` instead. This is the F3 territory in `CONVERGENCE_FAILURES.md`. Live in `segment-generation.ts:335–363`.
+2. **`arg0` got inlined as `20`.** Const-literal captures whose values are statically resolvable get folded at codegen time and dropped from `captureNames`. Logic in `segment-generation.ts:486–491` and `inlineConstCaptures` in `rewrite/index.ts`.
+3. **The captureNames metadata is just `["_rawProps"]`.** The unpacking line `const _rawProps = _captures[0]` is injected by `injectCapturesUnpacking` (`segment-codegen/body-transforms.ts:546–558`) at the start of the segment body.
+
+The parent segment passes the captures via `.w([_rawProps])` (snap line 40):
+
+```jsx
+export const Foo_component_HTDRsvUbLiE = (_rawProps)=>{
+    return q_Foo_component_1_DvU6FitWglY.w([
+        _rawProps
+    ]);
+};
+```
+
+That `.w(...)` call is the runtime hook that wires `_captures` through to the lazy-loaded segment.
+
+### Where capture data flows downstream
+
+- **Phase 3 (migration)** — `computeSegmentUsage` augments `segmentUsage` with `extraction.captureNames` (`transform/index.ts:340–373`) so migration decisions know which module-level decls each segment actually needs.
+- **Phase 4 (parent rewrite)** — emits the `.w([...])` capture array on each `q_<symbol>` reference (`rewrite/index.ts:374–401`).
+- **Phase 5 (segment codegen)** — `addCaptureAndMigrationImports` (`segment-codegen.ts:195`) emits the `_captures` import; `injectCapturesUnpacking` injects the unpacking line. The post-Phase-4 filtered `captureNames` is what gates these; in OSS-346's helper structure, `applyBodyTransforms` returns the filtered version explicitly.
+
+---
+
+## Deep dive: migration policy
+
+When a module-level binding (`const X = ...`, `function fn() {}`, etc.) is referenced from a segment, the optimizer has to decide where the binding lives in the output: in the parent (re-exported so segments can import it), moved into a segment, or just left untouched. That decision is `decideMigration` in `src/optimizer/variable-migration.ts:449`.
+
+### The three actions
+
+| Action | Effect on parent | Effect on segment |
+|---|---|---|
+| `keep` | Declaration left untouched | No interaction |
+| `move` | Declaration removed (its source range deleted) | Full declaration text inlined into the target segment, with import dependencies threaded |
+| `reexport` | Original declaration kept; an `export { name as _auto_name }` line added | Segment emits `import { _auto_name as name } from "./parent"` |
+
+The `_auto_` prefix is the convention for compiler-generated re-exports — distinguishes them from user `export` statements so the runtime can identify them.
+
+### Decision rules
+
+`decideMigration` evaluates rules in order at `variable-migration.ts:458–479`. First matching rule wins. After the main loop, the `promoteSharedDestructureGroups` post-pass (line 445, lines 497–526) refines specific shared-destructure cases.
+
+| Rule | Predicate | Action | Reason code |
+|---|---|---|---|
+| MIG-03 | `isExported && usedByAnySegment` | `reexport` | `REEXPORT_EXPORTED` |
+| (implicit) | `isExported && !usedByAnySegment` | `keep` | `KEEP_EXPORTED` |
+| MIG-02 (dual) | `usedByRoot && usedByAnySegment` | `reexport` | `REEXPORT_DUAL_USE` |
+| MIG-02 (multi) | `usingSegments.length > 1` | `reexport` | `REEXPORT_MULTI_SEGMENT` |
+| MIG-04 | `hasSideEffects && usedByAnySegment` | `reexport` | `REEXPORT_SIDE_EFFECTS` |
+| MIG-05 | `isPartOfSharedDestructuring && usedByAnySegment` | `reexport` | `REEXPORT_SHARED_DESTRUCTURE` |
+| MIG-01 | `usingSegments.length === 1` | `move` | `MOVE_SINGLE_SEGMENT` |
+| (implicit) | none match | `keep` | `KEEP_UNUSED` |
+
+The intuition: re-export is the safe default whenever **anyone else** still needs the binding (root code, multiple segments, side-effect chain, sibling destructure binding). Move only fires when exactly one segment is the consumer.
+
+### MIG-05a post-pass (added in OSS-338)
+
+MIG-05's blanket re-export rule for shared destructures is correct in cases like `should_keep_non_migrated_binding_from_shared_destructuring_declarator` (some bindings go to root, others to one segment — must re-export so root's binding survives). But when **all bindings** of a shared destructure go to **exactly one segment**, with no root use, no export, no side effects, the entire destructure should `move`.
+
+The `promoteSharedDestructureGroups` post-pass (`variable-migration.ts:497–526`) walks each shared-destructure group, validates the unanimous-target condition via `unifiedSingleSegmentTarget` (lines 532–551), and rewrites the per-binding decisions in place from `reexport` → `move` (with reason `MOVE_SHARED_DESTRUCTURE_UNIFIED`).
+
+This is still incomplete for nested-segment cases — the F4 convergence failure (`example_invalid_references`) is exactly this: parent passes, but segment-level migration fails because the post-pass doesn't yet handle nested-segment unification.
+
+### The `usingSegmentsOf` helper (added in OSS-338)
+
+`variable-migration.ts:415–421`:
+
+```ts
+function usingSegmentsOf(name, segmentUsage) {
+  const result = [];
+  for (const [segName, usedNames] of segmentUsage) {
+    if (usedNames.has(name)) result.push(segName);
+  }
+  return result;
+}
+```
+
+Used at lines 454 (basis for "is this a single-segment binding?"), 467 (multi-segment threshold), 476 (single-segment threshold), and 544 (post-pass sibling check). Centralising it made the rule predicates read as plain English instead of inline `for-loop` machinery, and gave the post-pass a shared primitive to validate against.
+
+### Worked example — `example_segment_variable_migration`
+
+Input (`match-these-snaps/qwik_core__test__example_segment_variable_migration.snap` lines 9–30):
+
+```tsx
+import { component$ } from '@qwik.dev/core';
+
+const helperFn = (msg) => {
+    console.log('Helper: ' + msg);
+    return msg.toUpperCase();
+};
+
+const SHARED_CONFIG = { value: 42 };
+
+export const publicHelper = () => console.log('public');
+
+export const App = component$(() => {
+    const result = helperFn('hello');
+    return <div>{result} {SHARED_CONFIG.value}</div>;
+});
+
+export const Other = component$(() => {
+    return <div>{SHARED_CONFIG.value}</div>;
+});
+```
+
+Three module-level decls, three different decisions:
+
+| Binding | Used by | Decision | Reason |
+|---|---|---|---|
+| `helperFn` | only App | **MOVE** to App segment | `MOVE_SINGLE_SEGMENT` |
+| `SHARED_CONFIG` | App + Other | **REEXPORT** | `REEXPORT_MULTI_SEGMENT` |
+| `publicHelper` | nobody (segments) | **KEEP** | `KEEP_EXPORTED` |
+
+Output parent (snap lines 62–79):
+
+```ts
+//
+const SHARED_CONFIG = { value: 42 };
+export const publicHelper = ()=>console.log('public');
+export const App = /*#__PURE__*/ componentQrl(q_App_component_ckEPmXZlub0);
+export const Other = /*#__PURE__*/ componentQrl(q_Other_component_C1my3EIdP1k);
+export { SHARED_CONFIG as _auto_SHARED_CONFIG };
+```
+
+`SHARED_CONFIG` got the `_auto_` re-export. `publicHelper` is unchanged. `helperFn` is gone.
+
+Output App segment (snap lines 82–93):
+
+```ts
+import { _auto_SHARED_CONFIG as SHARED_CONFIG } from "./test";
+//
+const helperFn = (msg)=>{
+    console.log('Helper: ' + msg);
+    return msg.toUpperCase();
+};
+export const App_component_ckEPmXZlub0 = ()=>{
+    const result = helperFn('hello');
+    return <div>{result} {SHARED_CONFIG.value}</div>;
+};
+```
+
+`helperFn` got moved here (lines 86–89). `SHARED_CONFIG` is imported via the `_auto_` alias.
+
+Output Other segment (snap lines 32–38) imports `SHARED_CONFIG` the same way but doesn't get `helperFn` (it doesn't use it).
+
+### Where decisions get applied
+
+Two consumers of the `migrationDecisions` array:
+
+- **Parent rewrite** (`rewrite/output-assembly.ts:459–481`): for `reexport`, append the `export { x as _auto_x }` line; for `move`, delete the source range.
+- **Segment codegen** (`transform/segment-generation.ts:500–594`): for `reexport`, add to the segment's `autoImports` (becomes `import { _auto_x as x }`); for `move` targeting **this segment**, inline the declaration text + its own import deps.
+
+---
+
+## Deep dive: JSX rewrite
+
+The JSX transform converts `<div onClick={...} />` syntax into `_jsxSorted(...)` / `_jsxSplit(...)` helper calls that the Qwik runtime understands. Two entry points: full-module JSX during parent rewrite, and per-segment JSX in Phase 5 of `generateSegmentCode`.
+
+### `_jsxSorted` vs `_jsxSplit`
+
+Both helpers have the same calling shape — `(tag, varProps, constProps, children, flags, key)` — but they differ in how the runtime treats reactive coordination between var and const props.
+
+The choice is made in `transform/jsx-elements-core.ts:365–368`:
+
+```ts
+const hasBindInConst = !tagIsHtml && constEntries.some(e => e.startsWith('"bind:'));
+const jsxFn = hasBindInConst ? '_jsxSplit' : '_jsxSorted';
+```
+
+`_jsxSplit` fires when:
+- The element has a **spread attribute** (handled separately via `buildJsxSplitCall`, lines 344–362).
+- A **component element** (non-HTML) carries a `bind:` directive in its const props — two-way binding needs reactive plumbing between the two prop pools.
+
+Otherwise: `_jsxSorted`, which is the common fast path.
+
+### Var props vs const props
+
+Each JSX attribute is classified as either `var` (could change between renders) or `const` (stable for the lifetime of the element). The classification logic lives in `classifyConstness` at `transform/jsx.ts:197–298`.
+
+| const | var |
+|---|---|
+| Literals (string, number, boolean, null) | Identifiers not imported / not const-bound |
+| `undefined`, imported names | `CallExpression` |
+| Const-bound identifiers with static initializers | Any expression tree containing a var element |
+| Object/array literals where every element is const | |
+| Function expressions | |
+| Template literals where every interpolation is const | |
+| Identifiers initialized via `$()`, `Qrl()`, `use*()` (`isReturnStatic`, lines 56–69) | |
+
+The output `_jsxSorted` call has the **var props as one bag and const props as another** so the runtime can skip re-computing the const bag on re-renders.
+
+### Worked example — `destructure_args_colon_props`
+
+Input (`match-these-snaps/qwik_core__test__destructure_args_colon_props.snap` lines 9–17):
+
+```tsx
+import { component$ } from "@qwik.dev/core";
+export default component$((props) => {
+    const { 'bind:value': bindValue } = props;
+    return (
+        <>
+        {bindValue}
+        </>
+    );
+});
+```
+
+Output segment (snap lines 30–38):
+
+```jsx
+import { Fragment as _Fragment } from "@qwik.dev/core/jsx-runtime";
+import { _jsxSorted } from "@qwik.dev/core";
+import { _wrapProp } from "@qwik.dev/core";
+//
+export const test_component_LUXeXe0DQrg = (props)=>{
+    return /*#__PURE__*/ _jsxSorted(_Fragment, null, null, _wrapProp(props, "bind:value"), 1, "u6_0");
+};
+```
+
+Reading the `_jsxSorted` arguments:
+
+| Arg | Value | Meaning |
+|---|---|---|
+| 1 | `_Fragment` | Tag |
+| 2 | `null` | Var props bag (none) |
+| 3 | `null` | Const props bag (none) |
+| 4 | `_wrapProp(props, "bind:value")` | Children (the `{bindValue}` interpolation, wrapped via `_wrapProp` for reactive prop access) |
+| 5 | `1` | Flags (bitmask — element kind, has-children, etc.) |
+| 6 | `"u6_0"` | JSX key (per-module-stable) |
+
+### The JSX key counter
+
+Every JSX element gets a key string of the form `"<prefix>_<count>"` (e.g., `"u6_0"`). The prefix is a hash of the module's relative path (`computeKeyPrefix(relPath)`); the counter is monotonic across the module.
+
+Why threaded across phases: parent rewrite assigns keys to its own JSX, then segment codegen has to keep counting from where the parent left off so the same key never appears twice. The counter implementation is `JsxKeyCounter` at `transform/jsx.ts:326–346`, threaded as:
+
+- `parentResult.jsxKeyCounterValue` from `transformAllJsx` (returned at jsx.ts:557) → into `transform/index.ts:603`.
+- `parentJsxKeyCounterValue` → consumed by `segment-generation.ts:284` and `transformSegmentJsx` (segment-codegen.ts:280–325) as `keyCounterStart`.
+- Each segment's emit returns its updated `keyCounterValue` (`segment-generation.ts:754–757`) — folded back so the next segment continues counting.
+
+### `_fnSignal` — reactive expression hoisting
+
+When a JSX expression depends on a signal or store and is non-trivial (`store.address.city.name`, computed array literals), the optimizer hoists it into a top-level `_hf<n>` arrow + serialised string and replaces the inline expression with a `_fnSignal(_hf<n>, [deps], _hf<n>_str)` call. Logic in `signal-analysis.ts:357–470` (`generateFnSignal`); fires for object/array literals with reactive values, complex `.value` access on signals, deep store access.
+
+Example shape (from a `_fnSignal`-heavy snapshot):
+
+```js
+const _hf0 = (p0) => ["container", `count-${p0.count}`];
+const _hf0_str = "[\"container\",`count-${p0.count}`]";
+// in JSX:
+class: _fnSignal(_hf0, [store], _hf0_str)
+```
+
+The string form is what the runtime serialises across the network; the function form is what executes locally on update.
+
+---
+
+## Deep dive: segment metadata
+
+The metadata block emitted next to each segment file (the `/* { ... } */` comments in `match-these-snaps/`) is what `convergence.test.ts` compares against. Each field has a specific purpose in extraction, codegen, or runtime resolution — knowing which is which makes it much easier to reason about why a convergence test fails.
+
+### Field reference
+
+All fields live on `ExtractionResult` (`src/optimizer/extract.ts:38–95`). They originate during Phase 1 extraction and travel through every downstream phase.
+
+| Field | Type | Computed at | Used for |
+|---|---|---|---|
+| `origin` | `string` | `extract.ts:532` | Source file path; preserved verbatim through pipeline |
+| `name` | `string` | `extract.ts:514` | Canonical symbol name for the segment's exported binding |
+| `displayName` | `string` | `extract.ts:504` | Human-readable name without hash; appears in dev tooling |
+| `hash` | `string` | `extract.ts:508` (extracted from `name`) | 11-char content-addressed suffix; stable across builds |
+| `canonicalFilename` | `string` | `extract.ts:517` | `displayName + "_" + hash`; basis for the segment file path |
+| `entry` | `string \| null` | `entry-strategy.ts:19–48` (Phase 5) | Routing field — non-null for `single` / `component` entry strategies |
+| `parent` | `string \| null` | initially null at extract; resolved in `rewrite/index.ts:344–372` | Symbol name of enclosing extraction (for nested segments) |
+| `ctxKind` | `'function' \| 'eventHandler' \| 'jSXProp'` | `extract.ts:500` | Drives downstream branching (e.g., event handlers get JSX-prop emit shape) |
+| `ctxName` | `string` | `extract.ts:502` (`getExtractionName`) | The `$`-marker name (`component$`, `useTask$`, etc.); drives strip rules and HMR injection |
+| `loc` | `[number, number]` | `extract.ts:511` | Source byte range; used for source map mapping and migration source-range surgery |
+| `captures` | `boolean` | `capture-analysis.ts:51` | Quick boolean — does this segment close over outer scope? |
+| `captureNames` | `string[]` | `capture-analysis.ts:26–27` | Actual list of captured names; mutated through Phase 4–5 (props consolidation, const inline, migration filter) |
+| `paramNames` | `string[]` | `capture-analysis.ts:40` | Closure parameter names; threaded to `rewriteFunctionSignature` for loop-padding (`_,_1,...`) cases |
+
+### Hash computation
+
+`src/optimizer/hashing/siphash.ts:21–55`. SipHash-1-3 with zero keys, base64url-encoded, 11 chars, dashes/underscores replaced with `0` for filesystem safety.
+
+Input: `scope (optional) + relPath + displayName`, concatenated without separators.
+
+Stable across builds: same inputs produce the same hash deterministically. This is what makes the `q_<symbol>_<hash>` references in the parent module match the actual segment filenames the runtime will fetch.
+
+If two extractions in the same module would collide on `displayName`, `extract.ts:660–689` recomputes with a numbered suffix in the context (so e.g. `Foo_component_1_<newhash>` vs `Foo_component_<oldhash>`).
+
+### `entry` field resolution
+
+Resolved at `entry-strategy.ts:19–48` during Phase 5 (segment generation), once per segment:
+
+| Strategy | Result |
+|---|---|
+| `smart`, `segment`, `hook`, `inline`, `hoist` | `null` (each segment is its own entry) |
+| `component` | `null` for component segments; parent's symbol name for non-component children |
+| `single` | Fixed string `"entry_hooks"` |
+| `manual` | Looked up from a user-provided `manual: Record<symbolName, entry>` map |
+
+For `example_1` and most convergence tests, the strategy is `smart` so all `entry` fields are `null`.
+
+### `captures` vs `captureNames`
+
+Both are populated by capture analysis, but they diverge through the pipeline:
+
+- `captures: boolean` is computed once during analysis as `captureNames.length > 0` (`capture-analysis.ts:51`).
+- `captureNames: string[]` is **mutated** through later phases:
+  - `segment-generation.ts:335–363` and `rewrite/index.ts:374–401` — props field consolidation can replace destructured prop names with `_rawProps`.
+  - `segment-generation.ts:486–491` — const-literal inlining drops names whose values get folded.
+  - `segment-generation.ts:584–605` — migration filtering drops names that became `_auto_` imports.
+
+So they can diverge: `captures: true` might persist while `captureNames` shrinks. They snap back into sync only when `captureNames` becomes empty.
+
+### Convergence test validation
+
+`tests/optimizer/convergence.test.ts:120–158`. Strict equality on:
+
+```ts
+actual.origin !== expected.origin ||
+actual.name !== expected.name ||
+actual.displayName !== expected.displayName ||
+actual.hash !== expected.hash ||
+actual.canonicalFilename !== expected.canonicalFilename ||
+actual.ctxKind !== expected.ctxKind ||
+actual.ctxName !== expected.ctxName ||
+actual.captures !== expected.captures
+```
+
+`parent`, `loc`, `paramNames`, and `captureNames` appear in the snapshot for inspection but **are not strict-compared** in this assertion. (They're still useful when debugging — a `captureNames` mismatch in the snap usually points at a real bug even if the test doesn't fail directly on it.)
+
+### Where the metadata is emitted
+
+`segment-generation.ts:796–811` assembles the per-segment `SegmentMetadataInternal` block from these fields. That object lands in the `TransformModule.segment` field for non-stripped segments. The runtime uses `name` + `canonicalFilename` to resolve the lazy import; everything else is for tooling and tests.
+
+---
+
+## Quick reference — code map
+
+| Concern | File |
+|---|---|
+| Top-level orchestrator | `src/optimizer/transform/index.ts:90` (`transformModule`) |
+| Find `$()` calls + initial metadata | `src/optimizer/extract.ts` |
+| Hash computation | `src/optimizer/hashing/siphash.ts` |
+| Capture analysis | `src/optimizer/capture-analysis.ts` |
+| Migration decisions | `src/optimizer/variable-migration.ts` |
+| Parent rewrite | `src/optimizer/rewrite/index.ts`, `rewrite/output-assembly.ts` |
+| Per-segment codegen orchestrator | `src/optimizer/segment-codegen.ts:444` (`generateSegmentCode`) |
+| Per-segment body transforms | `src/optimizer/segment-codegen/body-transforms.ts` |
+| Per-segment import collection | `src/optimizer/segment-codegen/import-collection.ts` |
+| All-segments orchestrator | `src/optimizer/transform/segment-generation.ts:generateAllSegmentModules` |
+| Post-process per segment | `src/optimizer/transform/post-process.ts:163` (`postProcessSegmentCode`) |
+| Shared extraction predicates | `src/optimizer/rewrite/predicates.ts` |
+| Stripped-segment codegen | `src/optimizer/strip-ctx.ts` |
+| Entry strategy resolution | `src/optimizer/entry-strategy.ts` |
+| JSX core transform | `src/optimizer/transform/jsx.ts`, `transform/jsx-elements-core.ts` |
+| Reactive expression hoisting (`_fnSignal`) | `src/optimizer/signal-analysis.ts` |
+| Module-level cleanups (DCE, unused imports) | `src/optimizer/transform/module-cleanup.ts`, `transform/dead-code.ts` |
+| Convergence test harness | `tests/optimizer/convergence.test.ts` |
+| Failure-families test (broader, less strict) | `tests/optimizer/failure-families.test.ts` |
