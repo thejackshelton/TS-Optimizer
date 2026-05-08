@@ -56,6 +56,39 @@ A specific instance of the author/tool boundary that recurs throughout the codeb
 
 The OSS-344 predicate split mirrors this directly: `isComponentCtx(ctxName)` matches the two-arm `component$ \| componentQrl` (pre-extraction); `isAnyComponentCtx(ctxName)` adds the post-extraction `'component'` form (three-arm). See `src/optimizer/rewrite/predicates.ts`.
 
+### The marker catalog
+
+The optimizer's marker-detection rule is **structural, not enumerated** (`marker-detection.ts:206`): any function call whose callee's *original imported name* ends with `$` triggers extraction, including renamed imports. Same rule applies to JSX attributes — `onClick$`, `bind:value$`, custom `*$` attrs all extract their value. The list below isn't a closed set; new library-defined `name$` functions extract automatically.
+
+These are the markers that actually appear in convergence snapshots and Qwik core's expected import surface. **Every marker below shares the three-form triad shape above** (`xName$` → `xNameQrl(q_<symbol>)` → `'xName'` ctxName) — the catalog is just specifying which markers exist, not redefining how each is processed.
+
+| Category | Marker | Definition |
+|---|---|---|
+| **Component** | `component$(fn)` | Define a Qwik component; body becomes a lazy-loadable segment, renders only at hydration boundary |
+| **Lifecycle / task** | `useTask$(fn)` | Reactive side-effect; runs eagerly server-side during SSR, reruns on signal/store dependency changes |
+|  | `useVisibleTask$(fn)` | Client-only `useTask$` deferred until the component is intersection-observed visible |
+|  | `useMount$(fn)` | Run once during component mount on whichever side instantiates the component |
+|  | `useClientMount$(fn)` | `useMount$` client-only; stripped from server bundles via `stripCtxName` |
+| **State / data** | `useResource$(fn)` | Async data resource with `Resource<T>` loading/resolved/rejected states the runtime can stream |
+|  | `useComputed$(fn)` | Derived signal — recomputes when any read signal/store changes |
+|  | `useMemo$(fn)` | Memoised computation; runs once per dependency change |
+|  | `useAsync$(fn)` | Async closure for non-resource async work (deferred until awaited) |
+| **Styles** | `useStyles$(stringOrFn)` | Inject component CSS, deduplicated across instances |
+|  | `useStyle$(stringOrFn)` | Singular variant |
+|  | `useStylesScoped$(stringOrFn)` | CSS scoped to component instance via attribute selector |
+| **Routing** | `usePreventNavigate$(fn)` | Predicate gating client-side navigation away from current route |
+| **Boundary** | `server$(fn)` | Server-only body, callable from client as async RPC; stripped from client bundles |
+| **JSX attr (HTML)** | `on*$`, `document:on*$`, `window:on*$` | `eventHandler` ctxKind; runtime wires the lazy QRL to DOM listeners |
+| **JSX attr (component)** | Any `*$` attribute on a component element | `jSXProp` ctxKind; passed into the child component as a lazy QRL ref |
+
+Three markers break the uniform treatment:
+
+| Marker | Why it's special |
+|---|---|
+| `$(fn)` | The bare base marker — no naming context. Symbol name derives from the call-site / JSX surroundings (`extract.ts:441–453`) |
+| `sync$(fn)` | Recognised but **does not extract** (`marker-detection.ts:222`, `isSyncMarker`). Body stays inline as a literal callback for QRL APIs that need a function reference rather than a lazy ref |
+| `implicit$FirstArg(fn, ...)` | Meta-marker; lets a non-`$`-suffixed function be treated as if its first argument were `$()`-marked. Backbone of `qwik-react`'s `qwikify$`. Resolved via `customInlined` map in `extract.ts:116` (`resolveCanonicalCalleeName`) |
+
 ---
 
 ## Before / after — `example_1`
