@@ -12,6 +12,52 @@ It takes a Qwik source file, finds every `$()` closure, lifts each one into its 
 
 ---
 
+## Two namespaces: what you write vs what the optimizer produces
+
+The optimizer transforms one canonical surface into another. The single most useful disambiguator when reading code is asking: **which side of the line does this name live on?**
+
+**Author surface** — what a developer actually writes:
+
+- `$(closure)` — "lazy-load this closure"
+- `component$`, `useTask$`, `useStyles$`, `useVisibleTask$`, `serverStuff$`, etc. — the `$`-suffixed marker family
+- Regular JSX, regular ES modules, regular bindings
+
+**Tool surface** — what the optimizer (or a peer codegen tool like `qwik-react`) emits, intended for the Qwik runtime to consume. A developer should almost never write any of these by hand:
+
+| Name shape | Role | Where it's emitted |
+|---|---|---|
+| `inlinedQrl(fn, "name", [captures])` | Pre-extracted QRL spec — the closure has already been analysed and is being handed to the optimizer fully-baked | Peer tools (`qwik-react`); idempotency cases |
+| `qrl(() => import("./..."), "name")` | Lazy-loadable QRL reference for one segment | Phase 4 parent rewrite, Phase 5 segment imports |
+| `componentQrl(...)`, `useTaskQrl(...)`, `useStylesQrl(...)`, etc. | Already-named-Qrl form of a marker; replaces `component$(fn)` with `componentQrl(q_<symbol>)` | Phase 4 parent rewrite |
+| `q_<symbol>` | Optimizer-generated `qrl(...)` constant binding; one per segment, lives in either parent or owning segment | Phase 4 / Phase 5 |
+| `_captures`, `_captures[i]` | Capture serialisation array; runtime injects the bound values when calling the segment | Phase 5 capture imports + injection |
+| `_rawProps` | Convention name for un-destructured component props when a child segment captures a destructured prop field | Phase 4 props consolidation |
+| `_auto_<name>` | Compiler-generated re-export prefix; distinguishes from user `export` statements | Phase 3 `reexport` decisions emitted in Phase 4 |
+| `_jsxSorted(tag, varProps, constProps, children, flags, key)` | JSX helper output; replaces user `<div ... />` syntax post-transform | JSX rewrite (full module, per-segment Phase 5) |
+| `_jsxSplit(...)` | Variant of `_jsxSorted` for spread or `bind:` cases | JSX rewrite |
+| `_fnSignal(_hf<n>, [deps], str)` | Hoisted reactive expression call; `_hf<n>` is the lifted arrow form, `str` is its serialised body | `signal-analysis.ts` |
+| `_wrapProp(props, "bind:value")` | Two-way-binding wrapper for `bind:` directives that cross a boundary | JSX rewrite |
+| `_noopQrl(...)`, `_noopQrlDEV(...)` | Stripped-segment placeholder (segment was elided per `stripCtxName` / `stripEventHandlers`) | Phase 5 inline-strategy emit |
+| `.w([captures])` | "with captures" QRL method; emitted on parent-side QRL refs that need to pass values to the segment | Phase 4 parent rewrite |
+| `.s(body)` | "set body" QRL method; only used by inline entry strategy | Phase 5 inline-strategy emit |
+| `useHmr(devFile)` | Auto-injected HMR hook for component segments in dev/hmr mode | Phase 6 `postProcessSegmentCode` |
+
+If you see one of those names in source someone hand-wrote, it's almost certainly a peer tool's output (e.g. `qwik-react` codegen) or a hand-crafted test fixture — not idiomatic developer code. If you see one of those names in optimizer output, it's machinery and you can trace it to the function in code that emits it.
+
+### The marker family triad
+
+A specific instance of the author/tool boundary that recurs throughout the codebase: every `$`-suffixed marker has **three forms** and the optimizer treats them differently in different phases.
+
+| Form | Who writes it | When it appears |
+|---|---|---|
+| `component$(fn)` | Developer | Source code, before extraction |
+| `componentQrl(qrlConst)` | Optimizer (parent rewrite) or peer tool (`inlinedQrl(componentQrl(...), ...)`) | After extraction; the developer-marker has been replaced by the QRL form |
+| `ctxName === 'component'` | Optimizer (inline-strategy emit only) | A synthesised ctxName used internally during inline-strategy hoisting; never appears as identifier in emitted code |
+
+The OSS-344 predicate split mirrors this directly: `isComponentCtx(ctxName)` matches the two-arm `component$ \| componentQrl` (pre-extraction); `isAnyComponentCtx(ctxName)` adds the post-extraction `'component'` form (three-arm). See `src/optimizer/rewrite/predicates.ts`.
+
+---
+
 ## Before / after — `example_1`
 
 **Input** (`match-these-snaps/qwik_core__test__example_1.snap` lines 9–19):
@@ -46,6 +92,8 @@ component(q_renderHeader2_component_Ay6ibkfFYsw);
 ```
 
 The two top-level `$()` calls became `q_<symbol>` references. The unused `$` and `onRender` imports got dropped. `qrl` got injected because we now use it.
+
+> Everything in this output that starts with `q_`, `_`, or is `qrl(...)` / `componentQrl(...)` is **tool-emitted**, not author-written — see [Two namespaces](#two-namespaces-what-you-write-vs-what-the-optimizer-produces) for the full convention list.
 
 ### 2. Segment for `renderHeader1`'s body — `test.tsx_renderHeader1_jMxQsjbyDss.tsx` (snap lines 65–71)
 
@@ -207,7 +255,30 @@ The orchestration lives in `transform/index.ts:135–328`. For each extraction i
 3. Calls `analyzeCaptures` to populate `extraction.captureNames`.
 4. Sets `extraction.captures = captureNames.length > 0`.
 
-Two distinct populating paths: regular `$()` extractions go through `analyzeCaptures` (`transform/index.ts:228–247`); `inlinedQrl(fn, [varA, varB])` extractions parse the explicit captures string directly (`transform/index.ts:206–225`) and skip the analysis.
+### Two populating paths: `$()` (developer) vs `inlinedQrl` (tool)
+
+There are **two completely separate code paths** for populating `captureNames`, and which one runs depends entirely on whether a developer or a tool wrote the source:
+
+**Path A: regular `$()` — author-written, optimizer infers everything.**
+- `transform/index.ts:228–247` calls `analyzeCaptures` to walk the closure scope.
+- The captures list is **derived** from what variables the closure references.
+- The body does not yet contain `_captures[i]` references; the optimizer injects the unpacking line during Phase 5.
+
+**Path B: `inlinedQrl(fn, "name", [captures])` — tool-written, optimizer trusts the spec.**
+- `transform/index.ts:206–225` parses the explicit `[captures]` array directly from the source.
+- The captures list is **declared**, not derived. The optimizer doesn't re-analyse — it trusts the upstream tool got it right.
+- The body **already contains** `const x = _captures[0]` lines (the upstream tool wrote them). Phase 5 sets `skipCaptureInjection: true` and doesn't inject a duplicate unpacking.
+- `inlinedQrl`'s captures array can contain non-identifier expressions — `[left, true, right]` is valid (see `should_preserve_non_ident_explicit_captures.snap`). Regular `$()` can't express this; only the explicit form can.
+
+**Where you'll actually encounter `inlinedQrl`:**
+
+1. **Interop library codegen.** `qwik-react` and similar frameworks have their own pre-processor that emits `inlinedQrl` directly because they've already done the analysis and want to hand the optimizer a fully-baked QRL. See `match-these-snaps/qwik_core__test__example_qwik_react.snap` lines 14–48 — every `inlinedQrl` there came from `qwikify$`'s codegen, not a developer's keyboard.
+2. **Idempotency.** When the optimizer runs over its own output (or a build pipeline that re-invokes it), it sees `inlinedQrl` calls left from a prior pass. Detection at `extract.ts:324–429` runs *before* the regular `$()` walker so these don't get double-extracted.
+3. **Hand-crafted test fixtures.** Snapshots like `should_preserve_non_ident_explicit_captures.snap` use `inlinedQrl` to exercise edge cases (non-identifier captures, explicit naming) the regular form can't reach.
+
+> **Rule of thumb.** Developers write `$()`. Tools write `inlinedQrl`. If you're hand-writing `inlinedQrl` you almost certainly want `$()` instead.
+
+This pairs with the broader author-vs-tool boundary documented in [Two namespaces](#two-namespaces-what-you-write-vs-what-the-optimizer-produces).
 
 `computeSegmentUsage` (`variable-migration.ts:341`) is a separate pass that walks the program once and produces a map of `segmentName → Set<moduleName>` plus a `rootUsage` set. This drives migration (Phase 3); it overlaps conceptually with `captureNames` but operates at module-decl granularity, not closure-scope granularity.
 
@@ -245,7 +316,7 @@ export const Foo_component_1_DvU6FitWglY = ()=>{
 };
 ```
 
-Three things happened:
+Three things happened (all of `_rawProps`, `_captures`, `.w([...])` are tool-surface — see [Two namespaces](#two-namespaces-what-you-write-vs-what-the-optimizer-produces)):
 
 1. **`foo` got consolidated to `_rawProps`.** When a parent's destructured prop is captured, the optimizer rewrites both sides — the parent passes `_rawProps` (the un-destructured object), and the segment reaches into `_rawProps.foo` instead. This is the F3 territory in `CONVERGENCE_FAILURES.md`. Live in `segment-generation.ts:335–363`.
 2. **`arg0` got inlined as `20`.** Const-literal captures whose values are statically resolvable get folded at codegen time and dropped from `captureNames`. Logic in `segment-generation.ts:486–491` and `inlineConstCaptures` in `rewrite/index.ts`.
@@ -404,6 +475,8 @@ Two consumers of the `migrationDecisions` array:
 ## Deep dive: JSX rewrite
 
 The JSX transform converts `<div onClick={...} />` syntax into `_jsxSorted(...)` / `_jsxSplit(...)` helper calls that the Qwik runtime understands. Two entry points: full-module JSX during parent rewrite, and per-segment JSX in Phase 5 of `generateSegmentCode`.
+
+> Both `_jsxSorted` and `_jsxSplit` are **tool-emitted** — they replace the author's `<div ... />` syntax. A developer never imports or calls them directly. Same for `_wrapProp` and `_fnSignal` below. See [Two namespaces](#two-namespaces-what-you-write-vs-what-the-optimizer-produces).
 
 ### `_jsxSorted` vs `_jsxSplit`
 
