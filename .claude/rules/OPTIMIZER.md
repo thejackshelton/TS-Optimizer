@@ -682,3 +682,82 @@ actual.captures !== expected.captures
 | Module-level cleanups (DCE, unused imports) | `src/optimizer/transform/module-cleanup.ts`, `transform/dead-code.ts` |
 | Convergence test harness | `tests/optimizer/convergence.test.ts` |
 | Failure-families test (broader, less strict) | `tests/optimizer/failure-families.test.ts` |
+
+---
+
+## Maintenance
+
+OPTIMIZER.md captures the pipeline's **stable structural shape** — phases, conventions, the author/tool boundary, and the worked-example cross-references. It does not track in-flight work; that's STATE.md's job.
+
+### How this differs from STATE.md
+
+| | STATE.md | OPTIMIZER.md |
+|---|---|---|
+| **Scope** | Branch-scoped — refreshed per workstream | Project-wide stable rule, alongside METHODOLOGIES / LINEAR / CONSTRAINTS |
+| **Edit cadence** | Aggressively, on every meaningful test flip / branch / ticket transition | Only when something **structural** changes (see below) |
+| **Where edits happen** | On feature branches; never on `main` directly | On any branch where a structural change lands; folded into the same PR as the code |
+| **Trim policy** | Trim "Most recent meaningful progress" past ~10 entries | No trim — sections grow only when conventions grow |
+
+The intuition: STATE.md is a working artifact you update aggressively; OPTIMIZER.md is a contract you update deliberately.
+
+### When to update
+
+Update when something **structural** changes:
+
+- A phase marker in `transformModule` is added, removed, renumbered, or substantially restructured.
+- A new author-surface marker is added to Qwik core (a new `$`-suffixed function the optimizer needs to recognise).
+- A new tool-surface convention name is introduced (e.g. a new `_<helper>` import) or an existing one is renamed.
+- A migration rule (MIG-XX) is added, removed, or its predicate fundamentally changes.
+- A new entry strategy is added or an existing one's emit shape changes materially.
+- An `ExtractionResult` metadata field is added, removed, or repurposed.
+- A core helper module is restructured enough that the file:line refs in this doc would mislead a reader (rule of thumb: >50 lines of drift, or the section moved to a different file).
+- A worked-example snapshot is materially changed or removed (the doc cites four: `example_1`, `example_multi_capture`, `example_segment_variable_migration`, `destructure_args_colon_props`). If any goes red on convergence, swap it for a still-passing equivalent.
+
+### Don't update for
+
+- Bug fixes that preserve the documented contract (e.g. correcting MIG-05a's nested-segment edge case doesn't require a doc update if the rule's intent is documented correctly — only its implementation moved).
+- File:line drift below ~30 lines — the section is still findable from surrounding text.
+- Per-test convergence flips.
+- Mid-investigation findings — those belong in commit messages and Linear comments.
+- Speculation about future phases, refactors, or planned conventions.
+
+### Trigger checklist for pipeline refactors
+
+When a refactor touches one of these modules, **audit OPTIMIZER.md before merging the PR**:
+
+- `src/optimizer/transform/index.ts` (the orchestrator)
+- `src/optimizer/extract.ts`
+- `src/optimizer/capture-analysis.ts`
+- `src/optimizer/variable-migration.ts`
+- `src/optimizer/segment-codegen.ts`
+- `src/optimizer/segment-codegen/body-transforms.ts`
+- `src/optimizer/segment-codegen/import-collection.ts`
+- `src/optimizer/transform/segment-generation.ts`
+- `src/optimizer/transform/post-process.ts`
+- `src/optimizer/rewrite/predicates.ts`
+- `src/optimizer/rewrite/index.ts`, `rewrite/output-assembly.ts`
+- `src/optimizer/transform/jsx.ts`, `transform/jsx-elements-core.ts`
+- `src/optimizer/signal-analysis.ts`
+- `src/optimizer/entry-strategy.ts`
+- `src/optimizer/strip-ctx.ts`
+- `src/optimizer/hashing/siphash.ts`
+
+For each touched file, ask:
+
+1. **Do file:line refs cited in OPTIMIZER.md still resolve?** Quick check: `grep -n "<filename>" .claude/rules/OPTIMIZER.md` then sanity-check each line number.
+2. **Does this rename or add a tool-surface convention?** If yes, the "Two namespaces" reference table needs updating.
+3. **Does this change phase shape, sequencer ordering, or the public contract of a deep-dive's subject?** If yes, that section needs a pass.
+4. **Does the worked example I'm citing still demonstrate what the doc says it demonstrates?** Re-read the snap and the prose side-by-side.
+
+If any answer is yes, fold the doc update into the same PR as the code change.
+
+### Each update
+
+1. Verify the worked-example snapshots still pass convergence (`pnpm vitest convergence --run`).
+2. Spot-check 3–5 file:line refs that the change might have invalidated.
+3. Read the affected section top-to-bottom in the new state — does the trace still match what the code does?
+4. Land the doc update in the **same PR** as the code change. Doc-only catch-up PRs are fine when drift is discovered later, but inline updates are the default.
+
+### When in doubt
+
+If you're not sure whether a change is "structural enough" to warrant a doc update, the safer default is to update. Stale conventions in OPTIMIZER.md mislead future readers in ways that are hard to detect — there's no test that fails when the doc and code disagree. Erring on the side of clarity costs little; erring on the side of silence accrues debt.
