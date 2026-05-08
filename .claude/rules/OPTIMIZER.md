@@ -203,7 +203,7 @@ Walks the AST looking for `$(...)` calls. For `example_1` it finds 3:
 | `renderHeader1_div_onClick_USi8k1jUb40` | `(ctx) => console.log(ctx)` | `renderHeader1_jMxQsjbyDss` | line 13 |
 | `renderHeader2_component_Ay6ibkfFYsw` | `() => { console.log("mount"); return render; }` | `null` | line 16 |
 
-The hash suffix (`jMxQsjbyDss`) is content-addressed via SipHash-1-3 (`hashing/siphash.ts:21`), so it's stable across builds. The symbol naming convention encodes call-site context: `<exportName>_<jsxAttrName>_<hash>` for nested, `<exportName>_<hash>` for top-level. See `getExtractionName` in `extract.ts`.
+Each row's `symbolName` is composed in four steps from a context-stack walk during AST traversal: build a `displayName` from the stack, hash it with SipHash-1-3, append the hash. Full mechanics (including disambiguation when contexts collide and the prod-mode `s_<hash>` rename) live in [Symbol naming and hashing](#symbol-naming-and-hashing) under the metadata deep dive.
 
 ### Phase 2 — capture analysis (`transform/index.ts:135–328`)
 
@@ -621,7 +621,7 @@ All fields live on `ExtractionResult` (`src/optimizer/extract.ts:38–95`). They
 | Field | Type | Computed at | Used for |
 |---|---|---|---|
 | `origin` | `string` | `extract.ts:532` | Source file path; preserved verbatim through pipeline |
-| `name` | `string` | `extract.ts:514` | Canonical symbol name for the segment's exported binding |
+| `name` | `string` | `extract.ts:514` | Canonical symbol name for the segment's exported binding (see [Symbol naming and hashing](#symbol-naming-and-hashing)) |
 | `displayName` | `string` | `extract.ts:504` | Human-readable name without hash; appears in dev tooling |
 | `hash` | `string` | `extract.ts:508` (extracted from `name`) | 11-char content-addressed suffix; stable across builds |
 | `canonicalFilename` | `string` | `extract.ts:517` | `displayName + "_" + hash`; basis for the segment file path |
@@ -634,15 +634,75 @@ All fields live on `ExtractionResult` (`src/optimizer/extract.ts:38–95`). They
 | `captureNames` | `string[]` | `capture-analysis.ts:26–27` | Actual list of captured names; mutated through Phase 4–5 (props consolidation, const inline, migration filter) |
 | `paramNames` | `string[]` | `capture-analysis.ts:40` | Closure parameter names; threaded to `rewriteFunctionSignature` for loop-padding (`_,_1,...`) cases |
 
-### Hash computation
+### Symbol naming and hashing
 
-`src/optimizer/hashing/siphash.ts:21–55`. SipHash-1-3 with zero keys, base64url-encoded, 11 chars, dashes/underscores replaced with `0` for filesystem safety.
+Four metadata fields encode different views of the same composed name: `displayName`, `hash`, `symbolName` (a.k.a. `name`), and `canonicalFilename`. They're all derived from a single AST walk that maintains a context stack as it descends into nested marker calls. Understanding the composition is the difference between "this name is a magic string" and "this name is a deterministic function of three things you can read off the source."
 
-Input: `scope (optional) + relPath + displayName`, concatenated without separators.
+#### The four-step pipeline
 
-Stable across builds: same inputs produce the same hash deterministically. This is what makes the `q_<symbol>_<hash>` references in the parent module match the actual segment filenames the runtime will fetch.
+**1. Walk the AST, push to a context stack** — `ContextStack` (`src/optimizer/context-stack.ts:48`). Pushed during traversal:
 
-If two extractions in the same module would collide on `displayName`, `extract.ts:660–689` recomputes with a numbered suffix in the context (so e.g. `Foo_component_1_<newhash>` vs `Foo_component_<oldhash>`).
+- Variable declarators (`renderHeader1`, `Foo`)
+- Function and class declarations
+- Object literal property keys
+- JSX element tag names (`div`, `Fragment`)
+- JSX attribute names with the trailing `$` stripped (`onClick$` → `onClick`)
+- Marker callee names with the trailing `$` stripped (`useTask$` → `useTask`); for the bare `$()`, the *wrapper context* is pushed instead via `getDirectWrapperContextName` (e.g. inside `useTaskQrl(...)` the stack picks up `useTask`)
+- `pushDefaultExport()` — for default exports without a binding name, uses the file stem with bracket-route handling: `[id].tsx` → `id`, `[[...slug]].tsx` → `slug`
+
+The walker pushes when entering relevant nodes and pops when leaving them; the stack at the moment of marker detection is the segment's naming context.
+
+**2. Build the displayName** — `buildDisplayName` (`src/hashing/naming.ts:60`):
+
+- Joins context stack with `_`; empty stack falls back to literal `s_`
+- Runs through `escapeSymbol` (`naming.ts:20`) — strips non-alphanumeric chars, collapses runs to a single `_`, drops leading/trailing `_`
+- If the result starts with a digit, prepends `_` so the name is a valid identifier
+- Prepends `<fileStem>_` (the source filename including extension, e.g. `test.tsx_`)
+- **Result**: `test.tsx_renderHeader1_div_onClick`
+
+**3. Compute the hash** — `qwikHash` (`src/hashing/siphash.ts:21`):
+
+- SipHash-1-3 with all-zero keys (`[0, 0, 0, 0]`)
+- Input: `(scope ?? '') + relPath + contextPortion` concatenated with no separators (`contextPortion` is the displayName minus the `<fileStem>_` prefix)
+- Encoded as 11-char base64url, with `+`/`/` mapped to `-`/`_` then `-`/`_` replaced by `0` for filesystem safety
+- **Result**: `jMxQsjbyDss`
+
+**4. Compose the final names** — `buildSymbolName` (`src/hashing/naming.ts:90`):
+
+- `symbolName` = `<contextPortion>_<hash>` → `renderHeader1_jMxQsjbyDss`
+- `canonicalFilename` = `<displayName>_<hash>` → `test.tsx_renderHeader1_jMxQsjbyDss` (basis for the segment file path on disk)
+- The `name` field on `ExtractionResult` aliases `symbolName`
+
+#### Disambiguation
+
+When two extractions in one file would collide on `displayName` (e.g., a `$()` nested inside a `component$` whose stack already ends at `Foo_component`), `disambiguateExtractions` (`extract.ts:660–689`) appends `_1`, `_2`, ... to the second-onwards occurrences and **recomputes the hash** for each renamed entry. This is why `example_multi_capture` shows both `Foo_component_HTDRsvUbLiE` (the outer) and `Foo_component_1_DvU6FitWglY` (the nested one) — the inner `$()` originally shared context with its parent, so it got the `_1` suffix and a fresh hash with `_1` folded into the input.
+
+#### Production rename
+
+In `prod` mode, `transform/index.ts:425–429` rewrites every non-`inlinedQrl` segment's `symbolName` from `<contextPortion>_<hash>` to a short `s_<hash>` to reduce shipped bytes. The original symbolName is preserved in `preRenameSymbolName` for migration-decision keying. `displayName`, `hash`, and `canonicalFilename` are unchanged — the rename is symbolName-only, and runtime resolution still works because the hash is the lookup key.
+
+`inlinedQrl` segments skip the rename: their name was set explicitly by the upstream tool (see [the `$()` vs `inlinedQrl` framing in capture analysis](#two-populating-paths--developer-vs-inlinedqrl-tool)) and renaming would break the contract.
+
+#### Worked examples — `example_1`
+
+| Source | Stack at extraction | displayName | hash | symbolName |
+|---|---|---|---|---|
+| `export const renderHeader1 = $(() => ...)` | `[renderHeader1]` | `test.tsx_renderHeader1` | `jMxQsjbyDss` | `renderHeader1_jMxQsjbyDss` |
+| `<div onClick={$((ctx) => ...)}/>` | `[renderHeader1, div, onClick]` | `test.tsx_renderHeader1_div_onClick` | `USi8k1jUb40` | `renderHeader1_div_onClick_USi8k1jUb40` |
+
+And from `example_multi_capture` (showing disambiguation):
+
+| Source | Stack at extraction | displayName | symbolName |
+|---|---|---|---|
+| `export const Foo = component$(({foo}) => ...)` | `[Foo, component]` | `test.tsx_Foo_component` | `Foo_component_HTDRsvUbLiE` |
+| `return $(() => ...)` (nested inside that component$) | `[Foo, component]` (collides → renamed) | `test.tsx_Foo_component_1` | `Foo_component_1_DvU6FitWglY` |
+
+#### Why this design
+
+- **Filesystem-safe** — `escapeSymbol` strips everything except alphanumeric and underscore; the hash's `-`/`_` get rewritten to `0`. The canonicalFilename can land on disk with no escaping.
+- **Deterministic across builds** — same source + same `relPath` produces the same `(displayName, hash, symbolName)`. The QRL refs in a parent module always match the segment filenames the runtime will fetch.
+- **Encodes call-site context** — readers can recover roughly *what kind of thing* a segment was from its name alone (`renderHeader1_div_onClick` is clearly a click handler nested inside `renderHeader1`'s render).
+- **Hash is a tiebreaker, not the identity** — the contextual prefix is the human-readable part; the hash exists only to disambiguate identical contexts across files and force any source change to produce a fresh name.
 
 ### `entry` field resolution
 
@@ -698,7 +758,7 @@ actual.captures !== expected.captures
 |---|---|
 | Top-level orchestrator | `src/optimizer/transform/index.ts:90` (`transformModule`) |
 | Find `$()` calls + initial metadata | `src/optimizer/extract.ts` |
-| Hash computation | `src/optimizer/hashing/siphash.ts` |
+| Symbol naming + hash computation | `src/optimizer/context-stack.ts`, `src/hashing/naming.ts`, `src/hashing/siphash.ts` |
 | Capture analysis | `src/optimizer/capture-analysis.ts` |
 | Migration decisions | `src/optimizer/variable-migration.ts` |
 | Parent rewrite | `src/optimizer/rewrite/index.ts`, `rewrite/output-assembly.ts` |
@@ -773,7 +833,8 @@ When a refactor touches one of these modules, **audit OPTIMIZER.md before mergin
 - `src/optimizer/signal-analysis.ts`
 - `src/optimizer/entry-strategy.ts`
 - `src/optimizer/strip-ctx.ts`
-- `src/optimizer/hashing/siphash.ts`
+- `src/optimizer/context-stack.ts`
+- `src/hashing/naming.ts`, `src/hashing/siphash.ts`
 
 For each touched file, ask:
 
