@@ -423,6 +423,15 @@ export function extractSegments(
             }
           }
 
+          // `inlinedQrl` is a pre-processed QRL emitted by peer codegen tools
+          // (qwik-react, etc.). Contract: JSX, if any, is *already* JSX-transformed
+          // in the body before `inlinedQrl` is called — peer tools run their own JSX
+          // pass and emit `_jsxSorted(...)` / `_jsxSplit(...)` rather than raw JSX
+          // syntax. Verified across all 12 inlinedQrl snapshots in match-these-snaps/:
+          // none have raw JSX as the first arg or in an arrow body. Therefore
+          // mirroring the source file's flavor is safe — unlike the marker-call /
+          // JSX-attribute paths (OSS-351), this path doesn't push onto
+          // `activeSegmentBodies` for JSX detection. See OSS-352 for the audit.
           const extension = sourceExt;
 
           const extraction: ExtractionResult = {
