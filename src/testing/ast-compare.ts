@@ -342,11 +342,16 @@ function isReorderableDeclaration(stmt: any): boolean {
   const { id, init } = stmt.declarations[0];
   if (!id) return false;
 
-  // Destructure of a simple read (`const [...] = obj`, `const {x} = obj.y`).
-  if (id.type === 'ArrayPattern' || id.type === 'ObjectPattern') {
-    return init?.type === 'Identifier' || init?.type === 'MemberExpression';
+  switch (id.type) {
+    // Destructure of a simple read (`const [...] = obj`, `const {x} = obj.y`).
+    case 'ArrayPattern':
+    case 'ObjectPattern':
+      return init?.type === 'Identifier' || init?.type === 'MemberExpression';
+    case 'Identifier':
+      break;
+    default:
+      return false;
   }
-  if (id.type !== 'Identifier') return false;
 
   // Framework-emitted name prefixes are reorderable regardless of init: `q_*`
   // are qrl/_noopQrl declarations, `_hf<n>` / `_hf<n>_str` are hoisted signal
