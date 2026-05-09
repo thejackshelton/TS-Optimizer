@@ -2134,32 +2134,27 @@ function stripUnusedImports(program: any): void {
 function stripFrameworkHelperImports(program: any): void {
   if (!program?.body || !Array.isArray(program.body)) return;
 
-  const isFrameworkSource = (src: string | undefined): boolean =>
-    src === '@qwik.dev/core' || src === '@qwik.dev/core/jsx-runtime';
-
-  const isFrameworkHelper = (importedName: string | undefined): boolean => {
-    if (!importedName) return false;
-    if (importedName.startsWith('_')) return true;
-    if (importedName === 'qrl' || importedName === 'inlinedQrl') return true;
-    if (importedName.endsWith('Qrl')) return true;
-    return false;
-  };
+  const isFrameworkHelper = (name: string | undefined): boolean =>
+    !!name && (
+      name.startsWith('_') ||
+      name === 'qrl' ||
+      name === 'inlinedQrl' ||
+      name.endsWith('Qrl')
+    );
 
   for (let i = program.body.length - 1; i >= 0; i--) {
     const stmt = program.body[i];
     if (stmt?.type !== 'ImportDeclaration') continue;
-    if (!stmt.specifiers || stmt.specifiers.length === 0) continue;
-    if (!isFrameworkSource(stmt.source?.value)) continue;
+    if (!stmt.specifiers?.length) continue;
+    const src = stmt.source?.value;
+    if (src !== '@qwik.dev/core' && src !== '@qwik.dev/core/jsx-runtime') continue;
 
-    stmt.specifiers = stmt.specifiers.filter((spec: any) => {
-      if (spec.type !== 'ImportSpecifier') return true;
-      const importedName = spec.imported?.name ?? spec.imported?.value;
-      return !isFrameworkHelper(importedName);
-    });
+    stmt.specifiers = stmt.specifiers.filter((spec: any) =>
+      spec.type !== 'ImportSpecifier' ||
+      !isFrameworkHelper(spec.imported?.name ?? spec.imported?.value),
+    );
 
-    if (stmt.specifiers.length === 0) {
-      program.body.splice(i, 1);
-    }
+    if (stmt.specifiers.length === 0) program.body.splice(i, 1);
   }
 }
 
