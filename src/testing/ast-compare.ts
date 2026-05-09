@@ -333,12 +333,18 @@ function collectDeclNames(node: any, names: Set<string>): void {
  * - Module-level function declarations moved into segments (const foo = (...) => {...})
  */
 function isReorderableDeclaration(stmt: any): boolean {
-  // Module-level function decls — may be moved between segments by migration.
-  if (stmt?.type === 'FunctionDeclaration') return true;
+  switch (stmt?.type) {
+    // Module-level function decls — may be moved between segments by migration.
+    case 'FunctionDeclaration':
+      return true;
+    // Single-declarator `const` — analyse below.
+    case 'VariableDeclaration':
+      if (stmt.kind !== 'const' || stmt.declarations?.length !== 1) return false;
+      break;
+    default:
+      return false;
+  }
 
-  // From here: single-declarator `const`.
-  if (stmt?.type !== 'VariableDeclaration' || stmt.kind !== 'const') return false;
-  if (stmt.declarations?.length !== 1) return false;
   const { id, init } = stmt.declarations[0];
   if (!id) return false;
 
