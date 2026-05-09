@@ -333,46 +333,44 @@ function collectDeclNames(node: any, names: Set<string>): void {
  * - Module-level function declarations moved into segments (const foo = (...) => {...})
  */
 function isReorderableDeclaration(stmt: any): boolean {
-  // FunctionDeclaration — module-level function decls that may be moved into
-  // segments. Independent of order vs neighbouring decls.
+  // Module-level function decls — may be moved between segments by migration.
   if (stmt?.type === 'FunctionDeclaration') return true;
 
-  if (stmt?.type !== 'VariableDeclaration') return false;
-  if (!stmt.declarations || stmt.declarations.length !== 1) return false;
-  const decl = stmt.declarations[0];
-  if (!decl.id) return false;
+  // From here: single-declarator `const`.
+  if (stmt?.type !== 'VariableDeclaration' || stmt.kind !== 'const') return false;
+  if (stmt.declarations?.length !== 1) return false;
+  const { id, init } = stmt.declarations[0];
+  if (!id) return false;
 
-  // Destructuring with a simple init (Identifier or MemberExpression).
-  // Module-level destructure of an external value, side-effect-free for our
-  // purposes (matches the SWC migration behaviour in `isInitializerSafe`).
-  if (decl.id.type === 'ArrayPattern' || decl.id.type === 'ObjectPattern') {
-    if (stmt.kind !== 'const') return false;
-    return decl.init?.type === 'Identifier' || decl.init?.type === 'MemberExpression';
+  // Destructure of a simple read (`const [...] = obj`, `const {x} = obj.y`).
+  if (id.type === 'ArrayPattern' || id.type === 'ObjectPattern') {
+    return init?.type === 'Identifier' || init?.type === 'MemberExpression';
   }
+  if (id.type !== 'Identifier') return false;
 
-  if (decl.id.type !== 'Identifier' || stmt.kind !== 'const') return false;
-  const name = decl.id.name;
-  // QRL declarations: const q_xxx = qrl(...) or _noopQrl(...)
-  if (name.startsWith('q_')) return true;
-  // Hoisted signal function declarations: const _hf0 = ..., const _hf0_str = ...
-  if (/^_hf\d+(_str)?$/.test(name)) return true;
-  // Function expressions assigned to a const — independent module-level decls.
-  if (decl.init?.type === 'ArrowFunctionExpression' || decl.init?.type === 'FunctionExpression') return true;
-  // String literal declarations (e.g., _hf0_str = "...") paired with signal fns
-  if (decl.init?.type === 'Literal' && typeof decl.init.value === 'string' && name.startsWith('_hf')) return true;
-  // .w() hoisting declarations: const xxx = q_xxx.w([...]) or const xxx = someRef.w([...])
-  // These are independent capture bindings that can be safely reordered.
-  if (decl.init?.type === 'CallExpression' &&
-      decl.init.callee?.type === 'MemberExpression' &&
-      decl.init.callee.property?.type === 'Identifier' &&
-      decl.init.callee.property.name === 'w') {
-    return true;
+  // Framework-emitted name prefixes are reorderable regardless of init: `q_*`
+  // are qrl/_noopQrl declarations, `_hf<n>` / `_hf<n>_str` are hoisted signal
+  // functions and their serialised string pair.
+  if (id.name.startsWith('q_') || /^_hf\d+(_str)?$/.test(id.name)) return true;
+
+  // Otherwise: side-effect-free init shapes. Plain reads (Literal, Identifier,
+  // MemberExpression), function expressions (don't run at decl time), or the
+  // `x.w(...)` capture-binding call pattern.
+  if (!init) return false;
+  switch (init.type) {
+    case 'Literal':
+    case 'Identifier':
+    case 'MemberExpression':
+    case 'ArrowFunctionExpression':
+    case 'FunctionExpression':
+      return true;
+    case 'CallExpression':
+      return init.callee?.type === 'MemberExpression' &&
+             init.callee.property?.type === 'Identifier' &&
+             init.callee.property.name === 'w';
+    default:
+      return false;
   }
-  // Simple-init const (Literal, Identifier, MemberExpression) — module-level
-  // bindings that don't depend on neighbouring decls. Safe to reorder for
-  // SWC/TS canonical-form comparison; both sides sort to the same order.
-  const initType = decl.init?.type;
-  return initType === 'Literal' || initType === 'Identifier' || initType === 'MemberExpression';
 }
 
 /**
