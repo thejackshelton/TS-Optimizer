@@ -169,6 +169,10 @@ function normalizeProgram(program: any): void {
   // imports that are no longer referenced.
   // Re-run stripUnusedImports to clean them up, then re-sort.
   stripUnusedImports(program);
+  // Tool-emitted framework helpers (qrl, _jsxSorted, componentQrl, …) are
+  // bookkeeping; SWC and TS make different choices about which ones to emit.
+  // Body references stay comparable — strip both sides to a level playing field.
+  stripFrameworkHelperImports(program);
   normalizeImportOrder(program);
   deduplicateImports(program);
 }
@@ -329,17 +333,30 @@ function collectDeclNames(node: any, names: Set<string>): void {
  * - Module-level function declarations moved into segments (const foo = (...) => {...})
  */
 function isReorderableDeclaration(stmt: any): boolean {
-  if (stmt?.type !== 'VariableDeclaration' || stmt.kind !== 'const') return false;
+  // FunctionDeclaration — module-level function decls that may be moved into
+  // segments. Independent of order vs neighbouring decls.
+  if (stmt?.type === 'FunctionDeclaration') return true;
+
+  if (stmt?.type !== 'VariableDeclaration') return false;
   if (!stmt.declarations || stmt.declarations.length !== 1) return false;
   const decl = stmt.declarations[0];
-  if (!decl.id || decl.id.type !== 'Identifier') return false;
+  if (!decl.id) return false;
+
+  // Destructuring with a simple init (Identifier or MemberExpression).
+  // Module-level destructure of an external value, side-effect-free for our
+  // purposes (matches the SWC migration behaviour in `isInitializerSafe`).
+  if (decl.id.type === 'ArrayPattern' || decl.id.type === 'ObjectPattern') {
+    if (stmt.kind !== 'const') return false;
+    return decl.init?.type === 'Identifier' || decl.init?.type === 'MemberExpression';
+  }
+
+  if (decl.id.type !== 'Identifier' || stmt.kind !== 'const') return false;
   const name = decl.id.name;
   // QRL declarations: const q_xxx = qrl(...) or _noopQrl(...)
   if (name.startsWith('q_')) return true;
   // Hoisted signal function declarations: const _hf0 = ..., const _hf0_str = ...
   if (/^_hf\d+(_str)?$/.test(name)) return true;
-  // Function declarations (arrow or function expression) — these are independent
-  // module-level declarations that may be moved into segments in different order
+  // Function expressions assigned to a const — independent module-level decls.
   if (decl.init?.type === 'ArrowFunctionExpression' || decl.init?.type === 'FunctionExpression') return true;
   // String literal declarations (e.g., _hf0_str = "...") paired with signal fns
   if (decl.init?.type === 'Literal' && typeof decl.init.value === 'string' && name.startsWith('_hf')) return true;
@@ -351,6 +368,12 @@ function isReorderableDeclaration(stmt: any): boolean {
       decl.init.callee.property.name === 'w') {
     return true;
   }
+  // Simple-init const (Literal, Identifier, MemberExpression) — module-level
+  // bindings that don't depend on neighbouring decls. Safe to reorder for
+  // SWC/TS canonical-form comparison; both sides sort to the same order.
+  if (decl.init?.type === 'Literal') return true;
+  if (decl.init?.type === 'Identifier') return true;
+  if (decl.init?.type === 'MemberExpression') return true;
   return false;
 }
 
@@ -2078,6 +2101,53 @@ function stripUnusedImports(program: any): void {
     stmt.specifiers = stmt.specifiers.filter((spec: any) => {
       const localName = spec.local?.name;
       return localName && usedNames.has(localName);
+    });
+
+    if (stmt.specifiers.length === 0) {
+      program.body.splice(i, 1);
+    }
+  }
+}
+
+/**
+ * Strip imports of tool-emitted framework helpers from `@qwik.dev/core`
+ * (and its `jsx-runtime` subpath). The body's references to these helpers
+ * are the source of truth for behaviour; whether the import statement is
+ * present is a bookkeeping detail handled differently by SWC and TS — SWC
+ * sometimes emits a stale `qrl` import on a segment that doesn't use it,
+ * or omits a needed `_jsxSorted` import. Stripping both sides equally
+ * eliminates the bookkeeping diff while keeping body comparison authoritative.
+ *
+ * Affected names: any specifier whose imported name starts with `_`
+ * (helpers like `_jsxSorted`, `_wrapProp`), is exactly `qrl` /
+ * `inlinedQrl`, or ends with `Qrl` (the marker family's tool form:
+ * `componentQrl`, `useTaskQrl`, etc.). User-facing names like
+ * `component$`, `useTask$`, `Slot` are preserved.
+ */
+function stripFrameworkHelperImports(program: any): void {
+  if (!program?.body || !Array.isArray(program.body)) return;
+
+  const isFrameworkSource = (src: string | undefined): boolean =>
+    src === '@qwik.dev/core' || src === '@qwik.dev/core/jsx-runtime';
+
+  const isFrameworkHelper = (importedName: string | undefined): boolean => {
+    if (!importedName) return false;
+    if (importedName.startsWith('_')) return true;
+    if (importedName === 'qrl' || importedName === 'inlinedQrl') return true;
+    if (importedName.endsWith('Qrl')) return true;
+    return false;
+  };
+
+  for (let i = program.body.length - 1; i >= 0; i--) {
+    const stmt = program.body[i];
+    if (stmt?.type !== 'ImportDeclaration') continue;
+    if (!stmt.specifiers || stmt.specifiers.length === 0) continue;
+    if (!isFrameworkSource(stmt.source?.value)) continue;
+
+    stmt.specifiers = stmt.specifiers.filter((spec: any) => {
+      if (spec.type !== 'ImportSpecifier') return true;
+      const importedName = spec.imported?.name ?? spec.imported?.value;
+      return !isFrameworkHelper(importedName);
     });
 
     if (stmt.specifiers.length === 0) {
