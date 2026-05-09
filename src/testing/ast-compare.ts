@@ -371,10 +371,8 @@ function isReorderableDeclaration(stmt: any): boolean {
   // Simple-init const (Literal, Identifier, MemberExpression) — module-level
   // bindings that don't depend on neighbouring decls. Safe to reorder for
   // SWC/TS canonical-form comparison; both sides sort to the same order.
-  if (decl.init?.type === 'Literal') return true;
-  if (decl.init?.type === 'Identifier') return true;
-  if (decl.init?.type === 'MemberExpression') return true;
-  return false;
+  const initType = decl.init?.type;
+  return initType === 'Literal' || initType === 'Identifier' || initType === 'MemberExpression';
 }
 
 /**
