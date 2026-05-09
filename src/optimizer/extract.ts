@@ -423,15 +423,12 @@ export function extractSegments(
             }
           }
 
-          // `inlinedQrl` is a pre-processed QRL emitted by peer codegen tools
-          // (qwik-react, etc.). Contract: JSX, if any, is *already* JSX-transformed
-          // in the body before `inlinedQrl` is called — peer tools run their own JSX
-          // pass and emit `_jsxSorted(...)` / `_jsxSplit(...)` rather than raw JSX
-          // syntax. Verified across all 12 inlinedQrl snapshots in match-these-snaps/:
-          // none have raw JSX as the first arg or in an arrow body. Therefore
-          // mirroring the source file's flavor is safe — unlike the marker-call /
-          // JSX-attribute paths (OSS-351), this path doesn't push onto
-          // `activeSegmentBodies` for JSX detection. See OSS-352 for the audit.
+          // Initial value; if `arg0` is a function whose body contains JSX, the
+          // leave-handler at line 701 will flip this via `extensionFromSegmentJsx`
+          // (same mechanism OSS-351 introduced for marker calls and JSX attrs).
+          // Static-value `arg0` (string, identifier, null) bypasses the push
+          // below — extension stays as `sourceExt`, which matches the snapshot
+          // baseline.
           const extension = sourceExt;
 
           const extraction: ExtractionResult = {
@@ -471,6 +468,20 @@ export function extractSegments(
             arg0.type === 'ArrowFunctionExpression' ||
             arg0.type === 'FunctionExpression'
           ) {
+            // Same JSX-detection treatment OSS-351 added for marker calls and
+            // JSX-attribute extractions: if any JSX node is encountered while
+            // walking arg0's body, the leave-handler flips the extension via
+            // extensionFromSegmentJsx. Defensive against peer codegen tools
+            // that might emit raw JSX inside an inlinedQrl arrow body
+            // (current peer tools — qwik-react etc. — pre-transform JSX, so
+            // none of the 12 inlinedQrl-using snapshots in match-these-snaps/
+            // exercise this path; verified during OSS-352).
+            activeSegmentBodies.push({
+              leaveNode: node,
+              root: arg0,
+              result: extraction,
+              hasJsx: false,
+            });
             pendingClosures.push({ extraction, node: arg0 });
           }
         }
