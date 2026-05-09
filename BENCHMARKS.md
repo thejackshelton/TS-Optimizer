@@ -83,6 +83,34 @@ The current CI assertion caps are **1.15×** for BENCH-01 and **1.5×** for BENC
 
 ---
 
+## Visual trend
+
+Both charts plot **TS / SWC ratio** (the dimensionless regression signal — lower is better) across the same 9 commits the tables above describe, oldest → newest. The y-axes are intentionally narrow so within-noise movement is visible; widening them to start at 0 would flatten the trend and hide the ~10% spread.
+
+### BENCH-01 ratio over time
+
+```mermaid
+xychart-beta
+    title "BENCH-01 — TS / SWC ratio (lower is better; CI cap = 1.15×)"
+    x-axis ["d3226c3", "e98cbff", "dd450a6", "d3f4387", "b903652", "3b8eac6", "29a439e", "854f04b", "4673e07"]
+    y-axis "Ratio (×)" 2.5 --> 3.0
+    line [2.82, 2.86, 2.74, 2.72, 2.83, 2.77, 2.70, 2.72, 2.66]
+```
+
+### BENCH-02 ratio over time
+
+```mermaid
+xychart-beta
+    title "BENCH-02 — TS / SWC ratio (lower is better; CI cap = 1.5×)"
+    x-axis ["d3226c3", "e98cbff", "dd450a6", "d3f4387", "b903652", "3b8eac6", "29a439e", "854f04b", "4673e07"]
+    y-axis "Ratio (×)" 4.5 --> 5.5
+    line [4.75, 4.93, 5.15, 5.03, 5.27, 4.87, 5.09, 4.65, 4.67]
+```
+
+> The CI caps (1.15× and 1.5×) sit well below the visible y-axis ranges and aren't drawn. Mermaid's `xychart-beta` doesn't support reference lines — caps stay textual in each chart's title. The tables above remain the source of truth; the charts are a visual aid.
+
+---
+
 ## Trend so far
 
 **Over the 4 days from 2026-05-06 → 2026-05-09 the TS optimizer is unchanged in perf within noise**, with one mildly suggestive recent uptick:
