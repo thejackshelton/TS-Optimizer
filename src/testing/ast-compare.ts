@@ -339,20 +339,20 @@ function collectDeclNames(node: any, names: Set<string>): void {
  * - Hoisted signal functions (const _hf0 = ..., const _hf0_str = ...)
  * - Module-level function declarations moved into segments (const foo = (...) => {...})
  */
-function isReorderableDeclaration(stmt: Statement | Directive): boolean {
-  switch (stmt.type) {
+function isReorderableDeclaration(decl: Statement | Directive): boolean {
+  switch (decl.type) {
     // Module-level function decls — may be moved between segments by migration.
     case 'FunctionDeclaration':
       return true;
     // Single-declarator `const` — analyse below.
     case 'VariableDeclaration':
-      if (stmt.kind !== 'const' || stmt.declarations.length !== 1) return false;
+      if (decl.kind !== 'const' || decl.declarations.length !== 1) return false;
       break;
     default:
       return false;
   }
 
-  const { id, init } = stmt.declarations[0];
+  const { id, init } = decl.declarations[0];
 
   switch (id.type) {
     // Destructure of a simple read (`const [...] = obj`, `const {x} = obj.y`).
