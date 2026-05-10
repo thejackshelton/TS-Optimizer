@@ -1,0 +1,55 @@
+---
+source: optimizer/src/js_lib_interface.rs
+expression: output
+---
+==INPUT==
+
+
+import { component$, useBrowserVisibleTask$, useStore, useStyles$ } from '@qwik.dev/core';
+import { thing } from './sibling';
+import mongodb from 'mongodb';
+
+export const Child = component$(() => {
+
+	useStyles$('somestring');
+	const state = useStore({
+		count: 0
+	});
+
+	// Double count watch
+	useBrowserVisibleTask$(() => {
+		state.count = thing.doStuff() + import("./sibling");
+	});
+
+	return (
+		<div onClick$={() => console.log(mongodb)}>
+		</div>
+	);
+});
+
+============================= test_example_inlined_entry_strategy.tsx ==
+
+import { thing } from "./sibling";
+import { _jsxSorted, _noopQrl, componentQrl, useBrowserVisibleTaskQrl, useStore, useStylesQrl } from "@qwik.dev/core";
+import mongodb from "mongodb";
+const q_Child_component_useStyles_0YP07jYh68c = /* @__PURE__ */ _noopQrl("Child_component_useStyles_0YP07jYh68c");
+const q_Child_component_useBrowserVisibleTask_zXrCgMzuI1U = /* @__PURE__ */ _noopQrl("Child_component_useBrowserVisibleTask_zXrCgMzuI1U");
+const q_Child_component_ZgWVJM9fzxw = /* @__PURE__ */ _noopQrl("Child_component_ZgWVJM9fzxw");
+q_Child_component_useStyles_0YP07jYh68c.s("somestring");
+q_Child_component_useBrowserVisibleTask_zXrCgMzuI1U.s(() => {
+	state.count = thing.doStuff() + import("./sibling");
+});
+q_Child_component_ZgWVJM9fzxw.s(() => {
+	useStylesQrl(q_Child_component_useStyles_0YP07jYh68c);
+	const state = useStore({ count: 0 });
+	// Double count watch
+	useBrowserVisibleTaskQrl(q_Child_component_useBrowserVisibleTask_zXrCgMzuI1U);
+	return /* @__PURE__ */ _jsxSorted("div", { onClick$: () => console.log(mongodb) }, {}, [], 1, null);
+});
+export const Child = /* @__PURE__ */ componentQrl(q_Child_component_ZgWVJM9fzxw);
+
+
+None
+== DIAGNOSTICS ==
+
+[]

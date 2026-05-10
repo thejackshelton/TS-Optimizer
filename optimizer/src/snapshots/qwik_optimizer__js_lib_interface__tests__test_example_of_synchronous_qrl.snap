@@ -1,0 +1,71 @@
+---
+source: optimizer/src/js_lib_interface.rs
+expression: output
+---
+==INPUT==
+
+
+		import { sync$, component$ } from "@qwik.dev/core";
+
+		export default component$(() => {
+		return (
+			<>
+				<input onClick$={sync$(function(event, target) {
+					// comment should be removed
+					event.preventDefault();
+				})}/>
+				<input onClick$={sync$((event, target) => {
+					event.preventDefault();
+				})}/>
+				<input onClick$={sync$((event, target) => event.preventDefault())}/>
+			</>
+		);
+		});
+
+============================= test_example_of_synchronous_qrl.tsx_component_EBbV1k5iRnk.js (ENTRY POINT)==
+
+import { _jsxSorted, _qrlSync } from "@qwik.dev/core";
+export const component_EBbV1k5iRnk = () => {
+	return [
+		/* @__PURE__ */ _jsxSorted("input", { onClick$: _qrlSync(function(event, target) {
+			event.preventDefault();
+		}, "function(event,target){event.preventDefault()}") }, {}, [], 1, null),
+		/* @__PURE__ */ _jsxSorted("input", { onClick$: _qrlSync((event, target) => {
+			event.preventDefault();
+		}, "(event,target)=>{event.preventDefault()}") }, {}, [], 1, null),
+		/* @__PURE__ */ _jsxSorted("input", { onClick$: _qrlSync((event, target) => event.preventDefault(), "(event,target)=>event.preventDefault()") }, {}, [], 1, null)
+	];
+};
+
+
+None
+/*
+{
+  "origin": "test_example_of_synchronous_qrl.tsx",
+  "name": "component_EBbV1k5iRnk",
+  "entry": null,
+  "displayName": "test_example_of_synchronous_qrl.tsx_component",
+  "hash": "EBbV1k5iRnk",
+  "canonicalFilename": "test_example_of_synchronous_qrl.tsx_component_EBbV1k5iRnk",
+  "path": "",
+  "extension": "js",
+  "parent": null,
+  "ctxKind": "function",
+  "ctxName": "component$",
+  "captures": false,
+  "loc": [
+    0,
+    0
+  ]
+}
+*/
+============================= test_example_of_synchronous_qrl.tsx ==
+
+import { componentQrl, qrl } from "@qwik.dev/core";
+export default componentQrl(qrl(() => import("./test_example_of_synchronous_qrl.tsx_component_EBbV1k5iRnk"), "component_EBbV1k5iRnk"));
+
+
+None
+== DIAGNOSTICS ==
+
+[]
