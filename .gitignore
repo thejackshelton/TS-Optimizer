@@ -1,6 +1,7 @@
 node_modules/
 dist/
 rust-impl/target/
+oxc/target/
 .tmpbuild/
 .pnpm-store/
 isolate-*.log
