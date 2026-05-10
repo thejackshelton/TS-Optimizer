@@ -1,6 +1,7 @@
 ---
 source: optimizer/src/js_lib_interface.rs
 expression: result
+snapshot_kind: text
 ---
 modules:
   - path: "./src/test_input/test_project_1/src/entry.preview.tsx"
@@ -29,7 +30,7 @@ modules:
         - 0
     isEntry: true
   - path: "./src/test_input/test_project_1/src/entry.ssr.tsx"
-    code: "import Root from \"./root\";\nimport { manifest } from \"@qwik-client-manifest\";\nimport { _jsxSorted } from \"@qwik.dev/core\";\nimport { renderToStream } from \"@qwik.dev/core/server\";\nexport default function(opts) {\n\treturn renderToStream(_jsxSorted(Root, {}, {}, [], 1, null), {\n\t\tmanifest,\n\t\t...opts,\n\t\tcontainerAttributes: {\n\t\t\tlang: \"en-us\",\n\t\t\t...opts.containerAttributes\n\t\t},\n\t\tserverData: { ...opts.serverData }\n\t});\n}\n"
+    code: "import Root from \"./root\";\nimport { manifest } from \"@qwik-client-manifest\";\nimport { _jsxSorted } from \"@qwik.dev/core\";\nimport { renderToStream } from \"@qwik.dev/core/server\";\nexport default function(opts) {\n\treturn renderToStream(_jsxSorted(Root, {}, {}, [], 1, null), {\n\t\tmanifest,\n\t\t...opts,\n\t\t// Use container attributes to set attributes on the html tag.\n\t\tcontainerAttributes: {\n\t\t\tlang: \"en-us\",\n\t\t\t...opts.containerAttributes\n\t\t},\n\t\tserverData: { ...opts.serverData }\n\t});\n}\n"
     map: ~
     segment: ~
     isEntry: false
@@ -64,7 +65,7 @@ modules:
     segment: ~
     isEntry: false
   - path: "./src/test_input/test_project_1/src/routes/layout.tsx"
-    code: "import { componentQrl, qrl } from \"@qwik.dev/core\";\nexport const onGet = async ({ cacheControl }) => {\n\t// Control caching for this request for best performance and to reduce hosting costs:\n\t// https://qwik.dev/docs/caching/\n\tcacheControl({\n\t\tstaleWhileRevalidate: 60 * 60 * 24 * 7,\n\t\tmaxAge: 5\n\t});\n};\nexport default componentQrl(qrl(() => import(\"./layout.tsx_component_e0ZOSHqXHEo.js\"), \"component_e0ZOSHqXHEo\"));\n"
+    code: "import { componentQrl, qrl } from \"@qwik.dev/core\";\nexport const onGet = async ({ cacheControl }) => {\n\t// Control caching for this request for best performance and to reduce hosting costs:\n\t// https://qwik.dev/docs/caching/\n\tcacheControl({\n\t\t// Always serve a cached response by default, up to a week stale\n\t\tstaleWhileRevalidate: 60 * 60 * 24 * 7,\n\t\t// Max once every 5 seconds, revalidate on the server to get a fresh version of this page\n\t\tmaxAge: 5\n\t});\n};\nexport default componentQrl(qrl(() => import(\"./layout.tsx_component_e0ZOSHqXHEo.js\"), \"component_e0ZOSHqXHEo\"));\n"
     map: ~
     segment: ~
     isEntry: false

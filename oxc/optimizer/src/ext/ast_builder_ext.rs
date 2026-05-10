@@ -2,7 +2,8 @@ use crate::component::ImportId;
 use oxc_allocator::{Box as OxcBox, IntoIn, Vec as OxcVec};
 use oxc_ast::ast::{ImportOrExportKind, Statement, WithClause};
 use oxc_ast::AstBuilder;
-use oxc_span::{Atom, SPAN};
+use oxc_span::SPAN;
+use oxc_str::Str;
 
 pub trait AstBuilderExt<'a> {
     fn create_import_statement<U: AsRef<str>>(
@@ -26,8 +27,8 @@ impl<'a> AstBuilderExt<'a> for AstBuilder<'a> {
             import_decl_specifier.push(import_id.into_in(self.allocator));
         }
 
-        let raw = self.atom(&format!("'{}'", source.as_ref()));
-        let source_location = self.string_literal(SPAN, self.atom(source.as_ref()), Some(raw));
+        let raw = self.str(&format!("'{}'", source.as_ref()));
+        let source_location = self.string_literal(SPAN, self.str(source.as_ref()), Some(raw));
         let import_decl = self.alloc_import_declaration(
             SPAN,
             Some(import_decl_specifier),
@@ -41,14 +42,14 @@ impl<'a> AstBuilderExt<'a> for AstBuilder<'a> {
     }
 
     fn create_export_statement(self, name: &str, source: &str) -> Statement<'a> {
-        let exported = self.module_export_name_identifier_name(SPAN, self.atom(name));
-        let local_name = self.module_export_name_identifier_name(SPAN, self.atom(name));
+        let exported = self.module_export_name_identifier_name(SPAN, self.ident(name));
+        let local_name = self.module_export_name_identifier_name(SPAN, self.ident(name));
         let export_specifier =
             self.export_specifier(SPAN, exported, local_name, ImportOrExportKind::Value);
         let mut export_specifiers = OxcVec::new_in(self.allocator);
         export_specifiers.push(export_specifier);
-        let raw = self.atom(&format!(r#""{}""#, source));
-        let source_location = self.string_literal(SPAN, self.atom(source), Some(raw));
+        let raw = self.str(&format!(r#""{}""#, source));
+        let source_location = self.string_literal(SPAN, self.str(source), Some(raw));
         let export_decl = self.alloc_export_named_declaration(
             SPAN,
             None,
@@ -62,8 +63,8 @@ impl<'a> AstBuilderExt<'a> for AstBuilder<'a> {
     }
 
     fn create_simple_import(self, name: &str) -> Statement<'a> {
-        let raw: Atom = self.atom(&format!(r#""{}""#, name));
-        let source = self.expression_string_literal(SPAN, self.atom(name), Some(raw));
+        let raw: Str = self.str(&format!(r#""{}""#, name));
+        let source = self.expression_string_literal(SPAN, self.str(name), Some(raw));
         let import_expression = self.expression_import(SPAN, source, None, None);
         self.statement_expression(SPAN, import_expression)
     }

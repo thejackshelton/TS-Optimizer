@@ -684,7 +684,7 @@ impl<'a> Traverse<'a, ()> for TransformGenerator<'a> {
                                         self.jsx_key_counter += 1;
                                         return self.builder.expression_string_literal(
                                             Span::default(),
-                                            self.builder.atom(&new_key),
+                                            self.builder.str(&new_key),
                                             None,
                                         );
                                     }
@@ -1039,7 +1039,7 @@ impl<'a> Traverse<'a, ()> for TransformGenerator<'a> {
                         match specifier {
                             ImportDeclarationSpecifier::ImportSpecifier(specifier) => {
                                 specifier.imported = ModuleExportName::IdentifierName(
-                                    ctx.ast.identifier_name(SPAN, ctx.ast.atom(&name)),
+                                    ctx.ast.identifier_name(SPAN, ctx.ast.ident(&name)),
                                 );
                                 specifier.local.name = local_name.into_in(ctx.ast.allocator);
                             }

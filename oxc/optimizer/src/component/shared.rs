@@ -3,7 +3,7 @@ use crate::import_clean_up::ImportCleanUp;
 use oxc_allocator::{Allocator, FromIn};
 use oxc_ast::ast::{ImportDeclarationSpecifier, ImportOrExportKind, Statement};
 use oxc_ast::AstBuilder;
-use oxc_span::{Atom, SPAN};
+use oxc_span::SPAN;
 use serde::{Deserialize, Serialize};
 use std::convert::Into;
 use std::path::PathBuf;
@@ -29,7 +29,7 @@ impl From<&str> for ImportId {
     }
 }
 
-fn replace_marker_with_qrl(name: Atom<'_>) -> String {
+fn replace_marker_with_qrl(name: &str) -> String {
     let name = name.to_string();
     if let Some(qrl_call) = name.strip_suffix(MARKER_SUFFIX) {
         format!("{}{}", qrl_call, QRL_SUFFIX)
@@ -42,8 +42,8 @@ impl From<&ImportDeclarationSpecifier<'_>> for ImportId {
     fn from(value: &ImportDeclarationSpecifier<'_>) -> Self {
         match value {
             ImportDeclarationSpecifier::ImportSpecifier(specifier) => {
-                let imported = replace_marker_with_qrl(specifier.imported.name());
-                let local_name = replace_marker_with_qrl(specifier.local.name);
+                let imported = replace_marker_with_qrl(specifier.imported.name().as_str());
+                let local_name = replace_marker_with_qrl(specifier.local.name.as_str());
 
                 if imported == local_name {
                     ImportId::Named(imported)
@@ -68,8 +68,8 @@ impl<'a> FromIn<'a, ImportId> for ImportDeclarationSpecifier<'a> {
         let ast = AstBuilder::new(allocator);
         match value {
             ImportId::Named(name) => {
-                let imported = ast.module_export_name_identifier_name(SPAN, ast.atom(&name));
-                let local_name = ast.binding_identifier(SPAN, ast.atom(&name));
+                let imported = ast.module_export_name_identifier_name(SPAN, ast.ident(&name));
+                let local_name = ast.binding_identifier(SPAN, ast.ident(&name));
                 ast.import_declaration_specifier_import_specifier(
                     SPAN,
                     imported,
@@ -79,8 +79,8 @@ impl<'a> FromIn<'a, ImportId> for ImportDeclarationSpecifier<'a> {
             }
 
             ImportId::NamedWithAlias(name, local_name) => {
-                let imported = ast.module_export_name_identifier_name(SPAN, ast.atom(&name));
-                let local_name = ast.binding_identifier(SPAN, ast.atom(&local_name));
+                let imported = ast.module_export_name_identifier_name(SPAN, ast.ident(&name));
+                let local_name = ast.binding_identifier(SPAN, ast.ident(&local_name));
                 ast.import_declaration_specifier_import_specifier(
                     SPAN,
                     imported,
@@ -89,11 +89,11 @@ impl<'a> FromIn<'a, ImportId> for ImportDeclarationSpecifier<'a> {
                 )
             }
             ImportId::Namespace(local_name) => {
-                let local_name = ast.binding_identifier(SPAN, ast.atom(&local_name));
+                let local_name = ast.binding_identifier(SPAN, ast.ident(&local_name));
                 ast.import_declaration_specifier_import_namespace_specifier(SPAN, local_name)
             }
             ImportId::Default(name) => {
-                let local_name = ast.binding_identifier(SPAN, ast.atom(&name));
+                let local_name = ast.binding_identifier(SPAN, ast.ident(&name));
                 ast.import_declaration_specifier_import_default_specifier(SPAN, local_name)
             }
         }

@@ -65,7 +65,7 @@ impl Qrl {
                 let qrl_symbol_id = if !symbols_by_name.contains_key(QRL) {
                     let symbol_id = ctx.scoping_mut().create_symbol(
                         SPAN,
-                        QRL,
+                        QRL.into(),
                         SymbolFlags::Import,
                         ScopeId::new(0),
                         NodeId::DUMMY,
@@ -84,7 +84,7 @@ impl Qrl {
                 if let Some(symbol_id) = symbols_by_name.get(name) {
                     ctx.create_bound_reference(*symbol_id, ReferenceFlags::None)
                 } else {
-                    ctx.create_unbound_reference(name, ReferenceFlags::None)
+                    ctx.create_unbound_reference(name.as_str().into(), ReferenceFlags::None)
                 }
             }
         }
@@ -119,7 +119,7 @@ impl Qrl {
                     Self::make_ref_id(&self.qrl_type, ctx, symbols_by_name, import_by_symbol);
                 ast.identifier_reference_with_reference_id(
                     SPAN,
-                    ast.atom(&format!("{}{}", prefix, QRL_SUFFIX)),
+                    ast.ident(&format!("{}{}", prefix, QRL_SUFFIX)),
                     ref_id,
                 )
             }
@@ -153,7 +153,7 @@ impl Qrl {
             SPAN,
             FormalParameterKind::ArrowFormalParameters,
             OxcVec::with_capacity_in(0, ast_builder.allocator),
-            None::<OxcBox<BindingRestElement>>,
+            None::<OxcBox<FormalParameterRest>>,
         );
 
         //  Arrow Function Expression ////////
@@ -172,9 +172,9 @@ impl Qrl {
         let allocator = ast_builder.allocator;
 
         // ARG: Display name string literal ////////
-        let raw = ast_builder.atom(&format!(r#""{}""#, &self.display_name));
+        let raw = ast_builder.str(&format!(r#""{}""#, &self.display_name));
         let display_name_arg = OxcBox::new_in(
-            ast_builder.string_literal(SPAN, ast_builder.atom(&self.display_name), Some(raw)),
+            ast_builder.string_literal(SPAN, ast_builder.str(&self.display_name), Some(raw)),
             allocator,
         );
 
@@ -224,7 +224,7 @@ impl Qrl {
                 let ident = OxcBox::new_in(
                     ast_builder.identifier_reference_with_reference_id(
                         SPAN,
-                        ast_builder.atom(&format!("{}{}", prefix, QRL_SUFFIX)),
+                        ast_builder.ident(&format!("{}{}", prefix, QRL_SUFFIX)),
                         ref_id,
                     ),
                     ast_builder.allocator,
