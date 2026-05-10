@@ -1,9 +1,11 @@
 import { parseSync } from 'oxc-parser';
 import equal from 'fast-deep-equal';
 import type {
+  Directive,
   ImportDeclaration,
   ModuleExportName,
   Program,
+  Statement,
 } from '../ast-types.js';
 
 export interface AstCompareResult {
@@ -337,21 +339,20 @@ function collectDeclNames(node: any, names: Set<string>): void {
  * - Hoisted signal functions (const _hf0 = ..., const _hf0_str = ...)
  * - Module-level function declarations moved into segments (const foo = (...) => {...})
  */
-function isReorderableDeclaration(stmt: any): boolean {
-  switch (stmt?.type) {
+function isReorderableDeclaration(stmt: Statement | Directive): boolean {
+  switch (stmt.type) {
     // Module-level function decls — may be moved between segments by migration.
     case 'FunctionDeclaration':
       return true;
     // Single-declarator `const` — analyse below.
     case 'VariableDeclaration':
-      if (stmt.kind !== 'const' || stmt.declarations?.length !== 1) return false;
+      if (stmt.kind !== 'const' || stmt.declarations.length !== 1) return false;
       break;
     default:
       return false;
   }
 
   const { id, init } = stmt.declarations[0];
-  if (!id) return false;
 
   switch (id.type) {
     // Destructure of a simple read (`const [...] = obj`, `const {x} = obj.y`).
@@ -381,8 +382,8 @@ function isReorderableDeclaration(stmt: any): boolean {
     case 'FunctionExpression':
       return true;
     case 'CallExpression':
-      return init.callee?.type === 'MemberExpression' &&
-             init.callee.property?.type === 'Identifier' &&
+      return init.callee.type === 'MemberExpression' &&
+             init.callee.property.type === 'Identifier' &&
              init.callee.property.name === 'w';
     default:
       return false;
