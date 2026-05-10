@@ -1,5 +1,10 @@
 import { parseSync } from 'oxc-parser';
 import equal from 'fast-deep-equal';
+import type {
+  ImportDeclaration,
+  ModuleExportName,
+  Program,
+} from '../ast-types.js';
 
 export interface AstCompareResult {
   match: boolean;
@@ -2131,29 +2136,33 @@ function stripUnusedImports(program: any): void {
  * `componentQrl`, `useTaskQrl`, etc.). User-facing names like
  * `component$`, `useTask$`, `Slot` are preserved.
  */
-function stripFrameworkHelperImports(program: any): void {
-  if (!program?.body || !Array.isArray(program.body)) return;
+function stripFrameworkHelperImports(program: Program): void {
+  const isFrameworkHelper = (name: string): boolean =>
+    name.startsWith('_') ||
+    name === 'qrl' ||
+    name === 'inlinedQrl' ||
+    name.endsWith('Qrl');
 
-  const isFrameworkHelper = (name: string | undefined): boolean =>
-    !!name && (
-      name.startsWith('_') ||
-      name === 'qrl' ||
-      name === 'inlinedQrl' ||
-      name.endsWith('Qrl')
-    );
+  // `ModuleExportName = IdentifierName | IdentifierReference | StringLiteral` —
+  // the first two carry `name` (`type: "Identifier"`), StringLiteral carries
+  // `value` (`type: "Literal"`).
+  const importedNameOf = (imported: ModuleExportName): string =>
+    imported.type === 'Literal' ? imported.value : imported.name;
+
+  const isStrippable = (decl: ImportDeclaration): boolean =>
+    decl.source.value === '@qwik.dev/core' ||
+    decl.source.value === '@qwik.dev/core/jsx-runtime';
+
+  const keepSpecifier = (spec: ImportDeclaration['specifiers'][number]): boolean =>
+    spec.type !== 'ImportSpecifier' ||
+    !isFrameworkHelper(importedNameOf(spec.imported));
 
   for (let i = program.body.length - 1; i >= 0; i--) {
     const stmt = program.body[i];
-    if (stmt?.type !== 'ImportDeclaration') continue;
-    if (!stmt.specifiers?.length) continue;
-    const src = stmt.source?.value;
-    if (src !== '@qwik.dev/core' && src !== '@qwik.dev/core/jsx-runtime') continue;
+    if (stmt.type !== 'ImportDeclaration' || stmt.specifiers.length === 0) continue;
+    if (!isStrippable(stmt)) continue;
 
-    stmt.specifiers = stmt.specifiers.filter((spec: any) =>
-      spec.type !== 'ImportSpecifier' ||
-      !isFrameworkHelper(spec.imported?.name ?? spec.imported?.value),
-    );
-
+    stmt.specifiers = stmt.specifiers.filter(keepSpecifier);
     if (stmt.specifiers.length === 0) program.body.splice(i, 1);
   }
 }
