@@ -2,41 +2,23 @@
 #![deny(clippy::perf)]
 #![deny(clippy::nursery)]
 
-extern crate napi;
-#[macro_use]
-extern crate napi_derive;
-
-use napi::{CallContext, JsObject, Result};
-use tokio::task;
+use napi::Result;
+use napi_derive::napi;
 use qwik_optimizer::js_lib_interface;
 
 #[cfg(windows)]
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-#[allow(clippy::needless_pass_by_value)]
-#[js_function(1)]
-fn transform_modules(ctx: CallContext) -> Result<JsObject> {
-	let opts = ctx.get::<JsObject>(0)?;
-	let config: js_lib_interface::TransformModulesOptions = ctx.env.from_js_value(opts)?;
+#[napi]
+pub async fn transform_modules(opts: serde_json::Value) -> Result<serde_json::Value> {
+    let config: js_lib_interface::TransformModulesOptions =
+        serde_json::from_value(opts).map_err(|e| napi::Error::from_reason(e.to_string()))?;
 
-	ctx.env.execute_tokio_future(
-		async move {
-			// Spawn the CPU-intensive work onto a separate thread in the thread pool
-			let result = task::spawn_blocking(move || js_lib_interface::transform_modules(config))
-				.await
-				.unwrap()
-				.map_err(|e| napi::Error::from_reason(e.to_string()))?;
+    let result = tokio::task::spawn_blocking(move || js_lib_interface::transform_modules(config))
+        .await
+        .unwrap()
+        .map_err(|e| napi::Error::from_reason(e.to_string()))?;
 
-			Ok(result)
-		},
-		|env, result| env.to_js_value(&result),
-	)
-}
-
-#[module_exports]
-fn init(mut exports: JsObject) -> Result<()> {
-	exports.create_named_method("transform_modules", transform_modules)?;
-
-	Ok(())
+    serde_json::to_value(&result).map_err(|e| napi::Error::from_reason(e.to_string()))
 }
