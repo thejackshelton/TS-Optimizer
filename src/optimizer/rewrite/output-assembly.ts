@@ -264,15 +264,7 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
     }
   }
 
-  // Sort by extracted symbol name (the quoted second arg to qrl/qrlDEV)
-  // rather than full text. This keeps bare `qrl(...)` preload statements
-  // interleaved alphabetically among the `const q_<sym> = ...` declarations
-  // — without this, bare statements (starting with `q`) sort to the end
-  // while `const q_*` lines (starting with `c`) cluster at the top, which
-  // diverges from SWC's expected interleaving.
-  const symRe = /, "([^"]+)"\)/;
-  const symOf = (decl: string): string => decl.match(symRe)?.[1] ?? decl;
-  ctx.qrlDecls.sort((a, b) => symOf(a).localeCompare(symOf(b)));
+  ctx.qrlDecls.sort();
 }
 
 export function buildInlineSCalls(ctx: RewriteContext): void {
