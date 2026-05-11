@@ -14,8 +14,8 @@ export const App = component$((props: Stuff) => {
 import { _noopQrl } from "@qwik.dev/core";
 import { componentQrl } from "@qwik.dev/core";
 //
-const q_App_component_Cmp_p_q_e_click_Yl4ybrJWrt4 = /* @__PURE__ */ _noopQrl("App_component_Cmp_p_q_e_click_Yl4ybrJWrt4");
 const q_App_component_ckEPmXZlub0 = /* @__PURE__ */ _noopQrl("App_component_ckEPmXZlub0");
+const q_App_component_Cmp_p_q_e_click_Yl4ybrJWrt4 = /* @__PURE__ */ _noopQrl("App_component_Cmp_p_q_e_click_Yl4ybrJWrt4");
 q_App_component_Cmp_p_q_e_click_Yl4ybrJWrt4.s(() => console.log("warn"));
 q_App_component_ckEPmXZlub0.s((props) => {
 	return <Cmp>

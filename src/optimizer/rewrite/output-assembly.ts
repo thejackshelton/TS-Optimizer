@@ -149,6 +149,29 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
   const topLevelNonSync = extractions.filter((e) => !e.isSync && e.parent === null && !inlinedQrlSymbols.has(e.symbolName));
   const allNonSync = extractions.filter((e) => !e.isSync && !inlinedQrlSymbols.has(e.symbolName));
 
+  // Symbols whose source-decl is being `move`d into a sibling segment's file.
+  // For these, the parent skips the usual `const q_<sym> = qrl(...)` declaration
+  // and instead emits a bare `qrl(...);` expression statement — runtime preload
+  // registration only, since `q_<sym>` is no longer referenced in the parent
+  // (the `componentQrl(q_<sym>)` wrap got moved out alongside the source decl).
+  const movedMarkerSymbols = new Set<string>();
+  if (ctx.migrationDecisions && ctx.moduleLevelDecls) {
+    const fileStem = relPath.split('/').pop() ?? relPath;
+    for (const decision of ctx.migrationDecisions) {
+      if (decision.action !== 'move') continue;
+      const exact = `${fileStem}_${decision.varName}`;
+      const prefix = `${exact}_`;
+      for (const e of extractions) {
+        if (e.parent !== null) continue;
+        if (e.isInlinedQrl) continue;
+        if (e.displayName === exact || e.displayName.startsWith(prefix)) {
+          movedMarkerSymbols.add(e.symbolName);
+          break;
+        }
+      }
+    }
+  }
+
   let strippedCounter = 0;
 
   if (isInline) {
@@ -213,6 +236,16 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
   } else {
     const devExt = explicitExtensions ? (outputExtension ?? '.js') : undefined;
     for (const ext of topLevelNonSync) {
+      if (movedMarkerSymbols.has(ext.symbolName)) {
+        const fileExt = explicitExtensions ? (outputExtension ?? '.js') : '';
+        ctx.qrlDecls.push(
+          `qrl(()=>import("./${ext.canonicalFilename}${fileExt}"), "${ext.symbolName}");`,
+        );
+        // Intentionally not adding `q_<sym>` to `qrlVarNames`: the
+        // parent no longer declares this binding, so any stray reference
+        // should surface as a downstream error rather than be silently named.
+        continue;
+      }
       if (isDevMode && devFilePath) {
         ctx.qrlDecls.push(buildQrlDevDeclaration(
           ext.symbolName, ext.canonicalFilename, devFilePath,
@@ -231,7 +264,15 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
     }
   }
 
-  ctx.qrlDecls.sort();
+  // Sort by extracted symbol name (the quoted second arg to qrl/qrlDEV)
+  // rather than full text. This keeps bare `qrl(...)` preload statements
+  // interleaved alphabetically among the `const q_<sym> = ...` declarations
+  // — without this, bare statements (starting with `q`) sort to the end
+  // while `const q_*` lines (starting with `c`) cluster at the top, which
+  // diverges from SWC's expected interleaving.
+  const symRe = /, "([^"]+)"\)/;
+  const symOf = (decl: string): string => decl.match(symRe)?.[1] ?? decl;
+  ctx.qrlDecls.sort((a, b) => symOf(a).localeCompare(symOf(b)));
 }
 
 export function buildInlineSCalls(ctx: RewriteContext): void {
