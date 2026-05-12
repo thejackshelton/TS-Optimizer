@@ -116,6 +116,12 @@ function normalizeProgram(program: any): void {
   normalizeVoidZero(program);
   normalizeBooleanLiterals(program);
 
+  // Fold constant subtrees (BinaryExpression / ConditionalExpression /
+  // UnaryExpression / LogicalExpression with literal operands). SWC
+  // evaluates these at compile time; TS-Optimizer preserves source.
+  // Both produce identical runtime behaviour, so canonicalise both sides.
+  foldTrivialConstants(program);
+
   // Module directives — `"use strict"` is implicit in ESM
   stripDirectives(program);
 
@@ -2435,6 +2441,113 @@ function stripOrphanedSideEffectCalls(program: any): void {
  * and actual sides equally so the rest of the structure can be compared
  * without position noise.
  */
+/**
+ * Fold trivial constant subtrees (binary ops over literals, unary ops over
+ * literals, short-circuiting logical ops with a literal left, conditional
+ * expressions with a literal test) into their literal result.
+ *
+ * SWC's optimizer evaluates user-side constant expressions at compile time
+ * (e.g. `'true' + 1 ? 'true' : ''` → `'true'`). TS-Optimizer preserves the
+ * source expression verbatim. Both forms have identical runtime behaviour
+ * — the JSX prop value evaluates to the same thing on every render — so
+ * the difference is parity noise, not a semantic gap. Folding both sides
+ * before structural compare canonicalises them.
+ *
+ * Post-order traversal so leaves fold first and propagate up: `('true' +
+ * 1) ? a : b` folds the BinaryExpression to a string Literal, then the
+ * ConditionalExpression sees a literal test and picks the consequent.
+ *
+ * Conservative — only folds operations where both operands are primitive
+ * Literals (no objects, no BigInt) and the operator's JS semantics are
+ * unambiguous. BigInt, division-by-zero, and exotic coercions are left
+ * untouched.
+ */
+function foldTrivialConstants(node: any): any {
+  if (node === null || typeof node !== 'object') return node;
+  if (Array.isArray(node)) {
+    for (let i = 0; i < node.length; i++) node[i] = foldTrivialConstants(node[i]);
+    return node;
+  }
+  // Recurse children first (post-order) so nested foldable expressions
+  // collapse to literals before their parents are evaluated.
+  for (const key of Object.keys(node)) {
+    if (key === 'type') continue;
+    node[key] = foldTrivialConstants(node[key]);
+  }
+  return tryFoldNode(node);
+}
+
+function isPrimitiveLiteral(n: any): boolean {
+  if (!n || n.type !== 'Literal') return false;
+  if (n.bigint !== undefined) return false;
+  const v = n.value;
+  return v === null || v === undefined ||
+    typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+}
+
+function makeLiteral(value: any): any {
+  return { type: 'Literal', value };
+}
+
+function tryFoldNode(node: any): any {
+  if (!node || typeof node !== 'object') return node;
+  switch (node.type) {
+    case 'UnaryExpression':
+      if (isPrimitiveLiteral(node.argument)) {
+        const v = node.argument.value;
+        switch (node.operator) {
+          case '!': return makeLiteral(!v);
+          case 'typeof': return makeLiteral(typeof v);
+          case 'void': return makeLiteral(undefined);
+          case '-': return typeof v === 'number' ? makeLiteral(-v) : node;
+          case '+': return typeof v === 'number' ? makeLiteral(+v) : node;
+          case '~': return typeof v === 'number' ? makeLiteral(~v) : node;
+        }
+      }
+      return node;
+
+    case 'BinaryExpression': {
+      if (!isPrimitiveLiteral(node.left) || !isPrimitiveLiteral(node.right)) return node;
+      const l = node.left.value;
+      const r = node.right.value;
+      switch (node.operator) {
+        case '+': return makeLiteral((l as any) + (r as any));
+        case '-': return typeof l === 'number' && typeof r === 'number' ? makeLiteral(l - r) : node;
+        case '*': return typeof l === 'number' && typeof r === 'number' ? makeLiteral(l * r) : node;
+        case '/': return typeof l === 'number' && typeof r === 'number' && r !== 0 ? makeLiteral(l / r) : node;
+        case '%': return typeof l === 'number' && typeof r === 'number' && r !== 0 ? makeLiteral(l % r) : node;
+        case '===': return makeLiteral(l === r);
+        case '!==': return makeLiteral(l !== r);
+        case '==': return makeLiteral(l == r);
+        case '!=': return makeLiteral(l != r);
+        case '<': return makeLiteral((l as any) < (r as any));
+        case '>': return makeLiteral((l as any) > (r as any));
+        case '<=': return makeLiteral((l as any) <= (r as any));
+        case '>=': return makeLiteral((l as any) >= (r as any));
+      }
+      return node;
+    }
+
+    case 'LogicalExpression': {
+      if (!isPrimitiveLiteral(node.left)) return node;
+      const l = node.left.value;
+      switch (node.operator) {
+        case '&&': return l ? node.right : node.left;
+        case '||': return l ? node.left : node.right;
+        case '??': return l === null || l === undefined ? node.right : node.left;
+      }
+      return node;
+    }
+
+    case 'ConditionalExpression':
+      if (isPrimitiveLiteral(node.test)) {
+        return node.test.value ? node.consequent : node.alternate;
+      }
+      return node;
+  }
+  return node;
+}
+
 function stripBareQrlPreloadCalls(program: any): void {
   if (!program?.body || !Array.isArray(program.body)) return;
   for (let i = program.body.length - 1; i >= 0; i--) {
