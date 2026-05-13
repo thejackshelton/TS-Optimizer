@@ -68,23 +68,7 @@ export function flattenDestructureUseCalls(
   walk(program, {
     enter(node: AstNode, parent: AstParentNode) {
       if (node.type !== 'Identifier' || !node.name) return;
-      // Skip identifier positions that are declaration names rather than
-      // references: object-pattern keys, the LHS of a variable declarator,
-      // function parameter bindings, etc. The conservative gate is
-      // "skip when the parent is one of the known declaring shapes."
-      if (parent) {
-        if (parent.type === 'VariableDeclarator' && parent.id === node) return;
-        if (parent.type === 'Property' && parent.key === node && !parent.computed) return;
-        if (parent.type === 'MemberExpression' && parent.property === node && !parent.computed) return;
-        if (parent.type === 'ImportSpecifier' && (parent.imported === node || parent.local === node)) return;
-        if (parent.type === 'ImportDefaultSpecifier' && parent.local === node) return;
-        if (parent.type === 'ImportNamespaceSpecifier' && parent.local === node) return;
-        if (parent.type === 'ExportSpecifier' && (parent.exported === node || parent.local === node)) return;
-        if (parent.type === 'LabeledStatement' && parent.label === node) return;
-        if (parent.type === 'BreakStatement' && parent.label === node) return;
-        if (parent.type === 'ContinueStatement' && parent.label === node) return;
-        if ((parent.type === 'FunctionDeclaration' || parent.type === 'FunctionExpression' || parent.type === 'ClassDeclaration' || parent.type === 'ClassExpression') && parent.id === node) return;
-      }
+      if (isDeclaringIdentifierPosition(node, parent)) return;
       // Find the innermost enclosing scope substitution set, if any.
       for (const decl of decls) {
         if (node.start < decl.scopeStart || node.end > decl.scopeEnd) continue;
@@ -103,6 +87,42 @@ export function flattenDestructureUseCalls(
 
   if (!s.hasChanged()) return { source, changed: false };
   return { source: s.toString(), changed: true };
+}
+
+/**
+ * True when an Identifier node sits in a *declaring* position rather than
+ * a reference position — i.e. it's introducing a binding, naming an object
+ * literal key, labelling a statement, etc. References to flattened
+ * destructured names need to be rewritten; declaring positions don't.
+ */
+function isDeclaringIdentifierPosition(node: AstNode, parent: AstParentNode): boolean {
+  if (!parent) return false;
+  switch (parent.type) {
+    case 'VariableDeclarator':
+      return parent.id === node;
+    case 'Property':
+      return parent.key === node && !parent.computed;
+    case 'MemberExpression':
+      return parent.property === node && !parent.computed;
+    case 'ImportSpecifier':
+      return parent.imported === node || parent.local === node;
+    case 'ImportDefaultSpecifier':
+    case 'ImportNamespaceSpecifier':
+      return parent.local === node;
+    case 'ExportSpecifier':
+      return parent.exported === node || parent.local === node;
+    case 'LabeledStatement':
+    case 'BreakStatement':
+    case 'ContinueStatement':
+      return parent.label === node;
+    case 'FunctionDeclaration':
+    case 'FunctionExpression':
+    case 'ClassDeclaration':
+    case 'ClassExpression':
+      return parent.id === node;
+    default:
+      return false;
+  }
 }
 
 interface FlattenableDecl {
