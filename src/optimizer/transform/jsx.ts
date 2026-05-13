@@ -53,6 +53,18 @@ export function isConstBindingName(
   return importedNames.has(name) || (constIdents?.has(name) ?? false);
 }
 
+/**
+ * Extract a non-computed Property key as a string. Returns the identifier
+ * name for `{x: ...}`, the stringified value for `{"x": ...}` / `{1: ...}`,
+ * or null for any shape that can't be resolved statically.
+ */
+function staticPropKeyName(key: AstNode | null | undefined): string | null {
+  if (!key) return null;
+  if (key.type === 'Identifier') return key.name;
+  if (key.type === 'Literal') return String(key.value);
+  return null;
+}
+
 function isReturnStatic(init: Expression | null | undefined): boolean {
   if (!init) return true;
   if (init.type === 'CallExpression' && init.callee.type === 'Identifier') {
@@ -104,10 +116,9 @@ export function collectConstBindings(program: AstProgram): Set<string> {
       if (init && init.type === 'ArrayExpression') {
         for (let i = 0; i < elems.length; i++) {
           const elem = elems[i];
-          if (!elem) continue;
-          // RestElement isn't tracked here; the rest binding's initializer
-          // is the "remainder" of the array, not const-foldable per-elem.
-          if (elem.type === 'RestElement') continue;
+          // RestElement isn't tracked — the rest binding's init is the
+          // "remainder" of the array, not const-foldable per-elem.
+          if (!elem || elem.type === 'RestElement') continue;
           const initElem = init.elements?.[i] ?? null;
           // SpreadElement in an array literal isn't a per-position init
           // we can pair with the destructure slot; skip.
@@ -130,21 +141,16 @@ export function collectConstBindings(program: AstProgram): Set<string> {
         // Build a name→value map for the object literal.
         const valueByKey = new Map<string, Expression | null>();
         for (const ip of init.properties ?? []) {
-          if (ip.type !== 'Property') continue;
-          if (ip.computed) continue;
-          const k = ip.key;
-          const keyName = k.type === 'Identifier' ? k.name : (k.type === 'Literal' ? String(k.value) : null);
+          if (ip.type !== 'Property' || ip.computed) continue;
+          const keyName = staticPropKeyName(ip.key);
           if (keyName === null) continue;
           valueByKey.set(keyName, ip.value as Expression);
         }
         for (const pp of props) {
-          if (pp.type !== 'Property') continue;
-          if (pp.computed) continue;
-          const k = pp.key;
-          const keyName = k.type === 'Identifier' ? k.name : (k.type === 'Literal' ? String(k.value) : null);
+          if (pp.type !== 'Property' || pp.computed) continue;
+          const keyName = staticPropKeyName(pp.key);
           if (keyName === null) continue;
-          const subInit = valueByKey.get(keyName) ?? null;
-          walkPatternInit(pp.value, subInit);
+          walkPatternInit(pp.value, valueByKey.get(keyName) ?? null);
         }
       } else {
         // Non-object-literal init (e.g. `const {x} = fn()`): treat all
