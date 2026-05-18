@@ -91,16 +91,17 @@ export function transformJsxCalls(
 
   walk(program, {
     leave(node: AstNode) {
-      if (node.type !== 'CallExpression') return;
-      if (node.callee?.type !== 'Identifier') return;
-      if (!opts.jsxFunctions.has(node.callee.name)) return;
-      // Must have at least (tag, props).
-      const args = node.arguments;
-      if (!args || args.length < 2) return;
-      const propsArg = args[1];
-      // Per SWC: if propsObj isn't an ObjectExpression literal, leave the
-      // call unchanged. SpreadElement args also skip.
-      if (!propsArg || propsArg.type !== 'ObjectExpression') return;
+      // Bail unless this is a `<jsxFunction>(tag, propsObjLiteral, ...)`
+      // call. Per SWC `transform.rs:1166-1168`, non-ObjectExpression props
+      // (e.g. a passed-through variable) leave the call unchanged.
+      if (
+        node.type !== 'CallExpression' ||
+        node.callee?.type !== 'Identifier' ||
+        !opts.jsxFunctions.has(node.callee.name) ||
+        !node.arguments ||
+        node.arguments.length < 2 ||
+        node.arguments[1]?.type !== 'ObjectExpression'
+      ) return;
 
       const rewritten = buildJsxSortedCall(s, node, opts);
       if (rewritten !== null) {
@@ -120,22 +121,33 @@ function buildJsxSortedCall(
   callNode: AstNode,
   opts: JsxCallTransformOptions,
 ): string | null {
+  // Caller already gates on `callNode.type === 'CallExpression'` and
+  // `arguments[1].type === 'ObjectExpression'`. The CallExpression check
+  // here is required for type-checker narrowing before destructuring; the
+  // combined guard after it covers the rest. Tag arg cannot be a
+  // SpreadElement (that'd be `jsx(...tag, ...)` — never emitted by peer
+  // tools).
   if (callNode.type !== 'CallExpression') return null;
   const args = callNode.arguments;
   const tagArg = args[0];
   const propsArg = args[1];
-  if (!tagArg || tagArg.type === 'SpreadElement') return null;
-  if (!propsArg || propsArg.type !== 'ObjectExpression') return null;
+  if (
+    !tagArg ||
+    tagArg.type === 'SpreadElement' ||
+    !propsArg ||
+    propsArg.type !== 'ObjectExpression'
+  ) return null;
 
   const tag = s.slice(tagArg.start, tagArg.end);
 
   // Partition props into `children` (positional 4th arg) and everything else
-  // (varProps bag). Spread inside the props object => skip (out of scope).
+  // (varProps bag). Anything that isn't a plain `Property` (e.g. spread
+  // inside the props object) is out of scope — leave the whole call
+  // unchanged.
   let childrenText: string | null = null;
   let childrenIsDynamic = false;
   const varEntries: string[] = [];
   for (const prop of propsArg.properties) {
-    if (prop.type === 'SpreadElement') return null;
     if (prop.type !== 'Property') return null;
     const keyName = propertyKeyName(prop);
     if (keyName === 'children' && !prop.computed) {
@@ -174,9 +186,8 @@ function buildJsxSortedCall(
 /** Extract a static key name from an object property. Returns null for
  * computed-key properties that don't have a constant string/identifier name. */
 function propertyKeyName(prop: AstNode): string | null {
-  if (prop.type !== 'Property') return null;
+  if (prop.type !== 'Property' || !prop.key) return null;
   const key = prop.key;
-  if (!key) return null;
   if (key.type === 'Identifier') return key.name;
   if (key.type === 'Literal' && typeof key.value === 'string') return key.value;
   return null;
@@ -185,7 +196,8 @@ function propertyKeyName(prop: AstNode): string | null {
 /** Classify a children expression as static. Conservative: any non-trivial
  * expression is dynamic. */
 function isStaticChildren(value: AstNode): boolean {
-  if (value.type === 'Literal') return true;
-  if (value.type === 'TemplateLiteral' && (value.expressions ?? []).length === 0) return true;
-  return false;
+  return (
+    value.type === 'Literal' ||
+    (value.type === 'TemplateLiteral' && (value.expressions ?? []).length === 0)
+  );
 }
