@@ -6,10 +6,13 @@
  * final output assembly with TS type stripping.
  */
 
+import type MagicString from 'magic-string';
 import { transformSync as oxcTransformSync, type TransformOptions } from 'oxc-transform';
 import { createRegExp, exactly, wordBoundary } from 'magic-regexp';
+import type { AstNode, AstProgram } from '../../ast-types.js';
 import type { ExtractionResult } from '../extract.js';
 import type { ImportInfo } from '../marker-detection.js';
+import type { ModuleLevelDecl } from '../variable-migration.js';
 import {
   buildQrlDeclaration,
   getQrlImportSource,
@@ -461,8 +464,115 @@ export function filterUnusedImports(ctx: RewriteContext): void {
   }
 }
 
+/**
+ * `export const X = component$(...)` pre-rewrite or `export const X = componentQrl(...)`
+ * post-rewrite. Either suffix identifies an export whose init is being QRL-wrapped —
+ * the OSS-404 F1c anchor for sCall placement (self-referencing sCalls must go after
+ * such exports to avoid TDZ at module load).
+ */
+function isMarkerLikeCall(init: AstNode | null | undefined): boolean {
+  if (!init || init.type !== 'CallExpression' || init.callee?.type !== 'Identifier') return false;
+  const name = init.callee.name;
+  return name.endsWith('$') || name.endsWith('Qrl');
+}
+
+function findExportedMarkerNames(program: AstProgram): Set<string> {
+  const names = new Set<string>();
+  for (const stmt of program.body) {
+    if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration') continue;
+    for (const decl of stmt.declaration.declarations ?? []) {
+      if (decl.id?.type !== 'Identifier' || !isMarkerLikeCall(decl.init)) continue;
+      names.add(decl.id.name);
+    }
+  }
+  return names;
+}
+
+function findLastMarkerExportAnchor(program: AstProgram): { start: number; end: number } | null {
+  for (let i = program.body.length - 1; i >= 0; i--) {
+    const stmt = program.body[i];
+    if (stmt.type === 'ExportDefaultDeclaration') return { start: stmt.start, end: stmt.end };
+    if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration') continue;
+    if (isMarkerLikeCall(stmt.declaration.declarations?.[0]?.init)) {
+      return { start: stmt.start, end: stmt.end };
+    }
+  }
+  return null;
+}
+
+function findLastReferencedDeclEnd(
+  sCalls: readonly string[],
+  decls: readonly ModuleLevelDecl[],
+): number | null {
+  let maxEnd = -1;
+  for (const decl of decls) {
+    if (decl.declEnd <= maxEnd) continue;
+    const wb = new RegExp('\\b' + decl.name + '\\b');
+    if (sCalls.some((sc) => wb.test(sc))) maxEnd = decl.declEnd;
+  }
+  return maxEnd >= 0 ? maxEnd : null;
+}
+
+function partitionSCallsBySelfRef(
+  sCalls: readonly string[],
+  exportedNames: ReadonlySet<string>,
+): { beforeExport: string[]; afterExport: string[] } {
+  const beforeExport: string[] = [];
+  const afterExport: string[] = [];
+  for (const sCall of sCalls) {
+    const refsExport = [...exportedNames].some((n) => new RegExp('\\b' + n + '\\b').test(sCall));
+    (refsExport ? afterExport : beforeExport).push(sCall);
+  }
+  return { beforeExport, afterExport };
+}
+
+/**
+ * Splice sCalls into the parent module via `MagicString` offsets — eliminates
+ * post-`toString()` line/regex/brace-counting that the original line-based
+ * placement needed.
+ *
+ * Anchor priority:
+ *   1. Last marker-call export (OSS-404 F1c port): partition sCalls by whether
+ *      their body references any exported marker name. Self-referencing sCalls
+ *      land AFTER the export (avoid TDZ when the body uses its own export name);
+ *      non-referencing sCalls land BEFORE.
+ *   2. Last module-level decl any sCall body references (OSS-405): peer-tool
+ *      `inlinedQrl` input has no marker export to anchor against (it uses plain
+ *      `export { name }`), so sCalls land immediately after their last source-
+ *      order dependency — splitting the program into the two independent-
+ *      statement blocks (sCalls + exports) that `compareAst` expects.
+ *   3. No anchor: append at end of file.
+ */
+function placeSCalls(
+  s: MagicString,
+  program: AstProgram,
+  sCalls: readonly string[],
+  moduleLevelDecls: readonly ModuleLevelDecl[] | undefined,
+): void {
+  if (sCalls.length === 0) return;
+
+  const markerAnchor = findLastMarkerExportAnchor(program);
+  if (markerAnchor) {
+    const exportedNames = findExportedMarkerNames(program);
+    const { beforeExport, afterExport } = partitionSCallsBySelfRef(sCalls, exportedNames);
+    if (beforeExport.length > 0) s.appendLeft(markerAnchor.start, beforeExport.join('\n') + '\n');
+    if (afterExport.length > 0) s.appendRight(markerAnchor.end, '\n' + afterExport.join('\n'));
+    return;
+  }
+
+  const lastDeclEnd = moduleLevelDecls && moduleLevelDecls.length > 0
+    ? findLastReferencedDeclEnd(sCalls, moduleLevelDecls)
+    : null;
+  if (lastDeclEnd !== null) {
+    s.appendRight(lastDeclEnd, '\n' + sCalls.join('\n'));
+    return;
+  }
+
+  s.append('\n' + sCalls.join('\n'));
+}
+
 export function assembleOutput(ctx: RewriteContext): string {
-  const { s, source, neededImports, survivingUserImports, jsxResult,
+  const { s, source, program, neededImports, survivingUserImports, jsxResult,
     inlineHoistedDeclarations, qrlDecls, sCalls, migrationDecisions,
     moduleLevelDecls, jsxOptions, transpileTs } = ctx;
 
@@ -520,125 +630,9 @@ export function assembleOutput(ctx: RewriteContext): string {
     }
   }
 
+  placeSCalls(s, program, sCalls, moduleLevelDecls);
+
   let finalCode = s.toString();
-  if (sCalls.length > 0) {
-    const lines = finalCode.split('\n');
-
-    // OSS-404 (F1c port from stale `ast-parity/F2` branch commit 534ddd4):
-    // Partition sCalls by whether their body references any name exported
-    // via `export const NAME = ...componentQrl(...)`. Self-referential
-    // components (e.g. `const Tree = component$(() => <Tree/>)`) TDZ at
-    // module load if `q_Tree.s(body)` runs before `Tree` is initialised,
-    // so referencing sCalls go AFTER the export; non-referencing sCalls
-    // keep the existing BEFORE position. Word-boundary regex distinguishes
-    // `Tree` from `q_Tree_xxx` (the underscore prevents `\bTree\b` from
-    // matching inside the QRL var name).
-    const exportedNames = new Set<string>();
-    for (const line of lines) {
-      const m = line.match(/^\s*export\s+(?:const|default)\s+(\w+)\s*=.*Qrl\(/);
-      if (m && m[1]) exportedNames.add(m[1]);
-    }
-
-    const beforeExport: string[] = [];
-    const afterExport: string[] = [];
-    for (const sCall of sCalls) {
-      let referencesExport = false;
-      for (const name of exportedNames) {
-        if (new RegExp('\\b' + name + '\\b').test(sCall)) {
-          referencesExport = true;
-          break;
-        }
-      }
-      (referencesExport ? afterExport : beforeExport).push(sCall);
-    }
-
-    let insertIdx = -1;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const trimmed = lines[i].trimStart();
-      if (trimmed.startsWith('export default ') || trimmed.startsWith('export const ') || trimmed.startsWith('export {')) {
-        if (trimmed.includes('Qrl(') || trimmed.includes('export default ')) {
-          insertIdx = i;
-          break;
-        }
-      }
-    }
-    if (insertIdx >= 0) {
-      // Splice "after" first so it doesn't shift insertIdx.
-      if (afterExport.length > 0) lines.splice(insertIdx + 1, 0, ...afterExport);
-      if (beforeExport.length > 0) lines.splice(insertIdx, 0, ...beforeExport);
-    } else if (moduleLevelDecls && moduleLevelDecls.length > 0) {
-      // OSS-405: when no Qrl-form export anchor is found (typical of
-      // peer-tool inlinedQrl input where the parent re-exports via plain
-      // `export { name }` instead of `export const name = componentQrl(...)`),
-      // insert sCalls right after the LAST module-level decl that any
-      // sCall body references. Matches SWC's placement: sCalls land
-      // immediately after their last source-order dependency, splitting
-      // the program into two independent-statement blocks (sCalls + exports)
-      // rather than collapsing them into one trailing block.
-      const referencedDeclNames = new Set<string>();
-      for (const decl of moduleLevelDecls) {
-        for (const sCall of sCalls) {
-          if (new RegExp('\\b' + decl.name + '\\b').test(sCall)) {
-            referencedDeclNames.add(decl.name);
-            break;
-          }
-        }
-      }
-      let lastReferencedDeclLine = -1;
-      if (referencedDeclNames.size > 0) {
-        for (let i = lines.length - 1; i >= 0; i--) {
-          const trimmed = lines[i].trimStart();
-          for (const name of referencedDeclNames) {
-            if (
-              new RegExp('^(?:export\\s+)?(?:const|let|var|function|async\\s+function)\\s+' + name + '\\b').test(trimmed)
-            ) {
-              lastReferencedDeclLine = i;
-              break;
-            }
-          }
-          if (lastReferencedDeclLine >= 0) break;
-        }
-      }
-      if (lastReferencedDeclLine >= 0) {
-        // Skip past the body of the matched decl by scanning for the line
-        // where the declaration ends (matching brace depth back to 0).
-        // For single-line const/let/var, that's the same line. For multi-
-        // line function/arrow bodies, walk forward.
-        let endLine = lastReferencedDeclLine;
-        const startLineText = lines[lastReferencedDeclLine];
-        let braceDepth = 0;
-        let foundOpenBrace = false;
-        let inTemplate = false;
-        for (let c = 0; c < startLineText.length; c++) {
-          const ch = startLineText[c];
-          if (ch === '`') inTemplate = !inTemplate;
-          if (inTemplate) continue;
-          if (ch === '{') { braceDepth++; foundOpenBrace = true; }
-          else if (ch === '}') braceDepth--;
-        }
-        if (foundOpenBrace && braceDepth > 0) {
-          for (let i = lastReferencedDeclLine + 1; i < lines.length && braceDepth > 0; i++) {
-            const line = lines[i];
-            for (let c = 0; c < line.length; c++) {
-              const ch = line[c];
-              if (ch === '`') inTemplate = !inTemplate;
-              if (inTemplate) continue;
-              if (ch === '{') braceDepth++;
-              else if (ch === '}') braceDepth--;
-            }
-            endLine = i;
-            if (braceDepth <= 0) break;
-          }
-        }
-        lines.splice(endLine + 1, 0, ...sCalls);
-      } else {
-        lines.push(...sCalls);
-      }
-    } else {
-      lines.push(...sCalls);
-    }
-    finalCode = lines.join('\n');
-  }
 
   if (transpileTs) {
     const tsStripOptions: TransformOptions = { typescript: { onlyRemoveTypeImports: false } };
