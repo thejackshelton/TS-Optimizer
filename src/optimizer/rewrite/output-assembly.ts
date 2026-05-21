@@ -326,7 +326,7 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
     const varName = qrlVarNames.get(ext.symbolName) ?? `q_${ext.symbolName}`;
     const { transformedBody: rawBody, additionalImports, hoistedDeclarations, keyCounterValue } = transformInlineSegmentBody(
       ext, extractions, qrlVarNames, inlineSegmentJsxOptions, inlineOptions?.regCtxName, sharedHoister,
-      ctx.closureNodes, ctx.source,
+      ctx.closureNodes, ctx.source, ctx.originalImports, ctx.relPath, ctx.jsxKeyCounterValue,
     );
 
     let sigRewrittenBody = rawBody;
@@ -344,6 +344,11 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
     if (isHoist && keyCounterValue !== undefined && inlineSegmentJsxOptions) {
       ctx.jsxKeyCounterValue = keyCounterValue;
       inlineSegmentJsxOptions = { ...inlineSegmentJsxOptions, keyCounterStart: ctx.jsxKeyCounterValue };
+    } else if (keyCounterValue !== undefined) {
+      // OSS-405: under inline strategy, jsx-call rewrites in `.s(body)` blocks
+      // advance the JSX key counter shared across all `.s(body)` calls in the
+      // module. Without this, body2's keys would restart at 0.
+      ctx.jsxKeyCounterValue = keyCounterValue;
     }
     ctx.inlineHoistedDeclarations.push(...hoistedDeclarations);
     for (const [sym, src] of additionalImports) {
@@ -561,6 +566,74 @@ export function assembleOutput(ctx: RewriteContext): string {
       // Splice "after" first so it doesn't shift insertIdx.
       if (afterExport.length > 0) lines.splice(insertIdx + 1, 0, ...afterExport);
       if (beforeExport.length > 0) lines.splice(insertIdx, 0, ...beforeExport);
+    } else if (moduleLevelDecls && moduleLevelDecls.length > 0) {
+      // OSS-405: when no Qrl-form export anchor is found (typical of
+      // peer-tool inlinedQrl input where the parent re-exports via plain
+      // `export { name }` instead of `export const name = componentQrl(...)`),
+      // insert sCalls right after the LAST module-level decl that any
+      // sCall body references. Matches SWC's placement: sCalls land
+      // immediately after their last source-order dependency, splitting
+      // the program into two independent-statement blocks (sCalls + exports)
+      // rather than collapsing them into one trailing block.
+      const referencedDeclNames = new Set<string>();
+      for (const decl of moduleLevelDecls) {
+        for (const sCall of sCalls) {
+          if (new RegExp('\\b' + decl.name + '\\b').test(sCall)) {
+            referencedDeclNames.add(decl.name);
+            break;
+          }
+        }
+      }
+      let lastReferencedDeclLine = -1;
+      if (referencedDeclNames.size > 0) {
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const trimmed = lines[i].trimStart();
+          for (const name of referencedDeclNames) {
+            if (
+              new RegExp('^(?:export\\s+)?(?:const|let|var|function|async\\s+function)\\s+' + name + '\\b').test(trimmed)
+            ) {
+              lastReferencedDeclLine = i;
+              break;
+            }
+          }
+          if (lastReferencedDeclLine >= 0) break;
+        }
+      }
+      if (lastReferencedDeclLine >= 0) {
+        // Skip past the body of the matched decl by scanning for the line
+        // where the declaration ends (matching brace depth back to 0).
+        // For single-line const/let/var, that's the same line. For multi-
+        // line function/arrow bodies, walk forward.
+        let endLine = lastReferencedDeclLine;
+        const startLineText = lines[lastReferencedDeclLine];
+        let braceDepth = 0;
+        let foundOpenBrace = false;
+        let inTemplate = false;
+        for (let c = 0; c < startLineText.length; c++) {
+          const ch = startLineText[c];
+          if (ch === '`') inTemplate = !inTemplate;
+          if (inTemplate) continue;
+          if (ch === '{') { braceDepth++; foundOpenBrace = true; }
+          else if (ch === '}') braceDepth--;
+        }
+        if (foundOpenBrace && braceDepth > 0) {
+          for (let i = lastReferencedDeclLine + 1; i < lines.length && braceDepth > 0; i++) {
+            const line = lines[i];
+            for (let c = 0; c < line.length; c++) {
+              const ch = line[c];
+              if (ch === '`') inTemplate = !inTemplate;
+              if (inTemplate) continue;
+              if (ch === '{') braceDepth++;
+              else if (ch === '}') braceDepth--;
+            }
+            endLine = i;
+            if (braceDepth <= 0) break;
+          }
+        }
+        lines.splice(endLine + 1, 0, ...sCalls);
+      } else {
+        lines.push(...sCalls);
+      }
     } else {
       lines.push(...sCalls);
     }
