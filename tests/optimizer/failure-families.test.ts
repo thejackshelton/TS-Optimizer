@@ -26,7 +26,7 @@ function strip(node: any, ancestors: any[] = []): any {
 }
 
 describe('failure families', () => {
-  it('categorizes all 210 snapshots into ordered families', () => {
+  it('categorizes all 209 snapshots into ordered families', () => {
     const files = readdirSync(SNAP_DIR).filter(f => f.endsWith('.snap')).sort();
 
     const alreadyPassing: string[] = [];
