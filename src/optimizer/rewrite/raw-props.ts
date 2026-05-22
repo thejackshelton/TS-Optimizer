@@ -179,6 +179,42 @@ export function extractDestructuredFieldMap(body: string): Map<string, string> {
   return fieldMap;
 }
 
+/**
+ * Extract destructure-time default expressions from a function body whose
+ * first parameter is an ObjectPattern. Returns a map keyed by local-binding
+ * name to the default expression's source text (e.g. `some` → `1+2`,
+ * `hey2` → `123`). Returns an empty map when the destructure aborts under
+ * the safe-consolidation gate (mirrors {@link extractDestructuredFieldMap}).
+ *
+ * Used by nested-segment field propagation so `_rawProps.<key>` references
+ * inside a child segment's body get `?? <default>` appended for fields
+ * that the parent destructure defaulted — matching SWC's NullishCoalescing
+ * emission in `transform_pat` (`swc-reference-only/props_destructuring.rs:382-388`).
+ */
+export function extractDestructuredFieldDefaultsMap(body: string): Map<string, string> {
+  const session = createFunctionTransformSession('__rpd__.tsx', body, {
+    wrapperPrefix: 'const __rp__ = ',
+  });
+  if (!session) return new Map();
+
+  const params = session.fn.params;
+  if (params.length === 0) return new Map();
+
+  const firstParam = params[0];
+  if (firstParam.type !== 'ObjectPattern') return new Map();
+
+  const bindings = collectPatternBindings(firstParam, body, session.offset);
+  if (bindings.unsafe) return new Map();
+
+  const defaults = new Map<string, string>();
+  for (const field of bindings.fields) {
+    if (field.defaultValue !== undefined) {
+      defaults.set(field.local, field.defaultValue);
+    }
+  }
+  return defaults;
+}
+
 function collectPatternBindings(
   pattern: unknown,
   sourceText?: string,
@@ -643,11 +679,20 @@ export function applyRawPropsTransform(body: string): string {
 /**
  * Replace original field name references with _rawProps.field in a body string.
  * For child segments whose captures were consolidated into a single _rawProps capture.
+ *
+ * When `defaultValues` is provided, defaulted fields emit
+ * `(_rawProps.<key> ?? <default>)` — see SWC's NullishCoalescing emission in
+ * `transform_pat` (`swc-reference-only/props_destructuring.rs:382-388`).
  */
-export function replacePropsFieldReferencesInBody(body: string, fieldMap: Map<string, string>): string {
+export function replacePropsFieldReferencesInBody(
+  body: string,
+  fieldMap: Map<string, string>,
+  defaultValues?: ReadonlyMap<string, string>,
+): string {
   return rewritePropsFieldReferences(body, fieldMap, {
     parseFilename: '__rpfb__.tsx',
     wrapperPrefix: 'const __rpfb__ = ',
     memberPropertyMode: 'nonComputed',
+    defaultValues,
   });
 }
