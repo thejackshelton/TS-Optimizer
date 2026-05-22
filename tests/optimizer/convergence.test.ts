@@ -1,7 +1,7 @@
 /**
  * Convergence test for the Qwik optimizer.
  *
- * Runs ALL 209 snapshot tests through transformModule() with correct
+ * Runs ALL 210 snapshot tests through transformModule() with correct
  * per-snapshot options and compares output against expected snapshots.
  *
  * This is a measurement tool -- not all tests are expected to pass yet.
@@ -54,7 +54,7 @@ function getTestName(snapFilename: string): string {
     .replace('.snap', '');
 }
 
-describe('convergence: all 209 snapshots', () => {
+describe('convergence: all 210 snapshots', () => {
   const allFiles = getSnapshotFiles(SNAP_DIR);
 
   // Track results for summary

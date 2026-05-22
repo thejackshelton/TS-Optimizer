@@ -141,14 +141,14 @@ describe('parseSnapshot', () => {
     });
   });
 
-  describe('bulk validation: all 209 .snap files', () => {
+  describe('bulk validation: all 210 .snap files', () => {
     const snapFiles = readdirSync(SNAPS_DIR).filter((f: string) => f.endsWith('.snap'));
 
-    it('finds 209 snapshot files', () => {
-      expect(snapFiles).toHaveLength(209);
+    it('finds 210 snapshot files', () => {
+      expect(snapFiles).toHaveLength(210);
     });
 
-    it('parses all 209 files without errors', () => {
+    it('parses all 210 files without errors', () => {
       const errors: string[] = [];
       let totalSegments = 0;
       let totalParentModules = 0;
