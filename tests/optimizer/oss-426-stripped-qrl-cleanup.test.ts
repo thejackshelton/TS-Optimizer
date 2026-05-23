@@ -37,7 +37,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../src/optimizer/transform/index.js';
-import type { TransformModule } from '../../src/optimizer/types.js';
+import type { TransformModule, SegmentMetadataInternal } from '../../src/optimizer/types.js';
 import { mkFilePath, mkSourceText } from '../../src/optimizer/types/brands.js';
 
 function findParent(result: { modules: readonly TransformModule[] }): TransformModule {
@@ -102,9 +102,13 @@ export const Parent = component$(() => {
     const seg = findSegmentByCtx(result, 'shouldRemove$');
     if (seg.kind !== 'segment') throw new Error('expected segment');
     // Body closure reads `state.text` — captures would normally be
-    // populated. Under stripEventHandlers, SWC clears them.
-    expect(seg.segment.captures).toBe(false);
-    expect(seg.segment.captureNames).toEqual([]);
+    // populated. Under stripEventHandlers, SWC clears them. The
+    // `captureNames` field lives on `SegmentMetadataInternal` (the
+    // runtime shape) but the public `SegmentAnalysis` type doesn't
+    // expose it — cast to read it for the regression check.
+    const meta = seg.segment as SegmentMetadataInternal;
+    expect(meta.captures).toBe(false);
+    expect(meta.captureNames).toEqual([]);
   });
 
   it('stripCtxName-stripped segments PRESERVE capture metadata (negative-scope policy split)', () => {
@@ -130,8 +134,9 @@ export const Parent = component$(() => {
     });
     const seg = findSegmentByCtx(result, 'useClientMount$');
     if (seg.kind !== 'segment') throw new Error('expected segment');
-    expect(seg.segment.captures).toBe(true);
-    expect(seg.segment.captureNames).toEqual(['state']);
+    const meta = seg.segment as SegmentMetadataInternal;
+    expect(meta.captures).toBe(true);
+    expect(meta.captureNames).toEqual(['state']);
   });
 
   it('non-stripped event handlers still receive .w([captures]) when needed (negative scope)', () => {
