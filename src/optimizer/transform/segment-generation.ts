@@ -1216,6 +1216,22 @@ export function generateAllSegmentModules(
     // emission. Internal-builder cast — see extract.ts `Mutable<T>`.
     if (stripped) (ext as Mutable<ConsolidatedSegment>).loc = [mkByteOffset(0), mkByteOffset(0)];
 
+    // OSS-426 Sub-B: clear capture metadata for event-handler segments
+    // stripped via `stripEventHandlers`. SWC's reference emits these with
+    // `captures: false, captureNames: []` because the body is gone — the
+    // runtime never consumes the captures, so the metadata reflects that.
+    // `stripCtxName`-stripped segments preserve their captures (different
+    // policy: those carry runtime-meaningful info even with `null` body).
+    if (
+      stripped &&
+      ctx.options.stripEventHandlers &&
+      ext.ctxKind === 'eventHandler'
+    ) {
+      const mut = ext as Mutable<ConsolidatedSegment>;
+      mut.captures = false;
+      mut.captureNames = [];
+    }
+
     if (ctx.isInlineStrategy) {
       const inlineModule = buildInlineStrategySegment(ext, ctx, prep, stripped);
       // OSS-425: null result means non-stripped inline — body inlined into

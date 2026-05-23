@@ -358,6 +358,9 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
       ext, extractions, qrlVarNames, inlineSegmentJsxOptions, inlineOptions?.regCtxName, sharedHoister,
       ctx.closureNodes, ctx.source, ctx.originalImports, ctx.relPath, ctx.jsxKeyCounterValue,
       migratedNames,
+      // OSS-426 Sub-B: suppress `.w([])` on stripped child QRLs.
+      inlineOptions?.stripCtxName,
+      inlineOptions?.stripEventHandlers,
     );
 
     let sigRewrittenBody = rawBody;
