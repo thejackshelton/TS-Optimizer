@@ -217,6 +217,12 @@ export interface SegmentGenerationContext {
   relPath: string;
   emitMode: string;
   devFile: string | undefined;
+  /**
+   * Raw user-supplied `input.devPath`. Distinguished from `devFile` (which
+   * always falls back to a composed path); JSX dev-info `fileName:` only
+   * honors the explicit override. See OSS-428.
+   */
+  userDevPath: string | undefined;
   isInlineStrategy: boolean;
   entryStrategy: EntryStrategy;
   migrationDecisions: MigrationDecision[];
@@ -1096,7 +1102,12 @@ export function buildDefaultStrategySegment(
                 ? new Set(ext.paramNames)
                 : undefined,
               relPath,
-              devOptions: isDevMode ? { relPath } : undefined,
+              // OSS-428: JSX dev-info `fileName:` only switches to the
+              // user-supplied dev path when explicitly set on the input.
+              // The composed `devFile` (srcDir+relPath fallback) keeps
+              // `relPath` semantics here — preserves baseline-passing
+              // `example_dev_mode_inlined` / `example_jsx_keyed_dev` etc.
+              devOptions: isDevMode ? { relPath: ctx.userDevPath ?? relPath } : undefined,
               keyCounterStart: segmentKeyCounter,
             }
           : undefined,

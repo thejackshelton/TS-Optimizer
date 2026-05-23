@@ -307,7 +307,11 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
     ? {
         enableJsx: true,
         importedNames: jsxOptions.importedNames,
-        devOptions: isDevMode ? { relPath } : undefined,
+        // OSS-428: JSX dev-info `fileName:` only switches to the user-supplied
+        // dev path when explicitly set on the input (via `devPath`). The
+        // composed `devFilePath` (srcDir+relPath fallback) keeps the default
+        // `relPath` behavior — preserves `example_dev_mode_inlined` etc.
+        devOptions: isDevMode ? { relPath: ctx.userDevPath ?? relPath } : undefined,
         keyCounterStart: isHoist ? ctx.jsxKeyCounterValue : undefined,
         relPath,
       }
