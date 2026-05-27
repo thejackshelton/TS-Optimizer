@@ -244,6 +244,14 @@ export interface SegmentGenerationContext {
   preRenameSymbolName: Map<string, string>;
   qrlOutputExt: string | undefined;
   sourceExtensions: Map<string, string>;
+  /**
+   * OSS-443: the parent input file's extension. Threaded to
+   * `postProcessSegmentCode` so oxc-transform's TS-strip / JSX-strip
+   * parses the segment body in the source dialect (the segment's own
+   * `extension` is often downgraded to `.js` even when the body
+   * contains TS or JSX).
+   */
+  parentSourceExt: string;
   shouldTranspileJsx: boolean;
   shouldTranspileTs: boolean;
   isJsx: boolean;
@@ -1024,7 +1032,7 @@ export function buildDefaultStrategySegment(
     emitMode, devFile, entryStrategy, migrationDecisions,
     moduleLevelDeclsByName,
     parentModulePath, qrlOutputExt,
-    sourceExtensions, shouldTranspileJsx, shouldTranspileTs, isJsx,
+    sourceExtensions, parentSourceExt, shouldTranspileJsx, shouldTranspileTs, isJsx,
     importedNames, elementQpParamsMap,
     constLiteralsMap,
   } = ctx;
@@ -1168,6 +1176,7 @@ export function buildDefaultStrategySegment(
       extension: ext.extension,
       ctxName: ext.ctxName,
       sourceExtensions,
+      parentSourceExt,
       shouldTranspileTs,
       shouldTranspileJsx,
       isServer: options.isServer,
