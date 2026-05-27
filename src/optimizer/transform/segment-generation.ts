@@ -981,6 +981,16 @@ export function buildNestedCallSites(
         hoistedCaptureNames: hasLoopCrossCaptures
           ? child.captureNames
           : undefined,
+        // OSS-444: a JSX-attr child segment that captures variables but
+        // isn't subject to the loop-cross hoist path still needs `.w(…)`
+        // capture wrapping at the parent's prop call site. Mirrors the
+        // inline-strategy path at `rewrite/inline-body.ts:242-244`. The
+        // body-transforms consumer reads this only when
+        // `hoistedSymbolName` is unset.
+        captureNames:
+          !hasLoopCrossCaptures && child.captureNames.length > 0
+            ? child.captureNames
+            : undefined,
         loopLocalParamNames:
           loopLocalParams.length > 0 ? loopLocalParams : undefined,
         elementQpParams: elementQpParamsMap.get(child.symbolName),
