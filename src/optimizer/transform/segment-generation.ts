@@ -880,8 +880,13 @@ export function buildNestedCallSites(
   for (const child of children) {
     const qrlVarName =
       childQrlVarNames.get(child.symbolName) ?? `q_${child.symbolName}`;
+    // OSS-441: jSXProp ctxKind is a Component-side `$`-suffix attr that
+    // OSS-438's harmonisation correctly classifies separately from
+    // eventHandler. Both flow as JSX-attr call sites; the inner branch's
+    // `isComponentEvent` arm already keeps the callee raw (`onEvent$`
+    // stays `onEvent$`, no `q-e:event` transform).
     const isJsxAttr =
-      child.ctxKind === "eventHandler" &&
+      (child.ctxKind === "eventHandler" || child.ctxKind === "jSXProp") &&
       child.calleeName.endsWith("$") &&
       child.calleeName !== "$";
     if (isJsxAttr) {
