@@ -47,6 +47,7 @@ import {
   isReplaceableIdentifierPosition,
   type RangeReplacementCollector,
 } from '../utils/range-replace.js';
+import type { DevSuffixOptions } from '../transform/jsx.js';
 
 function isRawPropsMemberExpression(node: unknown): node is AstCompatNode & { object: AstIdentifierNode } {
   return (
@@ -77,7 +78,7 @@ export interface InlineSegmentJsxOptions {
   /** Set of imported identifier names (for prop classification) */
   importedNames: Set<string>;
   /** Dev mode options for JSX source info */
-  devOptions?: { relPath: string };
+  devOptions?: DevSuffixOptions;
   /**
    * OSS-410: original module source string, used to compute source-relative
    * `lineNumber:` / `columnNumber:` on JSX dev-info. Combined with the

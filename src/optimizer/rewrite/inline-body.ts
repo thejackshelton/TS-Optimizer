@@ -403,18 +403,17 @@ export function transformInlineSegmentBody(
     // function, `wrappedSource` is the JSX parser's input; without the
     // sourcePosition, dev-info positions would be wrappedSource-relative
     // (i.e. body-relative, off by the body's source-line offset).
-    const devOptionsForCall = jsxBodyOptions.devOptions
-      ? jsxBodyOptions.source != null
-        ? {
-            ...jsxBodyOptions.devOptions,
-            sourcePosition: {
-              source: jsxBodyOptions.source,
-              bodyOriginOffset: ext.loc[0],
-              wrapperPrefixLen: wrapperPrefix.length,
-            },
-          }
-        : jsxBodyOptions.devOptions
-      : undefined;
+    let devOptionsForCall = jsxBodyOptions.devOptions;
+    if (devOptionsForCall && jsxBodyOptions.source != null) {
+      devOptionsForCall = {
+        ...devOptionsForCall,
+        sourcePosition: {
+          source: jsxBodyOptions.source,
+          bodyOriginOffset: ext.loc[0],
+          wrapperPrefixLen: wrapperPrefix.length,
+        },
+      };
+    }
 
     const parseResult = parseSync('__body__.tsx', wrappedSource, RAW_TRANSFER_PARSER_OPTIONS);
     if (parseResult.program && !parseResult.errors?.length) {
