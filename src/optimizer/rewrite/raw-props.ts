@@ -78,6 +78,14 @@ export interface InlineSegmentJsxOptions {
   importedNames: Set<string>;
   /** Dev mode options for JSX source info */
   devOptions?: { relPath: string };
+  /**
+   * OSS-410: original module source string, used to compute source-relative
+   * `lineNumber:` / `columnNumber:` on JSX dev-info. Combined with the
+   * per-extraction `loc[0]` and the inline-body wrapper-prefix length to
+   * build a {@link DevInfoSourcePosition} at the `transformAllJsx` call.
+   * Only required when `devOptions` is set.
+   */
+  source?: string;
   /** Starting key counter value (for continuation from module-level JSX) */
   keyCounterStart?: number;
   /** Relative file path for key prefix derivation */
