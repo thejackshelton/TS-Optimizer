@@ -10,6 +10,8 @@ import MagicString from 'magic-string';
 import { parseSync } from 'oxc-parser';
 import { replaceConstants } from '../../src/optimizer/const-replacement.js';
 import { collectImports } from '../../src/optimizer/marker-detection.js';
+import { transformModule } from '../../src/index.js';
+import { mkFilePath, mkSourceText } from '../../src/optimizer/types/brands.js';
 
 function runReplace(source: string, isServer?: boolean, isDev?: boolean) {
   const { program } = parseSync('test.tsx', source);
@@ -93,31 +95,41 @@ console.log(isb);
     expect(result.replacedCount).toBe(1);
   });
 
-  it('substitutes usages but leaves the import declaration untouched', () => {
+  // `replaceConstants` substitutes usages but no longer removes the import
+  // itself — import cleanup is owned by the parent rewrite (processImports +
+  // the surviving-imports usage filter), which is what actually drops the
+  // now-unreferenced binding. So this contract is asserted end-to-end through
+  // `transformModule` rather than against `replaceConstants` in isolation.
+  it('removes import statement for replaced identifiers', () => {
     const source = `import { isServer, isBrowser } from '@qwik.dev/core/build';
-console.log(isServer, isBrowser);
+export const x = isServer ? 1 : 2;
+export const y = isBrowser ? 3 : 4;
 `;
-    const result = runReplace(source, true);
-    // Usages are substituted with literals...
-    expect(result.code).toContain('console.log(true, false)');
-    // ...but the import is intentionally NOT removed here. Import cleanup is
-    // owned by the parent rewrite (processImports removes every original import
-    // and the surviving-imports usage filter drops the now-unreferenced
-    // bindings). replaceConstants doing its own removal re-introduced a
-    // duplicate import into the body. See the note in const-replacement.ts.
-    expect(result.code).toContain("import { isServer, isBrowser } from '@qwik.dev/core/build'");
+    const result = transformModule({
+      input: [{ path: mkFilePath('/src/test.tsx'), code: mkSourceText(source) }],
+      srcDir: mkFilePath('/src'),
+      mode: 'prod',
+      isServer: true,
+      transpileTs: true,
+      minify: 'simplify',
+    });
+    const parent = result.modules.find((m) => m.kind === 'parent') ?? result.modules[0]!;
+    expect(parent.code).not.toContain('import { isServer, isBrowser }');
+    // Fully gone — usages substituted with literals, binding dropped.
+    expect(/\bisServer\b/.test(parent.code)).toBe(false);
   });
 
-  it('does not strip replaced specifiers from a mixed import (left for the pipeline)', () => {
+  it('keeps non-replaced specifiers in a mixed import', () => {
+    // At the replaceConstants level the import is left intact (the pipeline's
+    // usage filter handles removal); isDev is neither replaced nor dropped here.
     const source = `import { isServer, isBrowser, isDev } from '@qwik.dev/core/build';
 console.log(isServer, isBrowser, isDev);
 `;
     // Only replacing isServer/isBrowser (isServer=true), not isDev (isDev undefined)
     const result = runReplace(source, true, undefined);
     expect(result.code).toContain('console.log(true, false, isDev)');
-    // The whole import is left intact; the rewrite pipeline's usage filter is
-    // what later drops the now-unreferenced isServer/isBrowser bindings.
-    expect(result.code).toContain("import { isServer, isBrowser, isDev } from '@qwik.dev/core/build'");
+    // isDev still present (in the untouched import + the usage).
+    expect(result.code).toContain('isDev');
   });
 
   it('handles @builder.io/qwik/build source', () => {
