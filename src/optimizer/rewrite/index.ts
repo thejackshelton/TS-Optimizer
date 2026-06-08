@@ -41,6 +41,7 @@ import type { EmitMode } from '../types.js';
 import { collectBindingNamesFromPattern } from '../utils/binding-pattern.js';
 import type { AstFunction, AstNode, AstProgram, ImportDeclarationSpecifier, ImportSpecifier } from '../../ast-types.js';
 import { forEachAstChild } from '../utils/ast.js';
+import { pureAwareOverwriteStart } from '../utils/text-scanning.js';
 import { RAW_TRANSFER_PARSER_OPTIONS } from '../../ast-types.js';
 import type { RewriteContext } from './rewrite-context.js';
 import {
@@ -567,7 +568,11 @@ function rewriteCallSites(ctx: RewriteContext): void {
     if (ext.isSync) {
       s.overwrite(ext.callStart, ext.callEnd, buildSyncTransform(ext.bodyText));
     } else if (ext.isInlinedQrl) {
-      s.overwrite(ext.callStart, ext.callEnd, getQrlVarName(ctx, ext.symbolName));
+      s.overwrite(
+        pureAwareOverwriteStart(ctx.source, ext.callStart),
+        ext.callEnd,
+        getQrlVarName(ctx, ext.symbolName),
+      );
     } else if (ext.isBare) {
       s.overwrite(ext.callStart, ext.callEnd, getQrlVarName(ctx, ext.symbolName));
     } else if (isEventHandlerOrJsxProp(ext.ctxKind) && !ext.qrlCallee) {
