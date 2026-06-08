@@ -15,7 +15,7 @@ function runReplace(source: string, isServer?: boolean, isDev?: boolean) {
   const { program } = parseSync('test.tsx', source);
   const s = new MagicString(source);
   const importMap = collectImports(program);
-  const result = replaceConstants(source, s, program, importMap, isServer, isDev);
+  const result = replaceConstants(s, program, importMap, isServer, isDev);
   return { code: s.toString(), ...result };
 }
 
@@ -93,23 +93,31 @@ console.log(isb);
     expect(result.replacedCount).toBe(1);
   });
 
-  it('removes import statement for replaced identifiers', () => {
+  it('substitutes usages but leaves the import declaration untouched', () => {
     const source = `import { isServer, isBrowser } from '@qwik.dev/core/build';
 console.log(isServer, isBrowser);
 `;
     const result = runReplace(source, true);
-    expect(result.code).not.toContain("import { isServer, isBrowser }");
+    // Usages are substituted with literals...
+    expect(result.code).toContain('console.log(true, false)');
+    // ...but the import is intentionally NOT removed here. Import cleanup is
+    // owned by the parent rewrite (processImports removes every original import
+    // and the surviving-imports usage filter drops the now-unreferenced
+    // bindings). replaceConstants doing its own removal re-introduced a
+    // duplicate import into the body. See the note in const-replacement.ts.
+    expect(result.code).toContain("import { isServer, isBrowser } from '@qwik.dev/core/build'");
   });
 
-  it('keeps non-replaced specifiers in a mixed import', () => {
+  it('does not strip replaced specifiers from a mixed import (left for the pipeline)', () => {
     const source = `import { isServer, isBrowser, isDev } from '@qwik.dev/core/build';
 console.log(isServer, isBrowser, isDev);
 `;
     // Only replacing isServer/isBrowser (isServer=true), not isDev (isDev undefined)
     const result = runReplace(source, true, undefined);
     expect(result.code).toContain('console.log(true, false, isDev)');
-    // isDev import should remain
-    expect(result.code).toContain('isDev');
+    // The whole import is left intact; the rewrite pipeline's usage filter is
+    // what later drops the now-unreferenced isServer/isBrowser bindings.
+    expect(result.code).toContain("import { isServer, isBrowser, isDev } from '@qwik.dev/core/build'");
   });
 
   it('handles @builder.io/qwik/build source', () => {
