@@ -574,7 +574,14 @@ function rewriteCallSites(ctx: RewriteContext): void {
         getQrlVarName(ctx, ext.symbolName),
       );
     } else if (ext.isBare) {
-      s.overwrite(ext.callStart, ext.callEnd, getQrlVarName(ctx, ext.symbolName));
+      // Same bare-identifier replacement as the inlinedQrl branch above — a
+      // preceding PURE annotation would be stranded before the `q_<symbol>`
+      // identifier, so consume it too. Kept symmetric with that branch.
+      s.overwrite(
+        pureAwareOverwriteStart(ctx.source, ext.callStart),
+        ext.callEnd,
+        getQrlVarName(ctx, ext.symbolName),
+      );
     } else if (isEventHandlerOrJsxProp(ext.ctxKind) && !ext.qrlCallee) {
       let propName: string;
       if (ext.isComponentEvent) {
