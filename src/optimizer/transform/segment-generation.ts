@@ -58,6 +58,7 @@ import {
   postProcessSegmentCode,
 } from "./post-process.js";
 import type { LoopContext } from "../loop-hoisting.js";
+import { eventHandlerQpParams } from "../loop-hoisting.js";
 
 /**
  * Resolve the on-disk extension for a segment's emitted file (`module.path`
@@ -1047,17 +1048,9 @@ export function buildNestedCallSites(
       let qpParams: string[] | undefined = elementQpParamsMap.get(child.symbolName);
       if (
         qpParams === undefined &&
-        (child.ctxKind === "eventHandler" || child.ctxKind === "jSXProp") &&
-        child.paramNames.length >= 2 &&
-        child.paramNames[0] === "_" &&
-        child.paramNames[1] === "_1"
+        (child.ctxKind === "eventHandler" || child.ctxKind === "jSXProp")
       ) {
-        const params: string[] = [];
-        for (let pi = 2; pi < child.paramNames.length; pi++) {
-          const p = child.paramNames[pi];
-          if (numberedPaddingParam.test(p)) continue;
-          params.push(p);
-        }
+        const params = eventHandlerQpParams(child.paramNames);
         if (params.length > 0) qpParams = params;
       }
       nestedCallSites.push({
