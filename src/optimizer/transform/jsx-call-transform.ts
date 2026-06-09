@@ -288,9 +288,15 @@ function walkAndWrap(
     reactiveBindings.has(node.object.name)
   ) {
     const propName = staticPropName(node);
-    if (propName !== null && propName !== 'value') {
+    if (propName !== null) {
       const objText = s.slice(node.object.start, node.object.end);
-      s.overwrite(node.start, node.end, `_wrapProp(${objText}, "${propName}")`);
+      // Signal `.value` reads wrap to the one-arg form `_wrapProp(sig)`;
+      // store field reads (`store.count`) wrap to `_wrapProp(store, "count")`.
+      // Both yield a stable reactive reference the runtime resolves per render.
+      const replacement = propName === 'value'
+        ? `_wrapProp(${objText})`
+        : `_wrapProp(${objText}, "${propName}")`;
+      s.overwrite(node.start, node.end, replacement);
       neededImports.add('_wrapProp');
       return;
     }
@@ -543,8 +549,10 @@ function isStaticChildren(value: AstNode, reactive: ReadonlySet<string>): boolea
     value.object?.type === 'Identifier' &&
     reactive.has(value.object.name)
   ) {
+    // A reactive member read (signal `.value` or store `.field`) becomes a
+    // stable `_wrapProp(...)` reference, so it counts as static children.
     const propName = staticPropName(value);
-    if (propName !== null && propName !== 'value') return true;
+    if (propName !== null) return true;
   }
   if (value.type === 'ArrayExpression') {
     return (value.elements ?? []).every((el) => el != null && isStaticChildren(el, reactive));
