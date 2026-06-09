@@ -10,6 +10,7 @@ import MagicString from 'magic-string';
 import { parseSync } from 'oxc-parser';
 import { forEachAstChild } from '../utils/ast.js';
 import { isEventAttributeName } from '../utils/event-attrs.js';
+import { wCallSuffix } from '../utils/w-call.js';
 import {
   RAW_TRANSFER_PARSER_OPTIONS,
   type AstFunction,
@@ -234,7 +235,7 @@ export function transformInlineSegmentBody(
             hoistedDeclarations.push(hoistDecl);
             qrlRef = hoistedName;
           } else if (!isRegCtx && !childIsStripped && child.captureNames.length > 0) {
-            qrlRef += '.w([\n        ' + child.captureNames.join(',\n        ') + '\n    ])';
+            qrlRef += wCallSuffix(child.captureNames, '        ', '    ');
           }
 
           // A handler extracted from a pre-transformed `_jsxDEV(...)` props
@@ -252,7 +253,7 @@ export function transformInlineSegmentBody(
           let replacement = child.qrlCallee + '(' + childVarName;
 
           if (child.captureNames.length > 0) {
-            replacement += '.w([\n        ' + child.captureNames.join(',\n        ') + '\n    ])';
+            replacement += wCallSuffix(child.captureNames, '        ', '    ');
           }
 
           replacement += ')';
@@ -267,7 +268,7 @@ export function transformInlineSegmentBody(
           // parens) instead of `useTaskQrl(q_X.w([...]))`.
           let replacement = childVarName;
           if (child.captureNames.length > 0) {
-            replacement += '.w([\n        ' + child.captureNames.join(',\n        ') + '\n    ])';
+            replacement += wCallSuffix(child.captureNames, '        ', '    ');
           }
           body = body.slice(0, relCallStart) + replacement + body.slice(relCallEnd);
         }
