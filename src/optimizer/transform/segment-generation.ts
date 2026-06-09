@@ -1037,6 +1037,29 @@ export function buildNestedCallSites(
         elementQpParams: elementQpParamsMap.get(child.symbolName),
       });
     } else {
+      // An event handler extracted from a pre-transformed `_jsxDEV(...)` props
+      // bag (isJsxObjectProp) flows through this plain call-site branch, but it
+      // still needs its lexical captures delivered to the runtime via the
+      // element's `q:p`/`q:ps` prop. Those captures are the handler's params
+      // after the `_, _1` (event, element) prefix — the same positional
+      // delivery the loop-iter path uses. The peer-tool JSX-call rewriter
+      // (`buildJsxSortedCall`) reads `elementQpParams` to inject the prop.
+      let qpParams: string[] | undefined = elementQpParamsMap.get(child.symbolName);
+      if (
+        qpParams === undefined &&
+        (child.ctxKind === "eventHandler" || child.ctxKind === "jSXProp") &&
+        child.paramNames.length >= 2 &&
+        child.paramNames[0] === "_" &&
+        child.paramNames[1] === "_1"
+      ) {
+        const params: string[] = [];
+        for (let pi = 2; pi < child.paramNames.length; pi++) {
+          const p = child.paramNames[pi];
+          if (numberedPaddingParam.test(p)) continue;
+          params.push(p);
+        }
+        if (params.length > 0) qpParams = params;
+      }
       nestedCallSites.push({
         qrlVarName,
         callStart: child.callStart,
@@ -1046,6 +1069,7 @@ export function buildNestedCallSites(
         captureNames:
           child.captureNames.length > 0 ? child.captureNames : undefined,
         importSource: child.importSource || undefined,
+        elementQpParams: qpParams,
       });
     }
   }

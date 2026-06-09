@@ -34,6 +34,7 @@ import {
   type JsxKeyCounter,
 } from './jsx.js';
 import { transformEventPropName } from './event-handlers.js';
+import { buildCaptureProp } from '../loop-hoisting.js';
 import { forEachAstChild } from '../utils/ast.js';
 import type { SegmentImportData } from '../segment-codegen.js';
 
@@ -93,6 +94,15 @@ interface JsxCallTransformOptions {
    * left alone.
    */
   skipRanges?: ReadonlyArray<{ readonly start: number; readonly end: number }>;
+  /**
+   * Maps an event-handler QRL var name (`q_<sym>`) to the lexical-capture
+   * params the runtime must deliver to it positionally — the handler's
+   * params after the `_, _1` (event, element) prefix. When a const event
+   * handler on an element references one of these, `buildJsxSortedCall`
+   * injects the element's `q:p`/`q:ps` prop so the runtime passes the
+   * captures through. Mirrors the raw-JSX path's `injectQpProp`.
+   */
+  qpByQrl?: ReadonlyMap<string, readonly string[]>;
 }
 
 /**
@@ -400,6 +410,9 @@ function buildJsxSortedCall(
   let hasVarEventHandler = false;
   const varEntries: string[] = [];
   const constEntries: string[] = [];
+  // Union of `q:p`/`q:ps` capture params across all const event handlers on
+  // this element (an element with two capturing handlers shares one prop).
+  const qpParams: string[] = [];
   for (const prop of propsArg.properties) {
     if (prop.type === 'SpreadElement') {
       varEntries.push(s.slice(prop.start, prop.end));
@@ -429,6 +442,14 @@ function buildJsxSortedCall(
         // and drops the flag bit.
         if (isConstEventHandlerValue(prop.value)) {
           constEntries.push(`"${transformed}": ${valueText}`);
+          // A const handler delivers its captures positionally; record them
+          // so the element emits one `q:p`/`q:ps` prop below.
+          const handlerQp = opts.qpByQrl?.get(valueText);
+          if (handlerQp) {
+            for (const p of handlerQp) {
+              if (!qpParams.includes(p)) qpParams.push(p);
+            }
+          }
         } else {
           varEntries.push(`"${transformed}": ${valueText}`);
           hasVarEventHandler = true;
@@ -453,6 +474,14 @@ function buildJsxSortedCall(
     keyText = `"${opts.keyCounter.next()}"`;
   }
 
+  // The element's `q:p`/`q:ps` capture prop goes in the VAR bag (the captured
+  // values can change between renders), ahead of any other var props —
+  // matching SWC's emit order. Its presence sets the `moved_captures` flag.
+  if (qpParams.length > 0) {
+    const qp = buildCaptureProp(qpParams, true);
+    if (qp) varEntries.unshift(`"${qp.propName}": ${qp.propValue}`);
+  }
+
   const varPropsText = varEntries.length > 0 ? `{ ${varEntries.join(', ')} }` : 'null';
   const constPropsText = constEntries.length > 0 ? `{ ${constEntries.join(', ')} }` : 'null';
   const childrenSlot = childrenText ?? 'null';
@@ -460,7 +489,8 @@ function buildJsxSortedCall(
     ? 'none'
     : childrenIsDynamic ? 'dynamic' : 'static';
   const hasVarProps = varEntries.length > 0;
-  const flags = computeJsxFlags(hasVarProps, childrenType, false, hasVarEventHandler);
+  let flags = computeJsxFlags(hasVarProps, childrenType, false, hasVarEventHandler);
+  if (qpParams.length > 0) flags |= 4;
 
   opts.neededImports.add('_jsxSorted');
 
