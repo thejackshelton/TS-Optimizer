@@ -9,6 +9,7 @@
 import MagicString from 'magic-string';
 import { parseSync } from 'oxc-parser';
 import { forEachAstChild } from '../utils/ast.js';
+import { isEventAttributeName } from '../utils/event-attrs.js';
 import {
   RAW_TRANSFER_PARSER_OPTIONS,
   type AstFunction,
@@ -55,13 +56,6 @@ function getJsxAttrName(attr: JSXAttribute): string | null {
   return null;
 }
 
-function isEventAttribute(name: string): boolean {
-  return name.endsWith('$') ||
-    name.startsWith('q-e:') || name.startsWith('q-ep:') ||
-    name.startsWith('q-dp:') || name.startsWith('q-wp:') ||
-    name.startsWith('q-d:') || name.startsWith('q-w:');
-}
-
 /**
  * Collect promoted capture params from a JSX element's event handler attributes,
  * adding matched QRL names to `qrlsWithCaptures`.
@@ -78,7 +72,7 @@ function collectQpParamsFromElement(
     if (attr.type !== 'JSXAttribute') continue;
 
     const attrName = getJsxAttrName(attr);
-    if (!attrName || !isEventAttribute(attrName)) continue;
+    if (!attrName || !isEventAttributeName(attrName)) continue;
     if (attr.value?.type !== 'JSXExpressionContainer') continue;
     if (attr.value.expression.type !== 'Identifier') continue;
 
