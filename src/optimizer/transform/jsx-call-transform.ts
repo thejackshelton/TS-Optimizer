@@ -399,6 +399,7 @@ function buildJsxSortedCall(
   let childrenIsDynamic = false;
   let hasVarEventHandler = false;
   const varEntries: string[] = [];
+  const constEntries: string[] = [];
   for (const prop of propsArg.properties) {
     if (prop.type === 'SpreadElement') {
       varEntries.push(s.slice(prop.start, prop.end));
@@ -419,13 +420,19 @@ function buildJsxSortedCall(
       const transformed = transformEventPropName(keyName, new Set());
       if (transformed !== null) {
         const valueText = s.slice(prop.value.start, prop.value.end);
-        varEntries.push(`"${transformed}": ${valueText}`);
-        // A dynamic event-handler prop value (anything that isn't a
-        // static identifier-only reference) makes this a "var event
-        // handler" — drops the `static_listeners` flag bit. The peer-tool
-        // input typically passes `q_X.w([...])` here (CallExpression), so
-        // detect any non-Identifier value as dynamic.
-        if (prop.value.type !== 'Identifier') hasVarEventHandler = true;
+        // A const event handler — a bare QRL ref (`q_X`) or `q_X.w([…])` —
+        // belongs in the CONST props bag (3rd `_jsxSorted` arg), matching
+        // SWC and the `static_listeners` flag. Emitting it in the VAR bag
+        // while the flag claims static listeners leaves the runtime looking
+        // in the const bag, finding nothing, and never wiring the event.
+        // Anything else (an inline arrow, a computed value) is a var handler
+        // and drops the flag bit.
+        if (isConstEventHandlerValue(prop.value)) {
+          constEntries.push(`"${transformed}": ${valueText}`);
+        } else {
+          varEntries.push(`"${transformed}": ${valueText}`);
+          hasVarEventHandler = true;
+        }
         continue;
       }
     }
@@ -447,7 +454,7 @@ function buildJsxSortedCall(
   }
 
   const varPropsText = varEntries.length > 0 ? `{ ${varEntries.join(', ')} }` : 'null';
-  const constPropsText = 'null';
+  const constPropsText = constEntries.length > 0 ? `{ ${constEntries.join(', ')} }` : 'null';
   const childrenSlot = childrenText ?? 'null';
   const childrenType: 'none' | 'static' | 'dynamic' = childrenText === null
     ? 'none'
@@ -458,6 +465,22 @@ function buildJsxSortedCall(
   opts.neededImports.add('_jsxSorted');
 
   return `/*#__PURE__*/ _jsxSorted(${tag}, ${varPropsText}, ${constPropsText}, ${childrenSlot}, ${flags}, ${keyText})`;
+}
+
+/**
+ * A const event-handler value: a bare QRL identifier (`q_<sym>`), whose
+ * lexical captures (if any) are delivered out-of-band via the element's
+ * `q:p`/`q:ps` prop. SWC places these in the const props bag with the
+ * `static_listeners` flag set.
+ *
+ * A `q_<sym>.w([captures])` handler is NOT const — the `.w()` binds the
+ * captures inline, so the QRL reference varies with them. SWC keeps those
+ * in the VAR bag and clears the `static_listeners` bit (see the
+ * `example_parsed_inlined_qrls` snapshot, flags `2`). An inline arrow or
+ * any other expression is likewise a var handler.
+ */
+function isConstEventHandlerValue(value: AstNode): boolean {
+  return value.type === 'Identifier';
 }
 
 /** Extract a static key name from an object property. Returns null for
