@@ -16,7 +16,7 @@ describe('createOptimizer', () => {
     expect(typeof optimizer.sys.path.join).toBe('function');
   });
 
-  it('round-trips a minimal $() input through transformModules from raw strings', async () => {
+  it('round-trips a minimal $() input through transformModules', async () => {
     // No mk* constructors — the NAPI-parity surface accepts raw strings and
     // brands internally, matching how an SWC-typed consumer calls it.
     const optimizer = await createOptimizer();
