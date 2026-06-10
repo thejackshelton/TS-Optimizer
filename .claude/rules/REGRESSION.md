@@ -69,6 +69,16 @@ The check's output names every regressed test ID (up to 25 listed; rest summaris
 2. **A test legitimately changed and the baseline is stale.** Rare. Happens if a test was renamed or split between baseline-update runs. Don't update the baseline manually on your branch — let it land on `main` first and the auto-update will absorb it.
 3. **The total count dropped.** Means a test was deleted or filtered out. Either restore it or update the baseline through the normal merge flow if the deletion was intentional.
 
+### Deliberate ID migrations (renames / moves at scale)
+
+When a PR intentionally changes test IDs wholesale — file moves or renames, describe-text rewording — the gate cannot tell a rename from a regression: the old IDs simply vanish. The sanctioned procedure (first used by the test-tree reorganization):
+
+1. Make the changes through an explicit, machine-readable map: a file-move map plus a deterministic name transform (one function applied identically to source strings and to baseline fullNames).
+2. Run the full suite locally and verify the migration is exactly **1:1** against the old baseline: totals and passing counts identical; every old passing ID maps through the map to a new passing ID, with zero unaccounted IDs in either direction; the failing set identical under the same map.
+3. Regenerate `.ci/baseline.json` **in the same PR** via `pnpm ci:baseline:update <vitest-json>`, and include the verifier output in the PR description.
+
+The in-PR regeneration is what lets CI pass; the 1:1 verification is what keeps the regeneration from hiding a regression. This path is only for deliberate, mapped migrations — incidental renames still follow path 2 above.
+
 Local equivalent of the CI gate:
 
 ```bash
