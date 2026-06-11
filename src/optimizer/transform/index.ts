@@ -25,7 +25,11 @@ import {
   type JsxRewriteOptions,
   type ParentRewriteResult,
 } from "../rewrite/index.js";
-import { collectImports, type ImportInfo } from "../extraction/marker-detection.js";
+import {
+  collectImports,
+  sourceMayContainMarkers,
+  type ImportInfo,
+} from "../extraction/marker-detection.js";
 import { buildDevFilePath } from "../segment/dev-mode.js";
 import { isSimpleIdentifierName } from '../ast/identifier-name.js';
 import { type SymbolName, mkSymbolName, type RelativePath } from '../types/brands.js';
@@ -397,6 +401,25 @@ function extractModuleSegments(
 
   const willTranspileJsx =
     options.transpileJsx !== false && (ext === ".tsx" || ext === ".jsx");
+
+  // Sound textual prefilter (the Phase-0.5 flatten-prefilter pattern):
+  // a module whose text cannot contain an extraction trigger — see
+  // `sourceMayContainMarkers` for the soundness argument — and that has
+  // no JSX to transpile is a passthrough by construction. Skipping the
+  // gather walk for it cannot change behavior; it only avoids paying the
+  // tracker build and projection buffers on marker-less modules.
+  if (!willTranspileJsx && !sourceMayContainMarkers(repairedCode)) {
+    return {
+      kind: 'passthrough',
+      module: buildPassthroughModule(
+        repairedCode,
+        relPath,
+        input.path,
+        program,
+      ),
+    };
+  }
+
   // Closure AST nodes (the `arg` of each marker call) are threaded out by
   // the extraction collector keyed by post-disambiguation `symbolName`, so
   // downstream phases reuse the original parse instead of re-parsing each
