@@ -39,7 +39,17 @@
 import { isBindingIdentifier } from 'oxc-walker';
 import type { ScopeTrackerNode } from 'oxc-walker';
 import { ScopeQueryTracker } from './scope-query-tracker.js';
-import type { AstFunction, AstNode, AstProgram } from '../../ast-types.js';
+import type {
+  AstEcmaScriptModule,
+  AstFunction,
+  AstNode,
+  AstProgram,
+} from '../../ast-types.js';
+import {
+  createExtractionCollector,
+  type ExtractedSegment,
+  type ExtractionCollector,
+} from '../extraction/extract.js';
 import { walkWithProtocol } from '../ast/walk-with-protocol.js';
 import { addBindingNamesFromPatternToSet } from '../ast/binding-pattern.js';
 import { getJsxAttributeName } from '../jsx/jsx-attr-name.js';
@@ -89,12 +99,40 @@ export interface PassiveConflict {
 }
 
 /**
+ * Inputs for hosting the Phase-1 extraction collector in the gather walk.
+ * Mirrors the `extractSegments` parameter surface; the walk itself replaces
+ * the standalone extraction traversal.
+ */
+export interface ExtractionGatherInputs {
+  /** Repaired source text backing `program`. */
+  readonly source: string;
+  readonly relPath: string;
+  readonly scope?: string;
+  readonly transpileJsx?: boolean;
+  readonly explicitTranspileJsx?: boolean;
+  readonly parserModule?: AstEcmaScriptModule;
+  /** Same out-map contract as `extractSegments`'s `closureNodesOut`. */
+  readonly closureNodesOut?: Map<string, AstFunction>;
+}
+
+/**
  * Which facts to gather. A projection runs iff its input field is present —
  * passing an empty array/map still runs the projection (matching the
  * original functions, which walked regardless of how many targets they had).
+ *
+ * Two host modes:
+ *   - **standalone-facts mode** — the caller already has extractions and
+ *     passes `closureNodes` / `usageExtractions` / `loopExtractions`.
+ *   - **fused-extraction mode** — `extraction` is set; the walk hosts the
+ *     Phase-1 collector, discovers extractions itself, and the
+ *     free-identifier, lexical-scope, loop-map, and segment-usage
+ *     projections key off the discovered set. The three standalone-mode
+ *     inputs must be omitted.
  */
 export interface ModuleGatherInputs {
   readonly program: AstProgram;
+  /** Hosts the Phase-1 extraction collector in this walk (fused mode). */
+  readonly extraction?: ExtractionGatherInputs;
   /** Enables the free-identifier and lexical-scope projections. */
   readonly closureNodes?: ReadonlyMap<string, AstFunction>;
   /** Enables the segment-usage projection. */
@@ -114,8 +152,15 @@ export interface ModuleGatherInputs {
 
 /** Every gathered fact. Fields for disabled projections are empty. */
 export interface ModuleGatherFacts {
+  /** Phase-1 extraction output; empty unless fused-extraction mode. */
+  readonly extractions: readonly ExtractedSegment[];
   readonly closureFreeIdentifiers: ReadonlyMap<AstFunction, readonly string[]>;
-  readonly closureLexicalScopes: Map<string, Set<string>>;
+  /**
+   * Keyed by closure-node identity, not symbolName — in fused mode the
+   * union is recorded mid-walk, before `disambiguateExtractions` finalises
+   * names.
+   */
+  readonly closureLexicalScopes: Map<AstFunction, Set<string>>;
   readonly extractionLoopMap: Map<string, LoopContext[]>;
   readonly loopBodyVarDecls: LoopBodyVarDeclMap;
   readonly allScopeEntries: ScopeEntry[];
@@ -184,10 +229,14 @@ interface GatherEnterContext {
   readonly pendingResolutions: PendingResolution[];
   // Lexical-scope projection
   readonly lexicalEnabled: boolean;
-  readonly nodeToSymbol: ReadonlyMap<AstFunction, string>;
+  /** Closure nodes whose enclosing-scope union gets recorded. In fused
+   * mode this set grows mid-walk as extractions are discovered — always
+   * before the walker reaches the closure node, because discovery happens
+   * at the creation node's enter and the closure is a descendant. */
+  readonly lexicalClosureNodes: ReadonlySet<AstFunction>;
   readonly scopeStack: readonly Set<string>[];
   readonly pushScope: (scope: Set<string>) => void;
-  readonly closureLexicalScopes: Map<string, Set<string>>;
+  readonly closureLexicalScopes: Map<AstFunction, Set<string>>;
   // Loop-map projection
   readonly loopEnabled: boolean;
   readonly loopExtractions: ReadonlyArray<CallExtractionRange>;
@@ -201,8 +250,9 @@ interface GatherEnterContext {
   readonly allScopeEntries: ScopeEntry[];
   // Segment-usage projection
   readonly usageEnabled: boolean;
-  readonly usageExtractions: ReadonlyArray<UsageExtractionRange>;
-  readonly extractionLocals: ReadonlyMap<string, Set<string>>;
+  /** True when declaration visits must buffer — there is at least one
+   * usage extraction, or fused mode may still discover extractions. */
+  readonly bufferDeclVisits: boolean;
   readonly identifierVisits: Array<{ pos: number; name: string }>;
   readonly declVisits: AstNode[];
   // Passive-conflict projection
@@ -210,6 +260,8 @@ interface GatherEnterContext {
   readonly passiveConflicts: PassiveConflict[];
   // Scope-bindings projection
   readonly scopeBindingsCollector: ScopeBindingsCollector | undefined;
+  // Fused-extraction host
+  readonly extractionCollector: ExtractionCollector | undefined;
 }
 
 /** Exit view: adds the stack-pop act-helpers. */
@@ -249,14 +301,12 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   const pendingResolutions: PendingResolution[] = [];
 
   // --- Lexical-scope projection setup (buildClosureLexicalScopes) ---
-  const lexicalEnabled = inputs.closureNodes !== undefined;
-  const nodeToSymbol = new Map<AstFunction, string>();
-  if (inputs.closureNodes) {
-    for (const [sym, fn] of inputs.closureNodes) {
-      nodeToSymbol.set(fn, sym);
-    }
-  }
-  const closureLexicalScopes = new Map<string, Set<string>>();
+  const lexicalEnabled =
+    inputs.closureNodes !== undefined || inputs.extraction !== undefined;
+  const lexicalClosureNodes = new Set<AstFunction>(
+    inputs.closureNodes?.values() ?? [],
+  );
+  const closureLexicalScopes = new Map<AstFunction, Set<string>>();
   const scopeStack: Set<string>[] = [];
   if (lexicalEnabled) {
     // Module scope is pre-collected: the walk's enter fires for the
@@ -269,7 +319,8 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   }
 
   // --- Loop-map projection setup (buildExtractionLoopMap) ---
-  const loopEnabled = inputs.loopExtractions !== undefined;
+  const loopEnabled =
+    inputs.loopExtractions !== undefined || inputs.extraction !== undefined;
   const loopExtractions = inputs.loopExtractions ?? [];
   const repairedCode = inputs.repairedCode ?? '';
   const loopStack: LoopContext[] = [];
@@ -281,15 +332,11 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   const allScopeEntries: ScopeEntry[] = [];
 
   // --- Segment-usage projection setup (computeSegmentUsage) ---
-  const usageEnabled = inputs.usageExtractions !== undefined;
+  const usageEnabled =
+    inputs.usageExtractions !== undefined || inputs.extraction !== undefined;
   const usageExtractions = inputs.usageExtractions ?? [];
   const segmentUsage = new Map<string, Set<string>>();
   const rootUsage = new Set<string>();
-  const extractionLocals = new Map<string, Set<string>>();
-  for (const ext of usageExtractions) {
-    segmentUsage.set(ext.symbolName, new Set());
-    extractionLocals.set(ext.symbolName, new Set());
-  }
   const rootDeclPositions = usageEnabled ? collectRootDeclPositions(program) : new Set<number>();
   const identifierVisits: Array<{ pos: number; name: string }> = [];
   const declVisits: AstNode[] = [];
@@ -304,6 +351,45 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     scopeBindingsCollector = createScopeBindingsCollector(program);
   }
 
+  // --- Fused-extraction host setup (Phase-1 extractSegments) ---
+  // Loop-stack snapshots key by extraction object identity:
+  // `disambiguateExtractions` rewrites symbolNames post-walk, so the
+  // symbolName-keyed `extractionLoopMap` is derived after `finish()`.
+  const extractionLoopRefs = new Map<ExtractedSegment, LoopContext[]>();
+  let extractionCollector: ExtractionCollector | undefined;
+  if (inputs.extraction !== undefined) {
+    const ex = inputs.extraction;
+    extractionCollector = createExtractionCollector({
+      source: ex.source,
+      relPath: ex.relPath,
+      program,
+      parserModule: ex.parserModule,
+      scope: ex.scope,
+      transpileJsx: ex.transpileJsx,
+      explicitTranspileJsx: ex.explicitTranspileJsx,
+      closureNodesOut: ex.closureNodesOut,
+      onExtraction: (extraction, closureNode) => {
+        // Fires at the creation node's enter — before the walker descends
+        // into the closure body, so the free-identifier and lexical-scope
+        // projections see the registration when they reach the node.
+        if (closureNode && !freeIdentNames.has(closureNode)) {
+          freeIdentNames.set(closureNode, []);
+          freeIdentDedupes.set(closureNode, new Set());
+          lexicalClosureNodes.add(closureNode);
+        }
+        // Snapshot of the enclosing loop stack. Equivalent to the oracle's
+        // max-depth scan over every node containing the call range: loops
+        // pop only on leave, so the stack at the creation node's enter is
+        // exactly the deepest stack any containing node observes (the
+        // creation node is never itself a loop context — marker and
+        // inlinedQrl calls have Identifier callees, never `.map`).
+        if (loopStack.length > 0) {
+          extractionLoopRefs.set(extraction, [...loopStack]);
+        }
+      },
+    });
+  }
+
   const enterCtx: GatherEnterContext = {
     tracker,
     freeIdentNames,
@@ -312,7 +398,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     pushOpenClosure: (oc) => { openClosures.push(oc); },
     pendingResolutions,
     lexicalEnabled,
-    nodeToSymbol,
+    lexicalClosureNodes,
     scopeStack,
     pushScope: (scope) => { scopeStack.push(scope); },
     closureLexicalScopes,
@@ -326,13 +412,14 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     scopeEntriesEnabled,
     allScopeEntries,
     usageEnabled,
-    usageExtractions,
-    extractionLocals,
+    bufferDeclVisits:
+      usageExtractions.length > 0 || inputs.extraction !== undefined,
     identifierVisits,
     declVisits,
     passiveEnabled,
     passiveConflicts,
     scopeBindingsCollector,
+    extractionCollector,
   };
 
   const exitCtx: GatherExitContext = {
@@ -363,8 +450,14 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
         enterSegmentUsage(node, ctx);
         enterPassiveConflicts(node, ctx);
         ctx.scopeBindingsCollector?.enter(node);
+        // The extraction collector runs after the projections so its
+        // onExtraction hook observes this node's loop-stack push (no
+        // creation node is itself a loop context, but the ordering keeps
+        // the invariant local rather than depending on that fact).
+        ctx.extractionCollector?.enter(node, parent);
       },
       leave(node, _parent, ctx) {
+        ctx.extractionCollector?.leave(node);
         ctx.popOpenClosureIfMatches(node);
         if (ctx.lexicalEnabled) ctx.popScopeIfFunction(node);
         if (ctx.loopEnabled) ctx.popLoopIfMatches(node);
@@ -373,6 +466,14 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     },
     { scopeTracker: tracker },
   );
+
+  // Program-exit act for the fused-extraction host: disambiguate names,
+  // then derive the symbolName-keyed maps from the identity-keyed
+  // mid-walk records (names are only final after disambiguation).
+  const extractions = extractionCollector?.finish() ?? [];
+  for (const [ext, stack] of extractionLoopRefs) {
+    extractionLoopMap.set(ext.symbolName, stack);
+  }
 
   // Program-exit act for the free-identifier projection: the walk has
   // populated the full scope tree (hoisted declarations included), so
@@ -385,10 +486,17 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   // wait until the locals map has seen hoisted declarations (an identifier
   // reference can be visited before its `function g() {}` declaration).
   if (usageEnabled) {
+    const usageRanges: ReadonlyArray<UsageExtractionRange> =
+      inputs.extraction !== undefined ? extractions : usageExtractions;
+    const extractionLocals = new Map<string, Set<string>>();
+    for (const ext of usageRanges) {
+      segmentUsage.set(ext.symbolName, new Set());
+      extractionLocals.set(ext.symbolName, new Set());
+    }
     classifySegmentUsage(
       declVisits,
       identifierVisits,
-      usageExtractions,
+      usageRanges,
       extractionLocals,
       rootDeclPositions,
       segmentUsage,
@@ -397,6 +505,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   }
 
   return {
+    extractions,
     closureFreeIdentifiers: freeIdentNames,
     closureLexicalScopes,
     extractionLoopMap,
@@ -499,8 +608,7 @@ function enterLexicalScopes(node: AstNode, ctx: GatherEnterContext): void {
   if (!ctx.lexicalEnabled) return;
   if (!isFunctionLike(node)) return;
 
-  const sym = ctx.nodeToSymbol.get(node);
-  if (sym !== undefined) {
+  if (ctx.lexicalClosureNodes.has(node)) {
     // Record union of all enclosing scopes BEFORE pushing this
     // closure's own scope. The closure's params land in
     // `analyzeCaptures(..).paramNames` separately.
@@ -508,7 +616,7 @@ function enterLexicalScopes(node: AstNode, ctx: GatherEnterContext): void {
     for (const scope of ctx.scopeStack) {
       for (const id of scope) union.add(id);
     }
-    ctx.closureLexicalScopes.set(sym, union);
+    ctx.closureLexicalScopes.set(node, union);
   }
 
   // Push this function's own scope so any nested closure sees it as
@@ -595,7 +703,7 @@ function enterScopeEntries(node: AstNode, ctx: GatherEnterContext): void {
 function enterSegmentUsage(node: AstNode, ctx: GatherEnterContext): void {
   if (!ctx.usageEnabled) return;
 
-  if (DECLARATION_TYPES.has(node.type) && ctx.usageExtractions.length > 0) {
+  if (ctx.bufferDeclVisits && DECLARATION_TYPES.has(node.type)) {
     ctx.declVisits.push(node);
   }
   // JSXIdentifier matters too: <Component> references module-level bindings
