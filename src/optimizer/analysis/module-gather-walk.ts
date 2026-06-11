@@ -164,7 +164,11 @@ export interface ModuleGatherFacts {
   readonly extractionLoopMap: Map<string, LoopContext[]>;
   readonly loopBodyVarDecls: LoopBodyVarDeclMap;
   readonly allScopeEntries: ScopeEntry[];
+  /** Empty (not computed) when a fused-extraction walk found zero
+   * extractions — migration is a no-op without segment usage, so the
+   * classification sweep is skipped on extraction-less modules. */
   readonly segmentUsage: Map<string, Set<string>>;
+  /** Same skip contract as `segmentUsage`. */
   readonly rootUsage: Set<string>;
   readonly passiveConflicts: PassiveConflict[];
   /** Present iff the scope-bindings projection was enabled. */
@@ -188,6 +192,44 @@ function isFunctionLike(node: AstNode): node is AstFunction {
     node.type === 'FunctionExpression' ||
     node.type === 'FunctionDeclaration'
   );
+}
+
+/**
+ * One lexical-scope stack frame. The name set materializes lazily — only
+ * when a registered closure requests the enclosing-scope union — so
+ * modules (and functions) without extractions never pay the per-function
+ * param/shallow-decl collection. `node === null` marks the module-scope
+ * frame. Materialization is timing-independent: the collectors are pure
+ * reads of the (immutable) AST, so computing the set at union time yields
+ * exactly what computing it at push time would have.
+ */
+interface LexicalScopeFrame {
+  readonly node: AstFunction | null;
+  set: Set<string> | null;
+}
+
+function materializeScopeFrame(
+  frame: LexicalScopeFrame,
+  program: AstProgram,
+): Set<string> {
+  if (frame.set) return frame.set;
+  const set = new Set<string>();
+  if (frame.node === null) {
+    // Module scope: the walk's enter fires for the program's children but
+    // not the Program node itself, so it is collected from the body here.
+    for (const stmt of program.body ?? []) {
+      collectShallowDeclarationsFromStatement(stmt, set);
+    }
+  } else {
+    for (const param of frame.node.params ?? []) {
+      addBindingNamesFromPatternToSet(param, set);
+    }
+    if (frame.node.body) {
+      collectShallowDeclarationsFromBody(frame.node.body, set);
+    }
+  }
+  frame.set = set;
+  return set;
 }
 
 interface OpenClosure {
@@ -234,8 +276,9 @@ interface GatherEnterContext {
    * before the walker reaches the closure node, because discovery happens
    * at the creation node's enter and the closure is a descendant. */
   readonly lexicalClosureNodes: ReadonlySet<AstFunction>;
-  readonly scopeStack: readonly Set<string>[];
-  readonly pushScope: (scope: Set<string>) => void;
+  readonly program: AstProgram;
+  readonly scopeStack: readonly LexicalScopeFrame[];
+  readonly pushScope: (frame: LexicalScopeFrame) => void;
   readonly closureLexicalScopes: Map<AstFunction, Set<string>>;
   // Loop-map projection
   readonly loopEnabled: boolean;
@@ -245,9 +288,9 @@ interface GatherEnterContext {
   readonly pushLoop: (loopCtx: LoopContext) => void;
   readonly extractionLoopMap: Map<string, LoopContext[]>;
   readonly loopBodyVarDecls: LoopBodyVarDeclMap;
-  // Scope-entry projection
+  // Scope-entry projection (buffers nodes; entries build post-walk)
   readonly scopeEntriesEnabled: boolean;
-  readonly allScopeEntries: ScopeEntry[];
+  readonly scopeEntryNodes: AstNode[];
   // Segment-usage projection
   readonly usageEnabled: boolean;
   /** True when declaration visits must buffer — there is at least one
@@ -307,15 +350,9 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     inputs.closureNodes?.values() ?? [],
   );
   const closureLexicalScopes = new Map<AstFunction, Set<string>>();
-  const scopeStack: Set<string>[] = [];
+  const scopeStack: LexicalScopeFrame[] = [];
   if (lexicalEnabled) {
-    // Module scope is pre-collected: the walk's enter fires for the
-    // program's children but not the Program node itself.
-    const moduleScope = new Set<string>();
-    for (const stmt of program.body ?? []) {
-      collectShallowDeclarationsFromStatement(stmt, moduleScope);
-    }
-    scopeStack.push(moduleScope);
+    scopeStack.push({ node: null, set: null });
   }
 
   // --- Loop-map projection setup (buildExtractionLoopMap) ---
@@ -329,6 +366,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
 
   // --- Scope-entry projection setup (collectAllScopeEntries) ---
   const scopeEntriesEnabled = inputs.scopeEntries === true;
+  const scopeEntryNodes: AstNode[] = [];
   const allScopeEntries: ScopeEntry[] = [];
 
   // --- Segment-usage projection setup (computeSegmentUsage) ---
@@ -337,7 +375,6 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   const usageExtractions = inputs.usageExtractions ?? [];
   const segmentUsage = new Map<string, Set<string>>();
   const rootUsage = new Set<string>();
-  const rootDeclPositions = usageEnabled ? collectRootDeclPositions(program) : new Set<number>();
   const identifierVisits: Array<{ pos: number; name: string }> = [];
   const declVisits: AstNode[] = [];
 
@@ -399,8 +436,9 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     pendingResolutions,
     lexicalEnabled,
     lexicalClosureNodes,
+    program,
     scopeStack,
-    pushScope: (scope) => { scopeStack.push(scope); },
+    pushScope: (frame) => { scopeStack.push(frame); },
     closureLexicalScopes,
     loopEnabled,
     loopExtractions,
@@ -410,7 +448,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     extractionLoopMap,
     loopBodyVarDecls,
     scopeEntriesEnabled,
-    allScopeEntries,
+    scopeEntryNodes,
     usageEnabled,
     bufferDeclVisits:
       usageExtractions.length > 0 || inputs.extraction !== undefined,
@@ -433,7 +471,16 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
       if (isFunctionLike(node)) scopeStack.pop();
     },
     popLoopIfMatches: (node) => {
-      if (detectLoopContext(node, repairedCode)) loopStack.pop();
+      // `detectLoopContext` always sets `loopNode` to the node it was
+      // given, and loops nest properly, so the stack top on leave is this
+      // node's own context iff a context was pushed on its enter —
+      // identity comparison replaces a second detection pass per node.
+      if (
+        loopStack.length > 0 &&
+        loopStack[loopStack.length - 1].loopNode === node
+      ) {
+        loopStack.pop();
+      }
     },
   };
 
@@ -475,6 +522,23 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     extractionLoopMap.set(ext.symbolName, stack);
   }
 
+  // Program-exit act for the scope-entry projection. Skipped when a
+  // fused walk found no extractions — the entries' sole consumer
+  // (event-handler capture promotion) iterates extractions.
+  if (
+    scopeEntriesEnabled &&
+    (inputs.extraction === undefined || extractions.length > 0)
+  ) {
+    for (const node of scopeEntryNodes) {
+      if (isFunctionLike(node)) {
+        allScopeEntries.push(buildFunctionScopeEntry(node));
+      } else {
+        const entry = buildForLoopScopeEntry(node);
+        if (entry) allScopeEntries.push(entry);
+      }
+    }
+  }
+
   // Program-exit act for the free-identifier projection: the walk has
   // populated the full scope tree (hoisted declarations included), so
   // freeze and resolve the buffered identifier visits, in occurrence order
@@ -485,7 +549,15 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   // Program-exit act for the segment-usage projection: classification must
   // wait until the locals map has seen hoisted declarations (an identifier
   // reference can be visited before its `function g() {}` declaration).
-  if (usageEnabled) {
+  // A fused walk that discovered no extractions skips it: every rootUsage
+  // read downstream is conjunctive with segment usage (`usedByRoot &&
+  // usedByAnySegment` and the MIG-05a single-target check), so with an
+  // empty segmentUsage the migration outcome is `keep` for every decl
+  // regardless of rootUsage — sorting the identifier buffer would be pure
+  // waste on extraction-less modules.
+  const classifyUsage =
+    usageEnabled && (inputs.extraction === undefined || extractions.length > 0);
+  if (classifyUsage) {
     const usageRanges: ReadonlyArray<UsageExtractionRange> =
       inputs.extraction !== undefined ? extractions : usageExtractions;
     const extractionLocals = new Map<string, Set<string>>();
@@ -498,7 +570,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
       identifierVisits,
       usageRanges,
       extractionLocals,
-      rootDeclPositions,
+      collectRootDeclPositions(program),
       segmentUsage,
       rootUsage,
     );
@@ -613,24 +685,19 @@ function enterLexicalScopes(node: AstNode, ctx: GatherEnterContext): void {
     // closure's own scope. The closure's params land in
     // `analyzeCaptures(..).paramNames` separately.
     const union = new Set<string>();
-    for (const scope of ctx.scopeStack) {
-      for (const id of scope) union.add(id);
+    for (const frame of ctx.scopeStack) {
+      for (const id of materializeScopeFrame(frame, ctx.program)) {
+        union.add(id);
+      }
     }
     ctx.closureLexicalScopes.set(node, union);
   }
 
-  // Push this function's own scope so any nested closure sees it as
-  // an enclosing scope. Includes params + shallow body decls; nested
-  // function bodies are explored by the walker recursively, not by
-  // this collector.
-  const ownScope = new Set<string>();
-  for (const param of node.params ?? []) {
-    addBindingNamesFromPatternToSet(param, ownScope);
-  }
-  if (node.body) {
-    collectShallowDeclarationsFromBody(node.body, ownScope);
-  }
-  ctx.pushScope(ownScope);
+  // Push this function's own scope frame so any nested closure sees it as
+  // an enclosing scope (params + shallow body decls, materialized lazily;
+  // nested function bodies are explored by the walker recursively, not by
+  // this collector).
+  ctx.pushScope({ node, set: null });
 }
 
 /** Loop-map projection — `buildExtractionLoopMap`'s loop stack + buckets. */
@@ -679,22 +746,22 @@ function enterLoopMap(node: AstNode, ctx: GatherEnterContext): void {
   }
 }
 
-/** Scope-entry projection — `collectAllScopeEntries`'s per-node records. */
+/** Scope-entry projection — `collectAllScopeEntries`'s gather half. Pure
+ * node buffering; the per-node entry records build post-walk (and are
+ * skipped entirely when a fused walk found no extractions — the sole
+ * consumer, event-handler capture promotion, iterates extractions). */
 function enterScopeEntries(node: AstNode, ctx: GatherEnterContext): void {
   if (!ctx.scopeEntriesEnabled) return;
 
-  if (isFunctionLike(node) && node.start !== undefined && node.end !== undefined) {
-    ctx.allScopeEntries.push(buildFunctionScopeEntry(node));
-  }
   if (
-    (node.type === 'ForOfStatement' ||
+    (isFunctionLike(node) ||
+      node.type === 'ForOfStatement' ||
       node.type === 'ForInStatement' ||
       node.type === 'ForStatement') &&
     node.start !== undefined &&
     node.end !== undefined
   ) {
-    const entry = buildForLoopScopeEntry(node);
-    if (entry) ctx.allScopeEntries.push(entry);
+    ctx.scopeEntryNodes.push(node);
   }
 }
 

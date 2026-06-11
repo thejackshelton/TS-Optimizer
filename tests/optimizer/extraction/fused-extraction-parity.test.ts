@@ -33,7 +33,10 @@ import type { ExtractionResult } from '../../../src/optimizer/extraction/extract
 import { buildClosureLexicalScopes } from '../../../src/optimizer/analysis/capture-analysis.js';
 import { computeClosureFreeIdentifiers } from '../../../src/optimizer/analysis/closure-free-identifiers.js';
 import { computeSegmentUsage } from '../../../src/optimizer/analysis/variable-migration.js';
-import { buildExtractionLoopMap } from '../../../src/optimizer/jsx/event-capture-promotion.js';
+import {
+  buildExtractionLoopMap,
+  collectAllScopeEntries,
+} from '../../../src/optimizer/jsx/event-capture-promotion.js';
 import { parseSnapshot } from '../../../src/testing/snapshot-parser.js';
 import { RAW_TRANSFER_PARSER_OPTIONS } from '../../../src/ast-types.js';
 import type {
@@ -109,6 +112,7 @@ function diffFixture(source: string, filename: string, combo: FlagCombo): string
   const facts = gatherModuleFacts({
     program,
     repairedCode: source,
+    scopeEntries: true,
     extraction: {
       source,
       relPath: filename,
@@ -166,9 +170,20 @@ function diffFixture(source: string, filename: string, combo: FlagCombo): string
     Object.fromEntries(oracleLoop.loopBodyVarDecls),
   );
 
-  const oracleUsage = computeSegmentUsage(program, oracleArr);
-  check('segmentUsage', mapOfSetsToPlain(facts.segmentUsage), mapOfSetsToPlain(oracleUsage.segmentUsage));
-  check('rootUsage', [...facts.rootUsage].sort(), [...oracleUsage.rootUsage].sort());
+  // Usage classification is intentionally skipped when the fused walk
+  // found no extractions (every downstream rootUsage read is conjunctive
+  // with segment usage, so the maps would be dead weight) — pin the empty
+  // contract for that case and full oracle parity otherwise.
+  if (fusedExtractions.length === 0) {
+    check('segmentUsage(empty)', facts.segmentUsage.size, 0);
+    check('rootUsage(empty)', facts.rootUsage.size, 0);
+    check('allScopeEntries(empty)', facts.allScopeEntries.length, 0);
+  } else {
+    const oracleUsage = computeSegmentUsage(program, oracleArr);
+    check('segmentUsage', mapOfSetsToPlain(facts.segmentUsage), mapOfSetsToPlain(oracleUsage.segmentUsage));
+    check('rootUsage', [...facts.rootUsage].sort(), [...oracleUsage.rootUsage].sort());
+    check('allScopeEntries', facts.allScopeEntries, collectAllScopeEntries(program));
+  }
 
   const oracleLex = buildClosureLexicalScopes(program, oracleClosures);
   const fusedLex = new Map<string, Set<string>>();
