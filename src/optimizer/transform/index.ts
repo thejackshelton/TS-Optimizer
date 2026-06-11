@@ -796,6 +796,7 @@ function attributeSegmentUsage(
     moduleLevelDecls,
     segmentUsage,
     rootUsage,
+    program,
   );
   if (isInlineStrategy) {
     migrationDecisions = migrationDecisions.filter(

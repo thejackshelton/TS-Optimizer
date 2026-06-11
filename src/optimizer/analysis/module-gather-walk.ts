@@ -52,6 +52,7 @@ import {
   DECLARATION_TYPES,
   addDeclaredNamesFromNode,
   collectRootDeclPositions,
+  isNonReferenceIdentifier,
 } from './variable-migration.js';
 import {
   createScopeBindingsCollector,
@@ -333,7 +334,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
         enterLexicalScopes(node, ctx);
         enterLoopMap(node, ctx);
         enterScopeEntries(node, ctx);
-        enterSegmentUsage(node, ctx);
+        enterSegmentUsage(node, parent, ctx);
         enterPassiveConflicts(node, ctx);
         ctx.scopeBindingsCollector?.enter(node);
       },
@@ -543,14 +544,21 @@ function enterScopeEntries(node: AstNode, ctx: GatherEnterContext): void {
 
 /** Segment-usage projection — `computeSegmentUsage`'s gather half. Pure
  * buffering; all attribution happens in {@link classifySegmentUsage}. */
-function enterSegmentUsage(node: AstNode, ctx: GatherEnterContext): void {
+function enterSegmentUsage(
+  node: AstNode,
+  parent: AstNode | null,
+  ctx: GatherEnterContext,
+): void {
   if (!ctx.usageEnabled) return;
 
   if (DECLARATION_TYPES.has(node.type) && ctx.usageExtractions.length > 0) {
     ctx.declVisits.push(node);
   }
   // JSXIdentifier matters too: <Component> references module-level bindings
-  if (node.type === 'Identifier' || node.type === 'JSXIdentifier') {
+  if (
+    (node.type === 'Identifier' || node.type === 'JSXIdentifier') &&
+    !isNonReferenceIdentifier(node, parent)
+  ) {
     ctx.identifierVisits.push({ pos: node.start, name: node.name });
   }
 }
