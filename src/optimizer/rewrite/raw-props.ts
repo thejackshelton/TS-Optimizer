@@ -179,8 +179,8 @@ export interface DestructuredFieldInfo {
  * parameter in a single session/parse. The consumers always want both (or
  * are indifferent to computing both): keeping the projections separate
  * meant two back-to-back full-extraction loops parsing every parent body
- * twice — the single largest avoidable-parse population in the OSS-489
- * census.
+ * twice — the single largest avoidable-parse population in the session
+ * churn census (see BENCHMARKS.md).
  */
 export function extractDestructuredFieldInfo(body: string): DestructuredFieldInfo {
   const fieldMap = new Map<string, string>();
@@ -712,8 +712,9 @@ export function consolidateRawPropsInWCalls(body: string): string {
   // containing a `_rawProps` member expression (dotted OR computed —
   // `_rawProps[key]` consolidates too, so the bare token is the widest
   // sound gate). Both substrings necessarily appear in any body this pass
-  // could change; most segment bodies have neither — skip the parse
-  // (OSS-489: this was the largest per-segment one-shot parse population).
+  // could change; most segment bodies have neither — skip the parse. This
+  // was the largest per-segment one-shot parse population in the session
+  // churn census (see BENCHMARKS.md).
   if (!body.includes('_rawProps') || !body.includes('.w(')) return body;
   const session = createTransformSession(body);
   if (!session) return body;

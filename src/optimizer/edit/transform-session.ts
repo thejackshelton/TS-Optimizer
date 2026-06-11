@@ -20,10 +20,10 @@ const SESSION_FILENAME = '__session__.tsx';
  * consumers read the AST without mutating it; each session still gets
  * its own MagicString.
  *
- * Cap of 16: the OSS-489 churn census found a cap of 4 thrashing under
- * interleaved parent/nested-segment pipelines — ~20 re-parses of
- * already-seen text per worst-case file once the duplicated field-map
- * extraction was unified. Entries are small segment-body ASTs (the whole
+ * Cap of 16: the session churn census (see BENCHMARKS.md) found a cap of
+ * 4 thrashing under interleaved parent/nested-segment pipelines — ~20
+ * re-parses of already-seen text per worst-case file once the duplicated
+ * field-map extraction was unified. Entries are small segment-body ASTs (the whole
  * worst-case file's session parse volume is ~0.3 MB of text), so the
  * extra retention is noise; the cap still keeps the memo from growing
  * with module count.
