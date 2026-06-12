@@ -18,6 +18,7 @@ import { flattenAndReparse } from "../prepare/flatten-destructures.js";
 import { detectForeignJsxRuntime } from "../jsx/jsx-import-source.js";
 import type { ConsolidatedSegment, ExtractionResult, Mutable } from "../extraction/extract.js";
 import { repairInput } from "../prepare/input-repair.js";
+import { autoMark } from "../../auto-marker/auto-mark.js";
 import {
   rewriteParentModule,
   resolveConstLiteralsInClosure,
@@ -230,7 +231,9 @@ export function transformModule(
   const diagnostics: Diagnostic[] = [];
   let flags: ModuleKindFlags = { isTypeScript: false, isJsx: false };
 
-  for (const input of options.input) {
+  const inputs = options.autoMark ? autoMark(options.input).input : options.input;
+
+  for (const input of inputs) {
     const result = transformOneModule(input, options, flags);
     allModules.push(...result.modules);
     diagnostics.push(...result.diagnostics);
@@ -239,7 +242,7 @@ export function transformModule(
 
   return {
     modules: allModules,
-    diagnostics: applyDiagnosticSuppression(diagnostics, options.input),
+    diagnostics: applyDiagnosticSuppression(diagnostics, inputs),
     isTypeScript: flags.isTypeScript,
     isJsx: flags.isJsx,
   };

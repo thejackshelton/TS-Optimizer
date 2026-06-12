@@ -1,0 +1,158 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`forwarding into a row component 1`] = `
+"mark  app.tsx:3 onChoose
+
+app.tsx
+function Row({ onSelect$: onSelect }) { return <button onClick$={onSelect} />; }
+function List({ onChoose$: onChoose }) { return <Row onSelect$={onChoose} />; }
+export const App = () => <List onChoose$={() => pick()} />;
+"
+`;
+
+exports[`marks some props and skips others on one component 1`] = `
+"skip  app.tsx:10 onPreview  (prop is called during render)
+mark  app.tsx:10 onSave
+
+app.tsx
+function Btn({ onPress$: onPress }) { return <button onClick$={onPress} />; }
+function Panel({ onSave$: onSave, onPreview }) {
+  return (
+    <div>
+      <Btn onPress$={onSave} />
+      <p>{onPreview()}</p>
+    </div>
+  );
+}
+export const App = () => <Panel onSave$={() => s()} onPreview={() => "x"} />;
+"
+`;
+
+exports[`multiple host events on one component 1`] = `
+"mark  app.tsx:4 onEnter
+mark  app.tsx:4 onLeave
+
+app.tsx
+function Surface({ onEnter$: onEnter, onLeave$: onLeave }) {
+  return <div onMouseEnter$={onEnter} onMouseLeave$={onLeave} />;
+}
+export const App = () => <Surface onEnter$={() => a()} onLeave$={() => b()} />;
+"
+`;
+
+exports[`one hop through a destructured prop 1`] = `
+"mark  app.tsx:2 onPress
+
+app.tsx
+import { Button } from "./button.tsx";
+export const App = () => <Button onPress$={() => save()} />;
+
+
+button.tsx
+export function Button({ onPress$: onPress }) {
+  return <button onClick$={onPress}>Go</button>;
+}
+"
+`;
+
+exports[`resolves an aliased import 1`] = `
+"mark  app.tsx:2 onPress
+
+app.tsx
+import { Button as Action } from "./button.tsx";
+export const App = () => <Action onPress$={() => go()} />;
+
+
+button.tsx
+export function Button({ onPress$: onPress }) {
+  return <button onClick$={onPress} />;
+}
+"
+`;
+
+exports[`skips a prop passed to a helper call 1`] = `"skip  app.tsx:5 onReady  (prop is passed to a function call)"`;
+
+exports[`skips a render callback 1`] = `"skip  app.tsx:2 render  (prop is called during render)"`;
+
+exports[`skips conditional forwarding 1`] = `"skip  app.tsx:4 onTap  (prop is forwarded conditionally)"`;
+
+exports[`skips spread props 1`] = `"skip  app.tsx:2 onPress  (<Btn> spreads props at app.tsx:2)"`;
+
+exports[`three hops 1`] = `
+"mark  app.tsx:4 onGo
+
+app.tsx
+function A({ onTap$: onTap }) { return <button onClick$={onTap} />; }
+function B({ onRun$: onRun }) { return <A onTap$={onRun} />; }
+function C({ onGo$: onGo }) { return <B onRun$={onGo} />; }
+export const App = () => <C onGo$={() => go()} />;
+"
+`;
+
+exports[`through a props-object member access 1`] = `
+"mark  app.tsx:2 onPress
+
+app.tsx
+import { Button } from "./button.tsx";
+export const App = () => <Button onPress$={() => save()} />;
+
+
+button.tsx
+export function Button(props) {
+  return <button onClick$={props.onPress$}>Go</button>;
+}
+"
+`;
+
+exports[`through a renamed destructuring 1`] = `
+"mark  app.tsx:2 onPress
+
+app.tsx
+import { Button } from "./button.tsx";
+export const App = () => <Button onPress$={() => save()} />;
+
+
+button.tsx
+export function Button({ onPress$: handlePress }) {
+  return <button onClick$={handlePress}>Go</button>;
+}
+"
+`;
+
+exports[`through a same-file wrapper 1`] = `
+"mark  app.tsx:4 onTrigger
+
+app.tsx
+function Wrapper({ onTrigger$: onTrigger }) {
+  return <button onClick$={onTrigger}>Go</button>;
+}
+export const App = () => <Wrapper onTrigger$={() => go()} />;
+"
+`;
+
+exports[`two hops 1`] = `
+"mark  app.tsx:3 onRun
+
+app.tsx
+function Inner({ onTap$: onTap }) { return <button onClick$={onTap} />; }
+function Outer({ onRun$: onRun }) { return <Inner onTap$={onRun} />; }
+export const App = () => <Outer onRun$={() => go()} />;
+"
+`;
+
+exports[`two independent boundaries on one component 1`] = `
+"mark  app.tsx:9 onCancel
+mark  app.tsx:9 onConfirm
+
+app.tsx
+function Actions({ onConfirm$: onConfirm, onCancel$: onCancel }) {
+  return (
+    <div>
+      <button onClick$={onCancel}>cancel</button>
+      <button onClick$={onConfirm}>ok</button>
+    </div>
+  );
+}
+export const App = () => <Actions onConfirm$={() => a()} onCancel$={() => b()} />;
+"
+`;

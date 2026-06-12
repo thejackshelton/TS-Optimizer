@@ -1,0 +1,71 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`does not wrap a helper that is called 1`] = `
+"mark  app.tsx:2 App
+
+app.tsx
+import { component$ } from "@qwik.dev/core";
+function row(x) { return <li>{x}</li>; }
+export const App = component$(function App() { return <ul>{[1, 2].map(row)}</ul>; })
+"
+`;
+
+exports[`does not wrap a non-JSX function 1`] = `""`;
+
+exports[`does not wrap an inline render-prop arrow 1`] = `
+"mark  app.tsx:1 List
+mark  app.tsx:2 App
+
+app.tsx
+import { component$ } from "@qwik.dev/core";
+export const List = component$(function List({ render }) { return <ul>{render()}</ul>; })
+export const App = component$(function App() { return <List render={(x) => <li>{x}</li>} />; })
+"
+`;
+
+exports[`extends an existing core import instead of duplicating it 1`] = `
+"mark  app.tsx:2 App
+
+app.tsx
+import { component$, useSignal } from "@qwik.dev/core";
+export const App = component$(function App() {
+  const n = useSignal(0);
+  return <button>{n.value}</button>;
+})
+"
+`;
+
+exports[`wraps a const arrow component 1`] = `
+"mark  app.tsx:1 App
+
+app.tsx
+import { component$ } from "@qwik.dev/core";
+export const App = component$(() => <main>hi</main>);"
+`;
+
+exports[`wraps an exported function component and adds the import 1`] = `
+"mark  app.tsx:1 App
+
+app.tsx
+import { component$ } from "@qwik.dev/core";
+export const App = component$(function App() {
+  return <main>hi</main>;
+})
+"
+`;
+
+exports[`wraps every component in a forwarding chain 1`] = `
+"mark  app.tsx:2 App
+mark  button.tsx:1 Button
+
+app.tsx
+import { component$ } from "@qwik.dev/core";
+import { Button } from "./button.tsx";
+export const App = component$(function App() { return <Button>go</Button>; })
+
+
+button.tsx
+import { component$ } from "@qwik.dev/core";
+export const Button = component$(function Button({ children }) { return <button>{children}</button>; })
+"
+`;
