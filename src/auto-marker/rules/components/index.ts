@@ -26,20 +26,20 @@ export const componentRule: Rule = {
   },
 };
 
-/** Every top-level function, in one scan pass that skips nested bodies. */
+/** Every top-level function. */
 function topLevelFunctions(module: Module): FunctionNode[] {
   const fns: FunctionNode[] = [];
-  module.scan({
-    FunctionDeclaration(c) {
-      fns.push(c.node());
+  module.walk({
+    FunctionDeclaration(node, c) {
+      fns.push(node);
       c.skip();
     },
-    ArrowFunctionExpression(c) {
-      fns.push(c.node());
+    ArrowFunctionExpression(node, c) {
+      fns.push(node);
       c.skip();
     },
-    FunctionExpression(c) {
-      fns.push(c.node());
+    FunctionExpression(node, c) {
+      fns.push(node);
       c.skip();
     },
   });
