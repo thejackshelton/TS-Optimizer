@@ -43,6 +43,13 @@ export interface TransformModulesOptions {
   readonly input: readonly TransformModuleInput[];
 
   /**
+   * When true, run the auto-marker over the whole input batch first, inserting
+   * `$` markers where serialization boundaries can be proven across files. The
+   * marked source then flows through the normal pipeline. Off by default.
+   */
+  readonly autoMark?: boolean;
+
+  /**
    * Absolute path to the application source root. Used with each input's
    * `path` to compute module-relative paths (e.g. for outputs and diagnostics).
    */
