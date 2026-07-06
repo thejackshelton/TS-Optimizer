@@ -12,6 +12,7 @@
 
 import { parseSync } from 'oxc-parser';
 import { forEachAstChild } from '../ast/guards.js';
+import { isShorthandPropertyValue } from '../prepare/flatten-destructures.js';
 import {
   RAW_TRANSFER_PARSER_OPTIONS,
   type AstCompatNode,
@@ -176,6 +177,13 @@ interface IdentRef {
   end: number;
   /** Which const declaration this ref lives inside (null if not inside any) */
   insideDeclOf: string | null;
+  /**
+   * When this ref is the value of an object shorthand property (`{ x }`), the
+   * property key that must be re-emitted if the ref is replaced — inlining
+   * `{ x }` to a non-identifier must expand to `{ key: value }`, else the
+   * emitted object is invalid (`{ obj.a.b }`).
+   */
+  shorthandKey: string | null;
 }
 
 // ── Helpers ──
@@ -303,6 +311,7 @@ export function propagateConstLiteralsInBody(body: string): string {
           start: refStart,
           end: refEnd,
           insideDeclOf: currentDeclName,
+          shorthandKey: isShorthandPropertyValue(node, parentNode ?? null) ? node.name : null,
         });
       }
     }
@@ -439,10 +448,14 @@ export function propagateConstLiteralsInBody(body: string): string {
   for (const ref of identRefs) {
     if (!toInline.has(ref.name)) continue;
     if (ref.insideDeclOf !== null && toRemove.has(ref.insideDeclOf)) continue;
+    const value = toInline.get(ref.name)!;
+    // A shorthand `{ x }` collapses key and value into one identifier; inlining
+    // a non-identifier value there must re-emit the key (`{ x: <value> }`).
+    const replacement = ref.shorthandKey !== null ? `${ref.shorthandKey}: ${value}` : value;
     edits.push({
       start: ref.start,
       end: ref.end,
-      replacement: toInline.get(ref.name)!,
+      replacement,
     });
   }
 
