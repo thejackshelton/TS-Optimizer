@@ -24,6 +24,7 @@ import { computeKeyPrefix } from '../jsx/key-prefix.js';
 import { SignalHoister } from '../jsx/signal-analysis.js';
 import { foldBodySimplifiableExpressions } from '../jsx/simplify.js';
 import { getQrlImportSource } from './rewrite-calls.js';
+import { foldConstantsInBodyText } from './const-replacement.js';
 import { injectCapturesUnpacking, removeDeadConstLiterals } from '../segment/segment-codegen.js';
 import {
   resolveConstLiterals,
@@ -109,6 +110,13 @@ export function transformInlineSegmentBody(
    */
   stripCtxName?: readonly string[],
   stripEventHandlers?: boolean,
+  /**
+   * Server/dev build flags for isServer/isBrowser/isDev const folding. The
+   * parent-rewrite `replaceConstants` folds the parent MagicString but not
+   * these re-emitted string bodies, so the fold is applied here directly.
+   */
+  isServer?: boolean,
+  isDev?: boolean,
 ): { transformedBody: string; additionalImports: Map<string, string>; hoistedDeclarations: string[]; keyCounterValue?: number } {
   // `body` is locally mutable plain string for slicing/concatenation
   // throughout this transform. The branded BodyText only matters at the
@@ -447,6 +455,15 @@ export function transformInlineSegmentBody(
       hoistedDeclarations.push(...bodyJsxResult.hoistedDeclarations);
       finalKeyCounterValue = bodyJsxResult.keyCounterValue;
     }
+  }
+
+  // Fold isServer/isBrowser/isDev to boolean literals before the final
+  // simplify pass, so dead client/server branches collapse to `if (false)`
+  // and the downstream parent DCE can drop them (and the imports only the
+  // dead branch referenced). The parent-rewrite `replaceConstants` cannot
+  // reach this body — it lives outside the parent MagicString.
+  if (originalImports && (isServer !== undefined || isDev !== undefined)) {
+    body = foldConstantsInBodyText(body, originalImports, isServer, isDev);
   }
 
   const hasNestedExts = allExtractions.some(e => e.parent === ext.symbolName);
