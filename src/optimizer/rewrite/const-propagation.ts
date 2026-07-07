@@ -177,12 +177,7 @@ interface IdentRef {
   end: number;
   /** Which const declaration this ref lives inside (null if not inside any) */
   insideDeclOf: string | null;
-  /**
-   * When this ref is the value of an object shorthand property (`{ x }`), the
-   * property key that must be re-emitted if the ref is replaced — inlining
-   * `{ x }` to a non-identifier must expand to `{ key: value }`, else the
-   * emitted object is invalid (`{ obj.a.b }`).
-   */
+  /** Property key when this ref is an object-shorthand value; inlining a non-identifier there expands to `{ key: value }`. */
   shorthandKey: string | null;
 }
 
@@ -449,8 +444,7 @@ export function propagateConstLiteralsInBody(body: string): string {
     if (!toInline.has(ref.name)) continue;
     if (ref.insideDeclOf !== null && toRemove.has(ref.insideDeclOf)) continue;
     const value = toInline.get(ref.name)!;
-    // A shorthand `{ x }` collapses key and value into one identifier; inlining
-    // a non-identifier value there must re-emit the key (`{ x: <value> }`).
+    // Re-emit the key when inlining into a shorthand `{ x }`, else the object is invalid.
     const replacement = ref.shorthandKey !== null ? `${ref.shorthandKey}: ${value}` : value;
     edits.push({
       start: ref.start,
