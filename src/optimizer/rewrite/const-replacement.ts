@@ -33,24 +33,14 @@ interface ConstReplacementResult {
   replacedCount: number;
 }
 
-/**
- * The `isDev` value implied by an emit mode: dev/hmr builds are dev, prod is
- * not, and any other mode leaves it unset (so const replacement skips `isDev`).
- * Shared so the parent-rewrite path and the inline/hoist body path derive it
- * identically.
- */
+/** `isDev` implied by an emit mode; undefined for modes that don't imply one. */
 export function deriveIsDev(mode: EmitMode | undefined): boolean | undefined {
   if (mode === 'dev' || mode === 'hmr') return true;
   if (mode === 'prod') return false;
   return undefined;
 }
 
-/**
- * Build the `localName → literal` fold map from a module's imports. Only
- * `isServer`/`isBrowser` (gated on `isServer`) and `isDev` (gated on `isDev`)
- * that trace to a Qwik package import are included. `isBrowser` is the negation
- * of `isServer`.
- */
+/** Build the `localName → literal` fold map from a module's Qwik-package imports. */
 export function buildConstReplacementMap(
   importMap: Map<string, ImportInfo>,
   isServer?: boolean,
@@ -76,12 +66,7 @@ export function buildConstReplacementMap(
   return replacements;
 }
 
-/**
- * Walk `program` and overwrite every identifier whose name maps to a literal.
- * Skips import-specifier positions (via `importRanges`), member-access property
- * names, and variable-declarator binding names — an identifier in those
- * positions is a name, not a value reference. Returns the number of edits.
- */
+/** Overwrite each value-position identifier that maps to a literal; name positions (imports, member props, declarator ids) are skipped. Returns the edit count. */
 function applyReplacements(
   s: MagicString,
   program: AstProgram,
@@ -155,17 +140,9 @@ export function replaceConstants(
 }
 
 /**
- * Fold isServer/isBrowser/isDev in a standalone inline/hoist segment body.
- *
- * The parent-rewrite `replaceConstants` edits the parent MagicString, so the
- * segment/smart paths — whose bodies are sliced from that same string — fold
- * for free. The inline/hoist path instead re-emits bodies as plain strings
- * (built from `ext.bodyText`, outside the parent MagicString), so those bodies
- * keep their `isBrowser`/`isServer` references and, with them, dead client
- * branches on a server build. Folding here lets the downstream parent DCE drop
- * `if (false) { … }` blocks and the now-unused import that only the dead branch
- * referenced. Returns the body unchanged when there is nothing to fold or the
- * body cannot be reparsed.
+ * Fold isServer/isBrowser/isDev in an inline/hoist body. These bodies are
+ * re-emitted outside the parent MagicString, so `replaceConstants` never reaches
+ * them. Returns the body unchanged when nothing folds or it cannot be reparsed.
  */
 export function foldConstantsInBodyText(
   body: string,
@@ -182,8 +159,7 @@ export function foldConstantsInBodyText(
   }
   if (!mentionsCandidate) return body;
 
-  // Parenthesise so the body (an arrow/function expression) parses as an
-  // expression statement; the single wrapping char is stripped back off.
+  // Parenthesise so the arrow/function body parses as an expression.
   const wrapped = `(${body})`;
   let parsed;
   try {

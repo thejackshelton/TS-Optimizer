@@ -784,14 +784,10 @@ function analyzeModuleCaptures(
 }
 
 /**
- * Inline/hoist strategy hoists every segment body to module level, so a
- * top-level extraction's module-scope references resolve in place and must not
- * be serialized as captures. A top-level extraction's parent scope *is* the
- * module scope, so each of its captures is a module-level decl; dropping them
- * keeps non-serializable module singletons (caches, stores) out of the
- * `_captures` array, leaving the body to reference the decl directly. Nested
- * extractions capture enclosing-function locals — not module decls — and are
- * left untouched.
+ * Under inline/hoist, bodies stay at module level so a top-level extraction's
+ * module-scope refs resolve in place — drop them from captures to keep
+ * non-serializable module singletons out of `_captures`. Nested extractions
+ * (function-local captures) are left untouched.
  */
 function dropTopLevelModuleScopeCaptures(
   extractions: ExtractionResult[],

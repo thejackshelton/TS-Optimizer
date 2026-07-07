@@ -355,7 +355,7 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
       // Suppress `.w([])` on stripped child QRLs.
       inlineOptions?.stripCtxName,
       inlineOptions?.stripEventHandlers,
-      // isServer/isBrowser/isDev const folding for the inline/hoist body.
+      // const folding for the inline/hoist body
       ctx.isServer,
       deriveIsDev(ctx.mode),
     );

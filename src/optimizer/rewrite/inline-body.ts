@@ -110,11 +110,7 @@ export function transformInlineSegmentBody(
    */
   stripCtxName?: readonly string[],
   stripEventHandlers?: boolean,
-  /**
-   * Server/dev build flags for isServer/isBrowser/isDev const folding. The
-   * parent-rewrite `replaceConstants` folds the parent MagicString but not
-   * these re-emitted string bodies, so the fold is applied here directly.
-   */
+  /** Server/dev flags for isServer/isBrowser/isDev folding, applied here since this body sits outside the parent MagicString. */
   isServer?: boolean,
   isDev?: boolean,
 ): { transformedBody: string; additionalImports: Map<string, string>; hoistedDeclarations: string[]; keyCounterValue?: number } {
@@ -457,11 +453,7 @@ export function transformInlineSegmentBody(
     }
   }
 
-  // Fold isServer/isBrowser/isDev to boolean literals before the final
-  // simplify pass, so dead client/server branches collapse to `if (false)`
-  // and the downstream parent DCE can drop them (and the imports only the
-  // dead branch referenced). The parent-rewrite `replaceConstants` cannot
-  // reach this body — it lives outside the parent MagicString.
+  // Fold const flags before the simplify pass so dead branches collapse for DCE.
   if (originalImports && (isServer !== undefined || isDev !== undefined)) {
     body = foldConstantsInBodyText(body, originalImports, isServer, isDev);
   }
