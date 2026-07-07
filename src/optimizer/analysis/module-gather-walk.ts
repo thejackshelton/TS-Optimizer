@@ -61,10 +61,7 @@ import {
   type LoopBodyVarDeclMap,
   type ScopeEntry,
 } from '../jsx/event-capture-promotion.js';
-import {
-  collectShallowDeclarationsFromBody,
-  collectShallowDeclarationsFromStatement,
-} from './capture-analysis.js';
+import { addScopeDeclarations } from './capture-analysis.js';
 import {
   DECLARATION_TYPES,
   addDeclaredNamesFromNode,
@@ -195,42 +192,10 @@ function isFunctionLike(node: AstNode): node is AstFunction {
   );
 }
 
-/**
- * One lexical-scope stack frame. The name set materializes lazily — only
- * when a registered closure requests the enclosing-scope union — so
- * modules (and functions) without extractions never pay the per-function
- * param/shallow-decl collection. `node === null` marks the module-scope
- * frame. Materialization is timing-independent: the collectors are pure
- * reads of the (immutable) AST, so computing the set at union time yields
- * exactly what computing it at push time would have.
- */
+/** One enclosing function scope; `node === null` is the module scope. */
 interface LexicalScopeFrame {
   readonly node: AstFunction | null;
-  set: Set<string> | null;
-}
-
-function materializeScopeFrame(
-  frame: LexicalScopeFrame,
-  program: AstProgram,
-): Set<string> {
-  if (frame.set) return frame.set;
-  const set = new Set<string>();
-  if (frame.node === null) {
-    // Module scope: the walk's enter fires for the program's children but
-    // not the Program node itself, so it is collected from the body here.
-    for (const stmt of program.body ?? []) {
-      collectShallowDeclarationsFromStatement(stmt, set);
-    }
-  } else {
-    for (const param of frame.node.params ?? []) {
-      addBindingNamesFromPatternToSet(param, set);
-    }
-    if (frame.node.body) {
-      collectShallowDeclarationsFromBody(frame.node.body, set);
-    }
-  }
-  frame.set = set;
-  return set;
+  readonly set: Set<string>;
 }
 
 interface OpenClosure {
@@ -281,6 +246,8 @@ interface GatherEnterContext {
   readonly scopeStack: readonly LexicalScopeFrame[];
   readonly pushScope: (frame: LexicalScopeFrame) => void;
   readonly closureLexicalScopes: Map<AstFunction, Set<string>>;
+  /** Per closure: enclosing frames snapshotted on enter, unioned post-walk. */
+  readonly pendingLexicalUnions: Array<{ node: AstFunction; frames: readonly LexicalScopeFrame[] }>;
   // Loop-map projection
   readonly loopEnabled: boolean;
   readonly loopExtractions: ReadonlyArray<CallExtractionRange>;
@@ -351,9 +318,10 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     inputs.closureNodes?.values() ?? [],
   );
   const closureLexicalScopes = new Map<AstFunction, Set<string>>();
+  const pendingLexicalUnions: Array<{ node: AstFunction; frames: readonly LexicalScopeFrame[] }> = [];
   const scopeStack: LexicalScopeFrame[] = [];
   if (lexicalEnabled) {
-    scopeStack.push({ node: null, set: null });
+    scopeStack.push({ node: null, set: new Set() });
   }
 
   // --- Loop-map projection setup (buildExtractionLoopMap) ---
@@ -441,6 +409,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     scopeStack,
     pushScope: (frame) => { scopeStack.push(frame); },
     closureLexicalScopes,
+    pendingLexicalUnions,
     loopEnabled,
     loopExtractions,
     repairedCode,
@@ -547,6 +516,16 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   tracker.freeze();
   resolveFreeIdentifiers(pendingResolutions, tracker);
 
+  // Union each closure's enclosing frames now that they have finished
+  // collecting — a later `const` in an enclosing scope is a valid capture.
+  for (const { node, frames } of pendingLexicalUnions) {
+    const union = new Set<string>();
+    for (const frame of frames) {
+      for (const id of frame.set) union.add(id);
+    }
+    closureLexicalScopes.set(node, union);
+  }
+
   // Program-exit act for the segment-usage projection: classification must
   // wait until the locals map has seen hoisted declarations (an identifier
   // reference can be visited before its `function g() {}` declaration).
@@ -591,6 +570,24 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   };
 }
 
+// A computed key (`obj[x]`, `{ [x]: v }`) references `x`, but oxc-walker's
+// `isBindingIdentifier` ignores `computed` and reports it as a binding.
+function isComputedKeyReference(node: AstNode, parent: AstNode | null): boolean {
+  if (parent === null) return false;
+  if (parent.type === 'MemberExpression') {
+    return parent.computed === true && parent.property === node;
+  }
+  if (
+    parent.type === 'Property' ||
+    parent.type === 'MethodDefinition' ||
+    parent.type === 'PropertyDefinition' ||
+    parent.type === 'AccessorProperty'
+  ) {
+    return parent.computed === true && parent.key === node;
+  }
+  return false;
+}
+
 /** Free-identifier projection — `computeClosureFreeIdentifiers`'s gather
  * half. Pure buffering of `(name, scopeKey)` per open closure; resolution
  * happens post-walk in {@link resolveFreeIdentifiers}. The same name can
@@ -625,7 +622,7 @@ function enterFreeIdentifiers(
 
   if (openClosures.length === 0) return;
   if (node.type !== 'Identifier') return;
-  if (isBindingIdentifier(node, parent)) return;
+  if (isBindingIdentifier(node, parent) && !isComputedKeyReference(node, parent)) return;
 
   const name = node.name;
   const scopeKey = tracker.getCurrentScope();
@@ -679,26 +676,22 @@ function resolveFreeIdentifiers(
 /** Lexical-scope projection — `buildClosureLexicalScopes`'s scope stack. */
 function enterLexicalScopes(node: AstNode, ctx: GatherEnterContext): void {
   if (!ctx.lexicalEnabled) return;
+
+  // Collect before pushing this node's own frame, so a function/class
+  // declaration name lands in the enclosing scope, not its own.
+  addScopeDeclarations(node, ctx.scopeStack[ctx.scopeStack.length - 1].set);
+
   if (!isFunctionLike(node)) return;
 
   if (ctx.lexicalClosureNodes.has(node)) {
-    // Record union of all enclosing scopes BEFORE pushing this
-    // closure's own scope. The closure's params land in
-    // `analyzeCaptures(..).paramNames` separately.
-    const union = new Set<string>();
-    for (const frame of ctx.scopeStack) {
-      for (const id of materializeScopeFrame(frame, ctx.program)) {
-        union.add(id);
-      }
-    }
-    ctx.closureLexicalScopes.set(node, union);
+    ctx.pendingLexicalUnions.push({ node, frames: [...ctx.scopeStack] });
   }
 
-  // Push this function's own scope frame so any nested closure sees it as
-  // an enclosing scope (params + shallow body decls, materialized lazily;
-  // nested function bodies are explored by the walker recursively, not by
-  // this collector).
-  ctx.pushScope({ node, set: null });
+  const set = new Set<string>();
+  for (const param of node.params ?? []) {
+    addBindingNamesFromPatternToSet(param, set);
+  }
+  ctx.pushScope({ node, set });
 }
 
 /** Loop-map projection — `buildExtractionLoopMap`'s loop stack + buckets. */
