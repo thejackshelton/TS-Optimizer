@@ -432,6 +432,19 @@ Order of preference, most preferred first:
    self-documenting function with *no* doc comment over a documented
    block of inline logic.
 
+**Interface and struct fields: all or none, preferring none.** Never
+document only some of an interface's fields. Either every field carries a
+doc comment or none does — and the overwhelming majority need none, so
+none is the default. A field name plus its type almost always suffices
+(`readonly usageExtractions?: ReadonlyArray<UsageExtractionRange>` needs
+no `/** the usage extractions */`). When one field genuinely has a
+non-obvious invariant — a key type that isn't what you'd expect, an
+"empty when …" contract, a mid-walk mutation rule — fold that WHY into
+the interface's single top-level doc comment, not onto the field.
+Scattered per-field docs read as "why is this one explained and not that
+one?"; keeping the field list a clean column, with the non-obvious parts
+described once at the top, is both consistent and easier to scan.
+
 Code comments (in `src/` and tests) must not reference the **SWC
 reference implementation** — not `SWC`, `swc-reference-only`,
 `@qwik.dev/optimizer`, "the Rust optimizer", nor file:line citations
