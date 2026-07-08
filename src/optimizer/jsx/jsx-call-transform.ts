@@ -32,6 +32,8 @@ import type { AstNode, AstProgram } from '../../ast-types.js';
 import {
   computeJsxFlags,
   collectScopeAwareBindings,
+  isConstBindingName,
+  type ScopeAwareBindings,
   type JsxKeyCounter,
 } from './jsx.js';
 import { transformEventPropName } from './event-handlers.js';
@@ -120,6 +122,18 @@ interface JsxCallTransformOptions {
    * reactive expressions stay verbatim (only bare `.value` wraps).
    */
   signalHoister?: SignalHoister;
+  /**
+   * Locally declared names in this body — the reactive-expression
+   * classifier's "declared somewhere locally, don't treat as a
+   * signal/store dep" filter. Derived once per body in `transformJsxCalls`.
+   */
+  localNames?: ReadonlySet<string>;
+  /**
+   * Scope-aware binding lookup for the prop var/const classifier. A
+   * reactive-wrapped prop whose deps are all stable (imported or const-
+   * bound) belongs in the const-props bag so the host doesn't subscribe.
+   */
+  bindings?: ScopeAwareBindings;
 }
 
 /**
@@ -167,8 +181,12 @@ export function transformJsxCalls(
   const reactiveBindings = collectReactiveBindings(program);
   opts.reactiveBindings = reactiveBindings;
   // Names resolvable in this body's scope — the reactive-expression
-  // classifier treats a `.value` / member read on one of these as a signal.
-  const localNames = collectScopeAwareBindings(program).allLocalNames;
+  // classifier treats a `.value` / member read on one of these as a signal,
+  // and `bindings` classifies each dep as const/var for the var/const bag.
+  const scopeBindings = collectScopeAwareBindings(program);
+  const localNames = scopeBindings.allLocalNames;
+  opts.localNames = localNames;
+  opts.bindings = scopeBindings.bindings;
 
   // Tag kinds of the open jsx() ancestors, most-recent last; `'html'` for a
   // string-literal-tag call, `'component'` for an identifier-tag call.
@@ -303,20 +321,82 @@ function wrapReactiveValue(node: AstNode | null | undefined, ctx: WrapReactiveCo
     ctx.neededImports.add('_wrapProp');
     return;
   }
-  // Only scalar reactive expressions hoist to `_fnSignal`. Array/object
-  // values (`class={[...]}`) and call/chain render expressions
-  // (`items.map(...)`) stay verbatim — the former track reactivity as var
-  // props, and hoisting the latter would strand their callback bindings.
-  const hoistable =
-    node.type !== 'ArrayExpression' &&
-    node.type !== 'ObjectExpression' &&
-    node.type !== 'CallExpression' &&
-    node.type !== 'ChainExpression';
-  if (result.type === 'fnSignal' && ctx.signalHoister !== undefined && hoistable) {
+  if (result.type === 'fnSignal' && ctx.signalHoister !== undefined && isHoistableSignalExpr(node)) {
     const hf = ctx.signalHoister.hoist(result.hoistedFn, result.hoistedStr, node.start ?? 0);
     ctx.s.overwrite(node.start, node.end, `_fnSignal(${hf}, [${result.deps.join(', ')}], ${hf}_str)`);
     ctx.neededImports.add('_fnSignal');
   }
+}
+
+/**
+ * Only scalar reactive expressions hoist to `_fnSignal`. Array/object values
+ * (`class={[...]}`) and call/chain render expressions (`items.map(...)`) stay
+ * verbatim — the former track reactivity as var props, and hoisting the latter
+ * would strand their callback bindings. Shared so the wrap (emit) and the
+ * var/const classifier agree on which values became `_fnSignal(...)`.
+ */
+function isHoistableSignalExpr(node: AstNode): boolean {
+  return (
+    node.type !== 'ArrayExpression' &&
+    node.type !== 'ObjectExpression' &&
+    node.type !== 'CallExpression' &&
+    node.type !== 'ChainExpression'
+  );
+}
+
+/**
+ * Decide which prop bag a `_jsxDEV` prop value belongs in. A prop whose value
+ * became a reactive wrapper in the enter pass belongs in the const-props bag,
+ * mirroring the raw-JSX path (`jsx-props.ts`); everything else keeps its
+ * original var-bag placement.
+ *
+ * Only the reactive-wrapped cases move: a var-bag reactive read subscribes the
+ * *host* to the signal, so a mid-render write re-renders the whole component
+ * (the "chore on an already-streamed host" SSR divergence). The const bag
+ * isolates the read in its `_wrapProp`/`_fnSignal` wrapper instead.
+ *   - a bare `signal.value` read → `_wrapProp(sig)` → const (a store-field
+ *     read `store.field` on an HTML element whose object is a var binding
+ *     stays var, matching the raw path);
+ *   - a hoistable scalar reactive expr → `_fnSignal(...)` → const when every
+ *     dep is stable (imported or const-bound), else var.
+ *
+ * Non-reactive props are left in the var bag rather than run through the full
+ * structural const/var split: peer-tool input carries pre-analysed markers
+ * (`[_IMMUTABLE]: [...]`) that must stay where the tool placed them, and a
+ * non-reactive prop in the var bag never over-subscribes the host.
+ */
+function classifyProp(
+  valueNode: AstNode,
+  opts: JsxCallTransformOptions,
+  isHtmlTag: boolean,
+  s: MagicString,
+): 'const' | 'var' {
+  const importedNames = (opts.importedNames ?? EMPTY_SET) as Set<string>;
+  const bindings = opts.bindings;
+  const localNames = opts.localNames as Set<string> | undefined;
+  const pos = valueNode.start ?? 0;
+  const sig = analyzeSignalExpression(valueNode, s.original, importedNames, localNames);
+
+  if (sig.type === 'wrapProp') {
+    if (sig.isStoreField && isHtmlTag) {
+      const objName = sig.code.match(/_wrapProp\((\w+)/)?.[1] ?? null;
+      return isConstBindingName(objName, importedNames, bindings, pos) ? 'const' : 'var';
+    }
+    return 'const';
+  }
+
+  if (
+    sig.type === 'fnSignal' &&
+    opts.signalHoister !== undefined &&
+    isHoistableSignalExpr(valueNode)
+  ) {
+    const depsAllConst = sig.deps.every(
+      (dep) => importedNames.has(dep) || bindings?.classify(dep, pos) === 'const',
+    );
+    return depsAllConst ? 'const' : 'var';
+  }
+
+  return 'var';
 }
 
 function staticPropName(member: AstNode): string | null {
@@ -425,7 +505,10 @@ function buildJsxSortedCall(
         continue;
       }
     }
-    varEntries.push(s.slice(prop.start, prop.end));
+    const bag = classifyProp(prop.value, opts, isHtmlTag, s) === 'const'
+      ? constEntries
+      : varEntries;
+    bag.push(s.slice(prop.start, prop.end));
   }
 
   // Optional 3rd arg: explicit key. Maps to the 6th `_jsxSorted` arg.
