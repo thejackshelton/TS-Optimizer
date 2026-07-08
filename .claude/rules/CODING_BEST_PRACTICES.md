@@ -400,6 +400,32 @@ names already say what. A comment earns its place by anchoring to an
 invariant, a precondition, or a non-obvious constraint the reader can't
 recover from the diff.
 
+**An inline comment is a smell.** When a block of code needs a comment
+to explain what it does, that need is the signal to **extract it into a
+function whose name states the intent** — the name is the documentation,
+and the extracted function carries little to no comment of its own. If
+the code's purpose is already obvious, **delete the comment** instead of
+writing it. Only when neither a better name nor extraction can carry the
+meaning does a comment survive — and then it explains a genuine *why*
+(an invariant, a precondition, a spec quirk, an external-tool bug being
+worked around) that the reader cannot recover from the code.
+
+Order of preference, most preferred first:
+
+1. **Rename** — a clearer identifier removes the need for the comment.
+2. **Extract** — a well-named `isBareScript(program)` /
+   `emptyParentModule(...)` replaces a commented inline block; the call
+   site reads as a sentence and needs no comment.
+3. **Delete** — if the logic is obvious, the comment is noise.
+4. **Comment** — a last resort, for a *why* the code genuinely can't
+   express. Keep it to **one or two lines**. A multi-line block
+   narrating how the code works is verbose by construction: the
+   narration belongs in a function name, and the rationale (parity
+   notes, failure scenarios, ticket context) belongs in the commit
+   message / PR description / Linear ticket, not the source. Prefer a
+   self-documenting function with *no* doc comment over a documented
+   block of inline logic.
+
 Code comments (in `src/` and tests) must not reference the **SWC
 reference implementation** — not `SWC`, `swc-reference-only`,
 `@qwik.dev/optimizer`, "the Rust optimizer", nor file:line citations
