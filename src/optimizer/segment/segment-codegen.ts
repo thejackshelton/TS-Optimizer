@@ -319,6 +319,7 @@ function transformSegmentJsxCalls(
   importContext: SegmentImportData,
   keyCounterStartOverride: number | undefined,
   qpByQrl?: ReadonlyMap<string, readonly string[]>,
+  paramNames?: readonly string[],
 ): { bodyText: string; keyCounterValue?: number } {
   // Cheap fast-path: only parse if the body even mentions a candidate
   // jsx-function name. Most segments don't.
@@ -352,6 +353,7 @@ function transformSegmentJsxCalls(
       qpByQrl,
       importedNames,
       signalHoister,
+      paramNames,
     });
 
     const newBodyText = session.toSource();
@@ -698,6 +700,7 @@ export function generateSegmentCode(
     const jsxCallResult = transformSegmentJsxCalls(
       bodyText, parts, extraction.origin, importContext, segmentKeyCounterValue,
       qpByQrl.size > 0 ? qpByQrl : undefined,
+      extraction.paramNames,
     );
     bodyText = jsxCallResult.bodyText;
     if (jsxCallResult.keyCounterValue !== undefined) {

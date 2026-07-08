@@ -71,4 +71,20 @@ export const C = component$((props) => {
     // both foo and the marker sit in the var bag (2nd arg), const bag null.
     expect(out).toMatch(/_jsxSorted\("div",\s*\{[^}]*\[_IMMUTABLE\][^}]*\},\s*null/);
   });
+
+  test('member access on the closure param is wrapped even with no reactive binding', () => {
+    // A bare `$((node) => …)` segment reads `node.id` / `node.label` — the
+    // param is props-like, so the read must be `_wrapProp`'d despite the body
+    // declaring no `useSignal`/`useStore`. Otherwise the raw read subscribes
+    // the host during SSR.
+    const out = transform(`import { jsxDEV as _jsxDEV } from "@qwik.dev/core/jsx-dev-runtime";
+import { $ } from '@qwik.dev/core';
+import { TreeLeaf } from './leaf';
+export const renderItem = $((node) => {
+  return _jsxDEV(TreeLeaf, { href: node.id, label: node.label }, void 0, false, undefined, this);
+});
+`);
+    expect(out).toMatch(/href:\s*_wrapProp\(node,\s*"id"\)/);
+    expect(out).toMatch(/label:\s*_wrapProp\(node,\s*"label"\)/);
+  });
 });

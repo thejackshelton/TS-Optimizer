@@ -134,6 +134,14 @@ interface JsxCallTransformOptions {
    * bound) belongs in the const-props bag so the host doesn't subscribe.
    */
   bindings?: ScopeAwareBindings;
+  /**
+   * The body's own closure params (props-like). Member access on one of
+   * these (`props.field`, `node.id`) is a wrappable store-field read even
+   * when the body declares no `useSignal`/`useStore` binding — so their
+   * presence keeps the reactive-wrap pass from being skipped, and they're
+   * unioned into the scope so the store-field detector recognises them.
+   */
+  paramNames?: readonly string[];
 }
 
 /**
@@ -185,6 +193,11 @@ export function transformJsxCalls(
   // and `bindings` classifies each dep as const/var for the var/const bag.
   const scopeBindings = collectScopeAwareBindings(program);
   const localNames = scopeBindings.allLocalNames;
+  // The body's own closure params (props) may not appear as declarations in
+  // the parsed program (codegen adds `(props) =>` around the transformed
+  // body afterward), so union them in explicitly — member access on them is
+  // a store-field read the wrap pass must recognise.
+  for (const p of opts.paramNames ?? []) localNames.add(p);
   opts.localNames = localNames;
   opts.bindings = scopeBindings.bindings;
 
@@ -211,7 +224,11 @@ export function transformJsxCalls(
           : 'component';
       tagStack.push(kind);
 
-      if (reactiveBindings.size === 0) return;
+      // Skip the reactive-wrap pass only when there is nothing to wrap: no
+      // `useSignal`/`useStore` binding AND no closure params (props). A body
+      // with props still needs `props.field` / `node.id` reads wrapped even
+      // with zero reactive bindings — matching SWC.
+      if (reactiveBindings.size === 0 && (opts.paramNames?.length ?? 0) === 0) return;
       if (isInSkipRange(node.start)) return;
       const propsArg = node.arguments?.[1];
       if (!propsArg || propsArg.type !== 'ObjectExpression') return;

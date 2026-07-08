@@ -363,6 +363,7 @@ export function transformInlineSegmentBody(
               qpByQrl: qpByQrl.size > 0 ? qpByQrl : undefined,
               importedNames: jsxCallImportedNames,
               signalHoister: bodyJsxCallHoister,
+              paramNames: ext.paramNames,
             });
             const rewritten = callS.toString();
             if (rewritten !== wrappedBody) {
