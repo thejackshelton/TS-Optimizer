@@ -45,9 +45,6 @@ function collectFunctionNodes(program: AstProgram): Map<string, AstFunction> {
   return nodes;
 }
 
-// Names in a computed-key position (`obj[x]`, `{ [x]: … }`). Our fused walk
-// surfaces these as references but the oxc-walker oracle drops them, so the
-// parity filter below excludes exactly these before comparing.
 function collectComputedKeyNames(fn: AstFunction): Set<string> {
   const names = new Set<string>();
   walk(fn as AstNode, {
