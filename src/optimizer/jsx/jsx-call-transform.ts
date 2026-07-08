@@ -31,11 +31,15 @@ import { walk } from 'oxc-walker';
 import type { AstNode, AstProgram } from '../../ast-types.js';
 import {
   computeJsxFlags,
+  collectScopeAwareBindings,
   type JsxKeyCounter,
 } from './jsx.js';
 import { transformEventPropName } from './event-handlers.js';
 import { buildCaptureProp } from './loop-hoisting.js';
+import { analyzeSignalExpression, type SignalHoister } from './signal-analysis.js';
 import type { SegmentImportData } from '../segment/segment-codegen.js';
+
+const EMPTY_SET: ReadonlySet<string> = new Set();
 
 /**
  * Collect the set of identifier names in this segment's import context that
@@ -102,6 +106,20 @@ interface JsxCallTransformOptions {
    * captures through. Mirrors the raw-JSX path's `injectQpProp`.
    */
   qpByQrl?: ReadonlyMap<string, readonly string[]>;
+  /**
+   * All names imported by the module, used by the reactive-expression
+   * classifier to distinguish signal reads (wrap/hoist) from expressions
+   * that reference imports or call unknown functions (leave verbatim).
+   */
+  importedNames?: ReadonlySet<string>;
+  /**
+   * Accumulates `_hf<n>` reactive-expression functions hoisted for
+   * `_fnSignal(...)` prop/child values. The caller emits its
+   * `getDeclarations()` alongside the body and threads the same instance
+   * across bodies for stable `_hf<n>` numbering. Without it, complex
+   * reactive expressions stay verbatim (only bare `.value` wraps).
+   */
+  signalHoister?: SignalHoister;
 }
 
 /**
@@ -148,6 +166,9 @@ export function transformJsxCalls(
 
   const reactiveBindings = collectReactiveBindings(program);
   opts.reactiveBindings = reactiveBindings;
+  // Names resolvable in this body's scope — the reactive-expression
+  // classifier treats a `.value` / member read on one of these as a signal.
+  const localNames = collectScopeAwareBindings(program).allLocalNames;
 
   // Tag kinds of the open jsx() ancestors, most-recent last; `'html'` for a
   // string-literal-tag call, `'component'` for an identifier-tag call.
@@ -176,7 +197,14 @@ export function transformJsxCalls(
       if (isInSkipRange(node.start)) return;
       const propsArg = node.arguments?.[1];
       if (!propsArg || propsArg.type !== 'ObjectExpression') return;
-      wrapReactivePropValues(propsArg, s, reactiveBindings, opts.neededImports);
+      wrapReactivePropValues(propsArg, {
+        s,
+        source,
+        importedNames: opts.importedNames ?? EMPTY_SET,
+        localNames,
+        neededImports: opts.neededImports,
+        signalHoister: opts.signalHoister,
+      });
     },
     leave(node: AstNode) {
       // Bail unless this is a `<jsxFunction>(tag, propsObjLiteral, ...)`
@@ -238,46 +266,57 @@ function isJsxCall(node: AstNode, jsxFunctions: ReadonlySet<string>): boolean {
   );
 }
 
-function wrapReactivePropValues(
-  propsObj: AstNode,
-  s: MagicString,
-  reactiveBindings: ReadonlySet<string>,
-  neededImports: Set<string>,
-): void {
+interface WrapReactiveContext {
+  s: MagicString;
+  source: string;
+  importedNames: ReadonlySet<string>;
+  localNames: ReadonlySet<string> | undefined;
+  neededImports: Set<string>;
+  signalHoister: SignalHoister | undefined;
+}
+
+function wrapReactivePropValues(propsObj: AstNode, ctx: WrapReactiveContext): void {
   if (propsObj.type !== 'ObjectExpression') return;
   for (const prop of propsObj.properties ?? []) {
     if (prop.type !== 'Property') continue;
     const value = prop.value;
     if (propertyKeyName(prop) === 'children' && value?.type === 'ArrayExpression') {
       for (const element of value.elements ?? []) {
-        wrapReactiveMember(element, s, reactiveBindings, neededImports);
+        wrapReactiveValue(element, ctx);
       }
       continue;
     }
-    wrapReactiveMember(value, s, reactiveBindings, neededImports);
+    wrapReactiveValue(value, ctx);
   }
 }
 
-function wrapReactiveMember(
-  node: AstNode | null | undefined,
-  s: MagicString,
-  reactiveBindings: ReadonlySet<string>,
-  neededImports: Set<string>,
-): void {
-  if (
-    !node ||
-    node.type !== 'MemberExpression' ||
-    node.object?.type !== 'Identifier' ||
-    !reactiveBindings.has(node.object.name)
-  ) return;
-  const propName = staticPropName(node);
-  if (propName === null) return;
-  const objText = s.slice(node.object.start, node.object.end);
-  const replacement = propName === 'value'
-    ? `_wrapProp(${objText})`
-    : `_wrapProp(${objText}, "${propName}")`;
-  s.overwrite(node.start, node.end, replacement);
-  neededImports.add('_wrapProp');
+function wrapReactiveValue(node: AstNode | null | undefined, ctx: WrapReactiveContext): void {
+  if (!node) return;
+  const result = analyzeSignalExpression(
+    node,
+    ctx.source,
+    ctx.importedNames as Set<string>,
+    ctx.localNames as Set<string> | undefined,
+  );
+  if (result.type === 'wrapProp') {
+    ctx.s.overwrite(node.start, node.end, result.code);
+    ctx.neededImports.add('_wrapProp');
+    return;
+  }
+  // Only scalar reactive expressions hoist to `_fnSignal`. Array/object
+  // values (`class={[...]}`) and call/chain render expressions
+  // (`items.map(...)`) stay verbatim — the former track reactivity as var
+  // props, and hoisting the latter would strand their callback bindings.
+  const hoistable =
+    node.type !== 'ArrayExpression' &&
+    node.type !== 'ObjectExpression' &&
+    node.type !== 'CallExpression' &&
+    node.type !== 'ChainExpression';
+  if (result.type === 'fnSignal' && ctx.signalHoister !== undefined && hoistable) {
+    const hf = ctx.signalHoister.hoist(result.hoistedFn, result.hoistedStr, node.start ?? 0);
+    ctx.s.overwrite(node.start, node.end, `_fnSignal(${hf}, [${result.deps.join(', ')}], ${hf}_str)`);
+    ctx.neededImports.add('_fnSignal');
+  }
 }
 
 function staticPropName(member: AstNode): string | null {
