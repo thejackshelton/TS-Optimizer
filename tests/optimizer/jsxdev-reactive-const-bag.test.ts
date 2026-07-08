@@ -87,4 +87,23 @@ export const renderItem = $((node) => {
     expect(out).toMatch(/href:\s*_wrapProp\(node,\s*"id"\)/);
     expect(out).toMatch(/label:\s*_wrapProp\(node,\s*"label"\)/);
   });
+
+  test('a spread on a component element emits _jsxSplit with _getVarProps/_getConstProps', () => {
+    // A props-forwarding wrapper (`<Inner {...props} />`) must split the
+    // spread into _getVarProps/_getConstProps under _jsxSplit so the runtime
+    // classifies the forwarded keys — a _jsxSorted with `...props` in the var
+    // bag would make every forwarded prop host-reactive (SSR over-subscription).
+    const out = transform(`import { jsxDEV as _jsxDEV } from "@qwik.dev/core/jsx-dev-runtime";
+import { component$ } from '@qwik.dev/core';
+import { Inner } from './inner';
+export const Wrapper = component$((props) => {
+  return _jsxDEV(Inner, { tabIndex: -1, ...props, id: "x" }, void 0, false, undefined, this);
+});
+`);
+    expect(out).toContain('_jsxSplit(Inner,');
+    expect(out).toMatch(/\.\.\._getVarProps\(props\)/);
+    expect(out).toMatch(/\.\.\._getConstProps\(props\)/);
+    // spread expanded in place: tabIndex before, id after — all one bag, const null.
+    expect(out).toMatch(/_jsxSplit\(Inner,\s*\{[^}]*tabIndex[^}]*_getVarProps\(props\)[^}]*_getConstProps\(props\)[^}]*id:[^}]*\},\s*null/);
+  });
 });

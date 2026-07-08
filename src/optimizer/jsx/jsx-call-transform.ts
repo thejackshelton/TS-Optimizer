@@ -462,25 +462,32 @@ function buildJsxSortedCall(
   // the `*$` form as a JSX prop and the runtime handles wiring internally.
   const isHtmlTag = tagArg.type === 'Literal' && typeof tagArg.value === 'string';
 
-  // Partition props into `children` (positional 4th arg) and everything else
-  // (varProps bag). SpreadElement entries are preserved inline in source
-  // order — compareAst's `mergeJsxSplitProps` + `mergeGetVarConstProps`
-  // collapse SWC's `_jsxSplit(tag, {..._getVarProps(rest), ...}, _getConstProps(rest), ...)`
-  // into the same shape as `_jsxSorted(tag, {...rest, ...}, null, ...)`, so
-  // we emit the single-bag form regardless. Anything other than
-  // Property/SpreadElement (e.g. a setter) is out of scope — leave the call
-  // unchanged.
+  // Partition props into `children` (positional 4th arg), a var bag, and a
+  // const bag. A `{...spread}` switches the element to `_jsxSplit` with the
+  // spread expanded to `_getVarProps`/`_getConstProps` (assembled below from
+  // `orderedEntries`); without a spread it's `_jsxSorted(tag, var, const, …)`.
+  // Anything other than Property/SpreadElement (e.g. a setter) is out of
+  // scope — leave the call unchanged.
   let childrenText: string | null = null;
   let childrenIsDynamic = false;
   let hasVarEventHandler = false;
   const varEntries: string[] = [];
   const constEntries: string[] = [];
+  // Source-ordered prop entries for the spread path (a `{...props}` spread
+  // is expanded in place to `..._getVarProps(props), ..._getConstProps(props)`
+  // so the runtime `_jsxSplit` can classify the spread's keys; the raw-JSX
+  // path does the same). Collected in parallel with the var/const bags —
+  // only used when `spreadArgs` is non-empty.
+  const orderedEntries: string[] = [];
+  const spreadArgs: string[] = [];
   // Union of `q:p`/`q:ps` capture params across all const event handlers on
   // this element (an element with two capturing handlers shares one prop).
   const qpParams: string[] = [];
   for (const prop of propsArg.properties) {
     if (prop.type === 'SpreadElement') {
-      varEntries.push(s.slice(prop.start, prop.end));
+      const spreadArg = s.slice(prop.argument.start, prop.argument.end);
+      spreadArgs.push(spreadArg);
+      orderedEntries.push(`..._getVarProps(${spreadArg})`, `..._getConstProps(${spreadArg})`);
       continue;
     }
     if (prop.type !== 'Property') return null;
@@ -507,6 +514,7 @@ function buildJsxSortedCall(
         // and drops the flag bit.
         if (isConstEventHandlerValue(prop.value)) {
           constEntries.push(`"${transformed}": ${valueText}`);
+          orderedEntries.push(`"${transformed}": ${valueText}`);
           // A const handler delivers its captures positionally; record them
           // so the element emits one `q:p`/`q:ps` prop below.
           const handlerQp = opts.qpByQrl?.get(valueText);
@@ -517,15 +525,18 @@ function buildJsxSortedCall(
           }
         } else {
           varEntries.push(`"${transformed}": ${valueText}`);
+          orderedEntries.push(`"${transformed}": ${valueText}`);
           hasVarEventHandler = true;
         }
         continue;
       }
     }
+    const entryText = s.slice(prop.start, prop.end);
+    orderedEntries.push(entryText);
     const bag = classifyProp(prop.value, opts, isHtmlTag, s) === 'const'
       ? constEntries
       : varEntries;
-    bag.push(s.slice(prop.start, prop.end));
+    bag.push(entryText);
   }
 
   // Optional 3rd arg: explicit key. Maps to the 6th `_jsxSorted` arg.
@@ -547,15 +558,34 @@ function buildJsxSortedCall(
   // matching SWC's emit order. Its presence sets the `moved_captures` flag.
   if (qpParams.length > 0) {
     const qp = buildCaptureProp(qpParams, true);
-    if (qp) varEntries.unshift(`"${qp.propName}": ${qp.propValue}`);
+    if (qp) {
+      varEntries.unshift(`"${qp.propName}": ${qp.propValue}`);
+      orderedEntries.unshift(`"${qp.propName}": ${qp.propValue}`);
+    }
   }
 
-  const varPropsText = varEntries.length > 0 ? `{ ${varEntries.join(', ')} }` : 'null';
-  const constPropsText = constEntries.length > 0 ? `{ ${constEntries.join(', ')} }` : 'null';
   const childrenSlot = childrenText ?? 'null';
   const childrenType: 'none' | 'static' | 'dynamic' = childrenText === null
     ? 'none'
     : childrenIsDynamic ? 'dynamic' : 'static';
+
+  // Spread path: a `{...props}` forwards props whose var/const split isn't
+  // statically known, so emit `_jsxSplit` with the spread expanded to
+  // `_getVarProps`/`_getConstProps` (source order preserved, everything in the
+  // var bag, null const bag) — the runtime classifies the spread's keys. A
+  // `_jsxSorted` with the spread lumped into the var bag would instead make
+  // every forwarded prop host-reactive (over-subscribing the host on SSR).
+  if (spreadArgs.length > 0) {
+    opts.neededImports.add('_jsxSplit');
+    opts.neededImports.add('_getVarProps');
+    opts.neededImports.add('_getConstProps');
+    const splitFlags = qpParams.length > 0 ? 4 : 0;
+    const bag = orderedEntries.length > 0 ? `{ ${orderedEntries.join(', ')} }` : 'null';
+    return `/*#__PURE__*/ _jsxSplit(${tag}, ${bag}, null, ${childrenSlot}, ${splitFlags}, ${keyText})`;
+  }
+
+  const varPropsText = varEntries.length > 0 ? `{ ${varEntries.join(', ')} }` : 'null';
+  const constPropsText = constEntries.length > 0 ? `{ ${constEntries.join(', ')} }` : 'null';
   const hasVarProps = varEntries.length > 0;
   let flags = computeJsxFlags(hasVarProps, childrenType, false, hasVarEventHandler);
   if (qpParams.length > 0) flags |= 4;
