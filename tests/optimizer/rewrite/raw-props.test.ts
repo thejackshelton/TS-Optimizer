@@ -62,6 +62,26 @@ describe('raw-props', () => {
     );
   });
 
+  it('rewrites a rest-destructure of a props-derived local (not the param)', () => {
+    // `props` here is derived from the param via a call — the native
+    // `{ ...rest } = props` would enumerate the props proxy at render and
+    // over-subscribe the host; rewrite it to `_restProps`, in place (after the
+    // local's definition, to avoid a TDZ), with the field ref rewritten.
+    const body =
+      '(rawProps) => {\n  const props = usePlayground(rawProps, "x");\n  const { value: givenValue, ...rest } = props;\n  return givenValue ?? rest;\n}';
+
+    const result = applyRawPropsTransform(body);
+
+    // The wrapper call is untouched; the native `{ ...rest } = props` is gone,
+    // replaced by `_restProps(props, ["value"])`; `givenValue` → `props.value`.
+    expect(result).toContain('const props = usePlayground(rawProps, "x");');
+    expect(result).toMatch(/const rest = _restProps\(props, \[\s*"value"\s*\]\);/);
+    expect(result).not.toMatch(/\{\s*value:\s*givenValue\s*,\s*\.\.\.rest\s*\}/);
+    expect(result).toContain('return props.value ?? rest;');
+    // The `_restProps` line sits AFTER the wrapper call (no TDZ).
+    expect(result.indexOf('_restProps')).toBeGreaterThan(result.indexOf('usePlayground'));
+  });
+
   it('rewrites rest-only destructuring in expression bodies', () => {
     const body = '({ ...rest }) => rest';
 

@@ -150,6 +150,14 @@ interface RawPropsTransformPlan {
   removeRange?: SourceRange;
   replacementBaseName: string;
   restLine?: string;
+  /**
+   * Emit `restLine` in place of the removed destructure (not at the body
+   * prologue). Required when the destructure base is a props-derived local
+   * declared partway through the body — a prologue insertion would reference
+   * it before initialization (TDZ). For a first-param base the prologue is
+   * safe (and preserves the historical emit position).
+   */
+  restLineInPlace?: boolean;
   fieldLocalToKey: Map<string, string>;
   fieldLocalToDefault: Map<string, string>;
   excludedRanges: SourceRange[];
@@ -421,11 +429,19 @@ function analyzeBodyDestructurePlan(
 ): RawPropsTransformPlan | null {
   if (!fnBody || fnBody.type !== 'BlockStatement') return null;
 
+  // The props a component destructures need not be the first param itself:
+  // libraries commonly wrap it (`const props = usePlayground(rawProps, …)`)
+  // and destructure the wrapper. Track every local that flows from the
+  // param through a call so a rest-destructure of it is still rewritten to
+  // `_restProps` — otherwise the native `{ ...rest }` enumerates the props
+  // proxy at render and over-subscribes the host.
+  const propsDerived = collectPropsDerivedLocals(baseName, fnBody.body ?? []);
+
   for (const stmt of fnBody.body ?? []) {
     if (stmt.type !== 'VariableDeclaration' || !hasRange(stmt)) continue;
 
     for (const declarator of stmt.declarations ?? []) {
-      const plan = analyzeBodyDestructureDeclarator(baseName, declarator, stmt, body, offset);
+      const plan = analyzeBodyDestructureDeclarator(propsDerived, baseName, declarator, stmt, body, offset);
       if (plan) return plan;
     }
   }
@@ -433,8 +449,30 @@ function analyzeBodyDestructurePlan(
   return null;
 }
 
-function analyzeBodyDestructureDeclarator(
+function collectPropsDerivedLocals(
   baseName: string,
+  statements: readonly unknown[],
+): Set<string> {
+  const derived = new Set<string>([baseName]);
+  for (const stmt of statements) {
+    if (!isAstNode(stmt) || stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') continue;
+    for (const declarator of (stmt.declarations as unknown[] | undefined) ?? []) {
+      if (!isVariableDeclaratorNode(declarator)) continue;
+      if (!isIdentifierNode(declarator.id)) continue;
+      const init = declarator.init;
+      if (!isAstNode(init) || init.type !== 'CallExpression') continue;
+      const arg0 = (init.arguments as unknown[] | undefined)?.[0];
+      if (isIdentifierNode(arg0) && derived.has(arg0.name)) {
+        derived.add(declarator.id.name);
+      }
+    }
+  }
+  return derived;
+}
+
+function analyzeBodyDestructureDeclarator(
+  propsDerived: ReadonlySet<string>,
+  firstParamName: string,
   declarator: unknown,
   stmt: { start: number; end: number },
   body: string,
@@ -442,7 +480,8 @@ function analyzeBodyDestructureDeclarator(
 ): RawPropsTransformPlan | null {
   if (!isVariableDeclaratorNode(declarator)) return null;
   if (!isAstNode(declarator.id) || declarator.id.type !== 'ObjectPattern') return null;
-  if (!isIdentifierNode(declarator.init) || declarator.init.name !== baseName) return null;
+  if (!isIdentifierNode(declarator.init) || !propsDerived.has(declarator.init.name)) return null;
+  const baseName = declarator.init.name;
 
   const bindings = collectPatternBindings(declarator.id);
   // Same SWC-gate as the param-level path — preserve the source
@@ -456,6 +495,7 @@ function analyzeBodyDestructureDeclarator(
     restLine: bindings.restElementName
       ? buildRestPropsLine(baseName, bindings.restElementName, bindings.fields)
       : undefined,
+    restLineInPlace: baseName !== firstParamName,
     fieldLocalToKey: toFieldLocalToKey(bindings.fields),
     fieldLocalToDefault: new Map(),
     excludedRanges: [{ start: stmt.start, end: stmt.end }],
@@ -711,9 +751,17 @@ export function applyRawPropsTransform(body: string): string {
     session.edits.overwrite(plan.replacementParamRange.start, plan.replacementParamRange.end, '_rawProps');
   }
   if (plan.removeRange) {
-    session.edits.remove(plan.removeRange.start, plan.removeRange.end);
-  }
-  if (plan.restLine) {
+    // When the base is a props-derived local declared partway through the
+    // body, emit the `_restProps` line in place of the removed destructure so
+    // it sits after that local's definition (a prologue insertion would hit a
+    // TDZ). A first-param base is prologue-safe, so keep the historical emit.
+    if (plan.restLine && plan.restLineInPlace) {
+      session.edits.overwrite(plan.removeRange.start, plan.removeRange.end, plan.restLine);
+    } else {
+      session.edits.remove(plan.removeRange.start, plan.removeRange.end);
+      if (plan.restLine) insertFunctionBodyPrologue(session, session.fn, plan.restLine);
+    }
+  } else if (plan.restLine) {
     insertFunctionBodyPrologue(session, session.fn, plan.restLine);
   }
   if (plan.fieldLocalToKey.size > 0) {
