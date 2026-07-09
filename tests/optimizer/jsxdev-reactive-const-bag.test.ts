@@ -88,6 +88,21 @@ export const renderItem = $((node) => {
     expect(out).toMatch(/label:\s*_wrapProp\(node,\s*"label"\)/);
   });
 
+  test('a $-suffixed member read (handler ref) is left raw, not _wrapProp', () => {
+    // `props.onChange$` is a QRL/handler reference, not a reactive value — it
+    // must stay raw (a reactive `props.title` beside it still wraps).
+    const out = transform(`import { jsxDEV as _jsxDEV } from "@qwik.dev/core/jsx-dev-runtime";
+import { component$ } from '@qwik.dev/core';
+import { Inner } from './inner';
+export const C = component$((props) => {
+  return _jsxDEV(Inner, { onChange$: props.onChange$, title: props.title }, void 0, false, undefined, this);
+});
+`);
+    expect(out).toMatch(/onChange\$:\s*props\.onChange\$/);
+    expect(out).not.toMatch(/_wrapProp\(props,\s*"onChange\$"\)/);
+    expect(out).toMatch(/title:\s*_wrapProp\(props,\s*"title"\)/);
+  });
+
   test('a spread on a component element emits _jsxSplit with _getVarProps/_getConstProps', () => {
     // A props-forwarding wrapper (`<Inner {...props} />`) must split the
     // spread into _getVarProps/_getConstProps under _jsxSplit so the runtime

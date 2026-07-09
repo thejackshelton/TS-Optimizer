@@ -325,8 +325,24 @@ function wrapReactivePropValues(propsObj: AstNode, ctx: WrapReactiveContext): vo
   }
 }
 
+/**
+ * A `$`-suffixed member read (`props.onChange$`, `props.onOpenChange$`) is a
+ * QRL / event-handler reference, not a reactive value — it must stay raw, not
+ * become `_wrapProp(props, "onChange$")`. (This surfaces once a props-field
+ * destructure is inlined to `props.onChange$`.)
+ */
+function isDollarSuffixedMemberRead(node: AstNode): boolean {
+  return (
+    node.type === 'MemberExpression' &&
+    !node.computed &&
+    node.property?.type === 'Identifier' &&
+    node.property.name.endsWith('$')
+  );
+}
+
 function wrapReactiveValue(node: AstNode | null | undefined, ctx: WrapReactiveContext): void {
   if (!node) return;
+  if (isDollarSuffixedMemberRead(node)) return;
   const result = analyzeSignalExpression(
     node,
     ctx.source,
@@ -392,6 +408,9 @@ function classifyProp(
   const bindings = opts.bindings;
   const localNames = opts.localNames as Set<string> | undefined;
   const pos = valueNode.start ?? 0;
+  // A `$`-suffixed member read is a handler ref left raw (see
+  // `wrapReactiveValue`); it stays in the var bag, not the reactive const bag.
+  if (isDollarSuffixedMemberRead(valueNode)) return 'var';
   const sig = analyzeSignalExpression(valueNode, s.original, importedNames, localNames);
 
   if (sig.type === 'wrapProp') {
