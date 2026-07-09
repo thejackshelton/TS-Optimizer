@@ -108,39 +108,20 @@ interface JsxCallTransformOptions {
    * captures through. Mirrors the raw-JSX path's `injectQpProp`.
    */
   qpByQrl?: ReadonlyMap<string, readonly string[]>;
-  /**
-   * All names imported by the module, used by the reactive-expression
-   * classifier to distinguish signal reads (wrap/hoist) from expressions
-   * that reference imports or call unknown functions (leave verbatim).
-   */
+  /** All names imported by the module; lets the reactive classifier tell
+   * signal reads apart from references to imports. */
   importedNames?: ReadonlySet<string>;
-  /**
-   * Accumulates `_hf<n>` reactive-expression functions hoisted for
-   * `_fnSignal(...)` prop/child values. The caller emits its
-   * `getDeclarations()` alongside the body and threads the same instance
-   * across bodies for stable `_hf<n>` numbering. Without it, complex
-   * reactive expressions stay verbatim (only bare `.value` wraps).
-   */
+  /** Accumulates `_hf<n>` functions hoisted for `_fnSignal(...)` values;
+   * threaded across bodies for stable `_hf<n>` numbering. */
   signalHoister?: SignalHoister;
-  /**
-   * Locally declared names in this body — the reactive-expression
-   * classifier's "declared somewhere locally, don't treat as a
-   * signal/store dep" filter. Derived once per body in `transformJsxCalls`.
-   */
+  /** Locally declared names in this body; a dep declared locally isn't
+   * treated as a signal/store read. */
   localNames?: ReadonlySet<string>;
-  /**
-   * Scope-aware binding lookup for the prop var/const classifier. A
-   * reactive-wrapped prop whose deps are all stable (imported or const-
-   * bound) belongs in the const-props bag so the host doesn't subscribe.
-   */
+  /** Scope-aware binding lookup; a reactive prop whose deps are all stable
+   * (imported or const-bound) goes in the const bag. */
   bindings?: ScopeAwareBindings;
-  /**
-   * The body's own closure params (props-like). Member access on one of
-   * these (`props.field`, `node.id`) is a wrappable store-field read even
-   * when the body declares no `useSignal`/`useStore` binding — so their
-   * presence keeps the reactive-wrap pass from being skipped, and they're
-   * unioned into the scope so the store-field detector recognises them.
-   */
+  /** The body's closure params. Member reads on them (`props.field`) are
+   * wrappable store-field reads even with no `useSignal`/`useStore` binding. */
   paramNames?: readonly string[];
 }
 
@@ -188,15 +169,11 @@ export function transformJsxCalls(
 
   const reactiveBindings = collectReactiveBindings(program);
   opts.reactiveBindings = reactiveBindings;
-  // Names resolvable in this body's scope — the reactive-expression
-  // classifier treats a `.value` / member read on one of these as a signal,
-  // and `bindings` classifies each dep as const/var for the var/const bag.
   const scopeBindings = collectScopeAwareBindings(program);
   const localNames = scopeBindings.allLocalNames;
-  // The body's own closure params (props) may not appear as declarations in
-  // the parsed program (codegen adds `(props) =>` around the transformed
-  // body afterward), so union them in explicitly — member access on them is
-  // a store-field read the wrap pass must recognise.
+  // Closure params aren't declarations in the parsed body (codegen wraps it in
+  // `(props) =>` afterward), so union them in — member reads on them are
+  // store-field reads the wrap pass must recognise.
   for (const p of opts.paramNames ?? []) localNames.add(p);
   opts.localNames = localNames;
   opts.bindings = scopeBindings.bindings;
@@ -224,10 +201,6 @@ export function transformJsxCalls(
           : 'component';
       tagStack.push(kind);
 
-      // Skip the reactive-wrap pass only when there is nothing to wrap: no
-      // `useSignal`/`useStore` binding AND no closure params (props). A body
-      // with props still needs `props.field` / `node.id` reads wrapped even
-      // with zero reactive bindings — matching SWC.
       if (reactiveBindings.size === 0 && (opts.paramNames?.length ?? 0) === 0) return;
       if (isInSkipRange(node.start)) return;
       const propsArg = node.arguments?.[1];
@@ -325,12 +298,8 @@ function wrapReactivePropValues(propsObj: AstNode, ctx: WrapReactiveContext): vo
   }
 }
 
-/**
- * A `$`-suffixed member read (`props.onChange$`, `props.onOpenChange$`) is a
- * QRL / event-handler reference, not a reactive value — it must stay raw, not
- * become `_wrapProp(props, "onChange$")`. (This surfaces once a props-field
- * destructure is inlined to `props.onChange$`.)
- */
+/** A `$`-suffixed member read (`props.onChange$`) is a QRL/handler ref, not a
+ * reactive value — it stays raw rather than becoming `_wrapProp(...)`. */
 function isDollarSuffixedMemberRead(node: AstNode): boolean {
   return (
     node.type === 'MemberExpression' &&
@@ -361,13 +330,9 @@ function wrapReactiveValue(node: AstNode | null | undefined, ctx: WrapReactiveCo
   }
 }
 
-/**
- * Only scalar reactive expressions hoist to `_fnSignal`. Array/object values
- * (`class={[...]}`) and call/chain render expressions (`items.map(...)`) stay
- * verbatim — the former track reactivity as var props, and hoisting the latter
- * would strand their callback bindings. Shared so the wrap (emit) and the
- * var/const classifier agree on which values became `_fnSignal(...)`.
- */
+/** Only scalar reactive expressions hoist to `_fnSignal`; arrays/objects and
+ * call/chain exprs (`items.map(...)`) stay verbatim — hoisting them would
+ * strand their callback bindings. */
 function isHoistableSignalExpr(node: AstNode): boolean {
   return (
     node.type !== 'ArrayExpression' &&
@@ -377,27 +342,12 @@ function isHoistableSignalExpr(node: AstNode): boolean {
   );
 }
 
-/**
- * Decide which prop bag a `_jsxDEV` prop value belongs in. A prop whose value
- * became a reactive wrapper in the enter pass belongs in the const-props bag,
- * mirroring the raw-JSX path (`jsx-props.ts`); everything else keeps its
- * original var-bag placement.
- *
- * Only the reactive-wrapped cases move: a var-bag reactive read subscribes the
- * *host* to the signal, so a mid-render write re-renders the whole component
- * (the "chore on an already-streamed host" SSR divergence). The const bag
- * isolates the read in its `_wrapProp`/`_fnSignal` wrapper instead.
- *   - a bare `signal.value` read → `_wrapProp(sig)` → const (a store-field
- *     read `store.field` on an HTML element whose object is a var binding
- *     stays var, matching the raw path);
- *   - a hoistable scalar reactive expr → `_fnSignal(...)` → const when every
- *     dep is stable (imported or const-bound), else var.
- *
- * Non-reactive props are left in the var bag rather than run through the full
- * structural const/var split: peer-tool input carries pre-analysed markers
- * (`[_IMMUTABLE]: [...]`) that must stay where the tool placed them, and a
- * non-reactive prop in the var bag never over-subscribes the host.
- */
+/** Which prop bag a `_jsxDEV` prop value belongs in. A reactive-wrapped value
+ * goes in the const bag so only its wrapper subscribes, not the host (a var-bag
+ * reactive read re-renders the whole component on a mid-render write). A
+ * store-field read on an HTML element keeps its var/const split by the object's
+ * binding. Everything else — including non-reactive props carrying pre-analysed
+ * peer-tool markers (`[_IMMUTABLE]`) — stays in the var bag. */
 function classifyProp(
   valueNode: AstNode,
   opts: JsxCallTransformOptions,
@@ -408,8 +358,6 @@ function classifyProp(
   const bindings = opts.bindings;
   const localNames = opts.localNames as Set<string> | undefined;
   const pos = valueNode.start ?? 0;
-  // A `$`-suffixed member read is a handler ref left raw (see
-  // `wrapReactiveValue`); it stays in the var bag, not the reactive const bag.
   if (isDollarSuffixedMemberRead(valueNode)) return 'var';
   const sig = analyzeSignalExpression(valueNode, s.original, importedNames, localNames);
 
@@ -481,22 +429,12 @@ function buildJsxSortedCall(
   // the `*$` form as a JSX prop and the runtime handles wiring internally.
   const isHtmlTag = tagArg.type === 'Literal' && typeof tagArg.value === 'string';
 
-  // Partition props into `children` (positional 4th arg), a var bag, and a
-  // const bag. A `{...spread}` switches the element to `_jsxSplit` with the
-  // spread expanded to `_getVarProps`/`_getConstProps` (assembled below from
-  // `orderedEntries`); without a spread it's `_jsxSorted(tag, var, const, …)`.
-  // Anything other than Property/SpreadElement (e.g. a setter) is out of
-  // scope — leave the call unchanged.
+  // Non-Property/SpreadElement props (e.g. a setter) are out of scope — bail.
   let childrenText: string | null = null;
   let childrenIsDynamic = false;
   let hasVarEventHandler = false;
   const varEntries: string[] = [];
   const constEntries: string[] = [];
-  // Source-ordered prop entries for the spread path (a `{...props}` spread
-  // is expanded in place to `..._getVarProps(props), ..._getConstProps(props)`
-  // so the runtime `_jsxSplit` can classify the spread's keys; the raw-JSX
-  // path does the same). Collected in parallel with the var/const bags —
-  // only used when `spreadArgs` is non-empty.
   const orderedEntries: string[] = [];
   const spreadArgs: string[] = [];
   // Union of `q:p`/`q:ps` capture params across all const event handlers on
@@ -588,12 +526,10 @@ function buildJsxSortedCall(
     ? 'none'
     : childrenIsDynamic ? 'dynamic' : 'static';
 
-  // Spread path: a `{...props}` forwards props whose var/const split isn't
-  // statically known, so emit `_jsxSplit` with the spread expanded to
-  // `_getVarProps`/`_getConstProps` (source order preserved, everything in the
-  // var bag, null const bag) — the runtime classifies the spread's keys. A
-  // `_jsxSorted` with the spread lumped into the var bag would instead make
-  // every forwarded prop host-reactive (over-subscribing the host on SSR).
+  // A `{...spread}` forwards props whose var/const split isn't statically
+  // known; `_jsxSplit` lets the runtime classify the forwarded keys. Lumping
+  // the spread into a `_jsxSorted` var bag would make every forwarded prop
+  // host-reactive (over-subscribing the host on SSR).
   if (spreadArgs.length > 0) {
     opts.neededImports.add('_jsxSplit');
     opts.neededImports.add('_getVarProps');

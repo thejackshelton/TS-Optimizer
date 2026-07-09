@@ -116,12 +116,9 @@ export function transformInlineSegmentBody(
   /** Server/dev flags for isServer/isBrowser/isDev folding, applied here since this body sits outside the parent MagicString. */
   isServer?: boolean,
   isDev?: boolean,
-  /**
-   * Cross-body hoister for `_fnSignal(...)` values emitted by the
-   * `_jsxDEV(...)` rewrite. Kept separate from `sharedSignalHoister` (used
-   * by `transformAllJsx`, which reorders it) so emitted `_hf<n>` references
-   * stay aligned with their declarations.
-   */
+  /** Cross-body hoister for `_fnSignal(...)` values from the `_jsxDEV(...)`
+   * rewrite; separate from the JSX hoister (which gets reordered) so emitted
+   * `_hf<n>` refs stay aligned with their declarations. */
   jsxCallHoister?: SignalHoister,
 ): { transformedBody: string; additionalImports: Map<string, string>; hoistedDeclarations: string[]; keyCounterValue?: number } {
   // `body` is locally mutable plain string for slicing/concatenation

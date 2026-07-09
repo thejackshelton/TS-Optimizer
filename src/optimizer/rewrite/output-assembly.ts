@@ -314,10 +314,8 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
     : undefined;
 
   const sharedHoister = jsxOptions?.enableJsx ? new SignalHoister() : undefined;
-  // A dedicated hoister for the `_jsxDEV(...)` (peer-tool) rewrite path,
-  // kept apart from `sharedHoister` (which `transformAllJsx` reorders via
-  // `buildRenameMap`) so already-emitted `_fnSignal(_hf<n>, …)` references
-  // stay aligned with their declarations.
+  // Separate hoister for the `_jsxDEV(...)` path, apart from `sharedHoister`
+  // (which gets reordered) so emitted `_hf<n>` refs stay aligned with decls.
   const sharedJsxCallHoister = new SignalHoister();
 
   const nestedExts: ExtractionResult[] = [];

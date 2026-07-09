@@ -150,13 +150,6 @@ interface RawPropsTransformPlan {
   removeRange?: SourceRange;
   replacementBaseName: string;
   restLine?: string;
-  /**
-   * Emit `restLine` in place of the removed destructure (not at the body
-   * prologue). Required when the destructure base is a props-derived local
-   * declared partway through the body — a prologue insertion would reference
-   * it before initialization (TDZ). For a first-param base the prologue is
-   * safe (and preserves the historical emit position).
-   */
   restLineInPlace?: boolean;
   fieldLocalToKey: Map<string, string>;
   fieldLocalToDefault: Map<string, string>;
@@ -429,12 +422,9 @@ function analyzeBodyDestructurePlan(
 ): RawPropsTransformPlan | null {
   if (!fnBody || fnBody.type !== 'BlockStatement') return null;
 
-  // The props a component destructures need not be the first param itself:
-  // libraries commonly wrap it (`const props = usePlayground(rawProps, …)`)
-  // and destructure the wrapper. Track every local that flows from the
-  // param through a call so a rest-destructure of it is still rewritten to
-  // `_restProps` — otherwise the native `{ ...rest }` enumerates the props
-  // proxy at render and over-subscribes the host.
+  // A destructured props object may be a local derived from the param
+  // (`const props = usePlayground(rawProps)`), not the param itself; a native
+  // `{ ...rest }` on it enumerates the props proxy and over-subscribes the host.
   const propsDerived = collectPropsDerivedLocals(baseName, fnBody.body ?? []);
 
   for (const stmt of fnBody.body ?? []) {
@@ -751,10 +741,8 @@ export function applyRawPropsTransform(body: string): string {
     session.edits.overwrite(plan.replacementParamRange.start, plan.replacementParamRange.end, '_rawProps');
   }
   if (plan.removeRange) {
-    // When the base is a props-derived local declared partway through the
-    // body, emit the `_restProps` line in place of the removed destructure so
-    // it sits after that local's definition (a prologue insertion would hit a
-    // TDZ). A first-param base is prologue-safe, so keep the historical emit.
+    // A props-derived local declared mid-body would hit a TDZ if the rest line
+    // were inserted at the prologue, so emit it in place of the destructure.
     if (plan.restLine && plan.restLineInPlace) {
       session.edits.overwrite(plan.removeRange.start, plan.removeRange.end, plan.restLine);
     } else {
