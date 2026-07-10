@@ -326,7 +326,21 @@ function buildJsxSplitCall(
     beforeSpreadEntries.length > 0 || additionalSpreads.length > 0
   );
 
-  if (componentHasExtras) {
+  // A single spread has no `additionalSpreads`; every non-`beforeSpread`
+  // prop then sits after the only spread, so `constEntries` is exactly the
+  // post-spread const set that belongs in the const bag (var stays in var).
+  // Multiple spreads keep the merge-to-var form: a const prop that sits
+  // *between* spreads is a var prop the buckets can't distinguish here.
+  const partitionableComponentSpread =
+    componentHasExtras && additionalSpreads.length === 0 && constEntries.length > 0;
+
+  if (partitionableComponentSpread) {
+    const hasVarAfterSpread = varEntries.length > 0;
+    const getConstInVar = hasVarAfterSpread ? `, ..._getConstProps(${spreadArg})` : '';
+    varPropsPart = `{ ${beforePart}..._getVarProps(${spreadArg})${getConstInVar}${afterPart} }`;
+    const getConstInConst = hasVarAfterSpread ? '' : `..._getConstProps(${spreadArg}), `;
+    constPropsPart = `{ ${getConstInConst}${constEntries.join(', ')} }`;
+  } else if (componentHasExtras) {
     const constPart = constEntries.length > 0 ? `, ${constEntries.join(', ')}` : '';
     varPropsPart = `{ ${beforePart}..._getVarProps(${spreadArg}), ..._getConstProps(${spreadArg})${afterPart}${constPart}${additionalSpreadsPart} }`;
     constPropsPart = 'null';

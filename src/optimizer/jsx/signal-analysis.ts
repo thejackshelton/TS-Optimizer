@@ -960,11 +960,13 @@ export function analyzeSignalExpression(
     return { type: 'fnSignal', deps: allDeps, hoistedFn, hoistedStr };
   }
 
-  // Compound expressions (binary, conditional, logical, template)
+  // Compound expressions. `tryBuildFnSignal` no-ops without a reactive root,
+  // so a plain `!open` is left alone while `!signal.value` hoists.
   if (
     exprNode.type === 'BinaryExpression' ||
     exprNode.type === 'ConditionalExpression' ||
     exprNode.type === 'LogicalExpression' ||
+    exprNode.type === 'UnaryExpression' ||
     exprNode.type === 'TemplateLiteral'
   ) {
     return tryBuildFnSignal(exprNode, source, importedNames, localNames);
