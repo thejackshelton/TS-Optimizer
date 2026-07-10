@@ -141,3 +141,66 @@ export const C = component$(({...rest}) => {
     expect(code).toMatch(/\.\.\._getConstProps\(rest\),\s*flag:\s*true/);
   });
 });
+
+describe('_jsxSplit component with single spread partitions const props', () => {
+  // A component element with a single spread previously merged EVERY explicit
+  // prop into the var bag with a `null` const bag. Reactive props (`_fnSignal`
+  // WrappedSignals) mixed into the var bag alongside an event handler shift the
+  // runtime's positional handler resolution → a WrappedSignal is dispatched as
+  // the click handler (`fn.apply is not a function`). The const-classified
+  // props (reactive `_fnSignal` + literals) must land in the const bag while
+  // the inline event handler stays in var.
+  const input = `
+import { component$, useSignal } from '@qwik.dev/core';
+import { Cmp } from './cmp';
+export const C = component$((props) => {
+  const open = useSignal(false);
+  return <Cmp {...props} onClick$={open.value ? props.onClick$ : props.onDefault$} aria-hidden={!open.value} role="button" />;
+});
+`;
+
+  function jsxSplitCall(): string {
+    const result = transformModule({
+      input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
+      srcDir: mkFilePath('.'),
+      entryStrategy: { type: 'segment' },
+    });
+    const seg = result.modules.find(
+      (m) => m.kind === 'segment' && /_jsxSplit\(Cmp/.test(m.code),
+    );
+    if (!seg) throw new Error('Cmp _jsxSplit segment not found');
+    const line = seg.code.split('\n').find((l) => l.includes('_jsxSplit(Cmp'));
+    if (!line) throw new Error('_jsxSplit(Cmp ...) call not found');
+    return line;
+  }
+
+  function bags(call: string): { varBag: string; constBag: string } {
+    // _jsxSplit(Cmp, <varBag>, <constBag>, children, flags, key) — both bags
+    // are `{ … }` object literals; slice them by brace matching.
+    const open1 = call.indexOf('{');
+    const close1 = call.indexOf('}', open1);
+    const open2 = call.indexOf('{', close1);
+    const close2 = call.indexOf('}', open2);
+    return {
+      varBag: call.slice(open1, close1 + 1),
+      constBag: call.slice(open2, close2 + 1),
+    };
+  }
+
+  it('routes reactive _fnSignal and literal into the const bag (not a null bag)', () => {
+    const { constBag } = bags(jsxSplitCall());
+    expect(constBag).toMatch(/"aria-hidden":\s*_fnSignal/);
+    expect(constBag).toMatch(/role:\s*"button"/);
+  });
+
+  it('keeps the inline event handler and _getVarProps in the var bag', () => {
+    const { varBag } = bags(jsxSplitCall());
+    expect(varBag).toContain('..._getVarProps(props)');
+    expect(varBag).toMatch(/onClick\$:/);
+  });
+
+  it('never leaves a reactive _fnSignal in the var bag', () => {
+    const { varBag } = bags(jsxSplitCall());
+    expect(varBag).not.toContain('_fnSignal');
+  });
+});
