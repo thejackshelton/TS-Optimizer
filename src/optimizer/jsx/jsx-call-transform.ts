@@ -287,8 +287,10 @@ function wrapReactivePropValues(propsObj: AstNode, ctx: WrapReactiveContext): vo
   if (propsObj.type !== 'ObjectExpression') return;
   for (const prop of propsObj.properties ?? []) {
     if (prop.type !== 'Property') continue;
+    const key = propertyKeyName(prop);
+    if (isHandlerPropKey(key)) continue;
     const value = prop.value;
-    if (propertyKeyName(prop) === 'children' && value?.type === 'ArrayExpression') {
+    if (key === 'children' && value?.type === 'ArrayExpression') {
       for (const element of value.elements ?? []) {
         wrapReactiveValue(element, ctx);
       }
@@ -296,6 +298,13 @@ function wrapReactivePropValues(propsObj: AstNode, ctx: WrapReactiveContext): vo
     }
     wrapReactiveValue(value, ctx);
   }
+}
+
+/** A `$`-suffixed prop key (`onPointerEnter$`, `onClick$`, custom `*$`) is an
+ * event-handler / QRL marker whose value is a handler ref, not a reactive
+ * value — it must never be `_wrapProp`/`_fnSignal`-wrapped. */
+function isHandlerPropKey(key: string | null): boolean {
+  return key !== null && key.endsWith('$');
 }
 
 /** A `$`-suffixed member read (`props.onChange$`) is a QRL/handler ref, not a
@@ -487,6 +496,19 @@ function buildJsxSortedCall(
         }
         continue;
       }
+    }
+    // Signal-classifying a handler would route it through `_fnSignal`, which
+    // the runtime then dispatches as a reactive signal rather than a function.
+    if (isHandlerPropKey(keyName)) {
+      const handlerText = s.slice(prop.start, prop.end);
+      orderedEntries.push(handlerText);
+      if (isConstEventHandlerValue(prop.value)) {
+        constEntries.push(handlerText);
+      } else {
+        varEntries.push(handlerText);
+        hasVarEventHandler = true;
+      }
+      continue;
     }
     const entryText = s.slice(prop.start, prop.end);
     orderedEntries.push(entryText);

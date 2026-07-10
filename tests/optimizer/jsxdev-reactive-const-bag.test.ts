@@ -90,6 +90,33 @@ export const C = component$((props) => {
     expect(out).toMatch(/title:\s*_wrapProp\(props,\s*"title"\)/);
   });
 
+  test('a $-suffixed handler with a reactive ternary value stays a raw handler, not _fnSignal', () => {
+    const out = transform(`import { jsxDEV as _jsxDEV } from "@qwik.dev/core/jsx-dev-runtime";
+import { component$ } from '@qwik.dev/core';
+import { Inner } from './inner';
+import { useHover } from './hover';
+export const C = component$((props) => {
+  const hover = useHover();
+  return _jsxDEV(Inner, { onPointerEnter$: hover ? [hover.handleIn$, props.onPointerEnter$] : props.onPointerEnter$ }, void 0, false, undefined, this);
+});
+`);
+    expect(out).toMatch(/onPointerEnter\$:\s*hover\s*\?/);
+    expect(out).not.toMatch(/onPointerEnter\$:\s*_fnSignal/);
+    expect(out).not.toMatch(/_hf\d+\s*=\s*\([^)]*\)\s*=>\s*[^;]*handleIn\$/);
+  });
+
+  test('a $-suffixed handler value lands in the var-props bag, not the const bag', () => {
+    const out = transform(`import { jsxDEV as _jsxDEV } from "@qwik.dev/core/jsx-dev-runtime";
+import { component$ } from '@qwik.dev/core';
+import { Inner } from './inner';
+export const C = component$((props) => {
+  const cb = props.onClose$;
+  return _jsxDEV(Inner, { onClose$: cb ? cb : props.onClose$ }, void 0, false, undefined, this);
+});
+`);
+    expect(out).toMatch(/_jsxSorted\(Inner,\s*\{\s*onClose\$:/);
+  });
+
   test('a spread on a component element emits _jsxSplit with _getVarProps/_getConstProps', () => {
     const out = transform(`import { jsxDEV as _jsxDEV } from "@qwik.dev/core/jsx-dev-runtime";
 import { component$ } from '@qwik.dev/core';
