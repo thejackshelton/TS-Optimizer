@@ -124,10 +124,48 @@ import { Inner } from './inner';
 export const Wrapper = component$((props) => {
   return _jsxDEV(Inner, { tabIndex: -1, ...props, id: "x" }, void 0, false, undefined, this);
 });
-`);
-    expect(out).toContain('_jsxSplit(Inner,');
-    expect(out).toMatch(/\.\.\._getVarProps\(props\)/);
-    expect(out).toMatch(/\.\.\._getConstProps\(props\)/);
-    expect(out).toMatch(/_jsxSplit\(Inner,\s*\{[^}]*tabIndex[^}]*_getVarProps\(props\)[^}]*_getConstProps\(props\)[^}]*id:[^}]*\},\s*null/);
+`).replace(/\s+/g, ' ');
+    expect(out).toMatch(
+      /_jsxSplit\(Inner, \{ tabIndex: -1, \.\.\._getVarProps\(props\) \}, \{ \.\.\._getConstProps\(props\), id: "x" \}/,
+    );
+  });
+
+  test('a trailing spread with no var prop after it emits a bare _getConstProps const bag', () => {
+    const out = transform(`import { jsxDEV as _jsxDEV } from "@qwik.dev/core/jsx-dev-runtime";
+import { component$ } from '@qwik.dev/core';
+import { Inner } from './inner';
+export const Wrapper = component$((props) => {
+  return _jsxDEV(Inner, { id: "x", ...props }, void 0, false, undefined, this);
+});
+`).replace(/\s+/g, ' ');
+    expect(out).toMatch(
+      /_jsxSplit\(Inner, \{ id: "x", \.\.\._getVarProps\(props\) \}, _getConstProps\(props\),/,
+    );
+  });
+
+  test('a $-handler after the last spread stays in the var bag while const props partition out', () => {
+    const out = transform(`import { jsxDEV as _jsxDEV } from "@qwik.dev/core/jsx-dev-runtime";
+import { component$ } from '@qwik.dev/core';
+import { Inner } from './inner';
+export const Wrapper = component$((props) => {
+  return _jsxDEV(Inner, { ...props, role: "switch", onChange$: props.onChange$ }, void 0, false, undefined, this);
+});
+`).replace(/\s+/g, ' ');
+    expect(out).toMatch(
+      /_jsxSplit\(Inner, \{ \.\.\._getVarProps\(props\), \.\.\._getConstProps\(props\), onChange\$: props\.onChange\$ \}, \{ role: "switch" \}/,
+    );
+  });
+
+  test('a shorthand prop stays in the var bag even when its value is a const expression', () => {
+    const out = transform(`import { jsxDEV as _jsxDEV } from "@qwik.dev/core/jsx-dev-runtime";
+import { component$ } from '@qwik.dev/core';
+import { Inner, sharedId } from './inner';
+export const Wrapper = component$((props) => {
+  return _jsxDEV(Inner, { ...props, sharedId }, void 0, false, undefined, this);
+});
+`).replace(/\s+/g, ' ');
+    expect(out).toMatch(
+      /_jsxSplit\(Inner, \{ \.\.\._getVarProps\(props\), \.\.\._getConstProps\(props\), sharedId \}, null,/,
+    );
   });
 });

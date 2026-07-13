@@ -1,34 +1,27 @@
 /**
  * Transform `jsx(Tag, propsObj)` / `jsxs(...)` / `jsxDEV(...)` CallExpressions
- * into `_jsxSorted(tag, varProps, constProps, children, flags, key)` form.
+ * into `_jsxSorted(...)` / `_jsxSplit(...)` form. This is the pre-transformed
+ * JSX path: a bundler (esbuild/oxc) or a peer tool (`qwik-react`'s codegen)
+ * lowers `<Tag ... />` to a JSX-factory call before the optimizer runs, and
+ * those calls must still land as the runtime helper form in the output.
  *
- * Mirrors SWC's `handle_jsx` (see `swc-reference-only/transform.rs:1163`).
- * The peer-tool input pattern this is for: `qwik-react`'s codegen emits
- * `jsx(...)` calls directly (pre-processed from JSX syntax) instead of leaving
- * JSX for the optimizer to rewrite. Those calls must still land as
- * `_jsxSorted(...)` in the optimized output. Convergence-test target:
- * `example_qwik_react`.
+ * Handled:
+ *   - `jsx(Tag, propsObj)` / `jsx(Tag, propsObj, keyArg)` — 2- and 3-arg forms.
+ *   - `children` property inside propsObj (static/dynamic classification).
+ *   - Event-handler key rewriting on HTML tags (`onClick$` → `"q-e:click"`).
+ *   - Signal analysis on prop values (`X.field` → `_wrapProp` / `_fnSignal`).
+ *   - Spread props → `_jsxSplit`, partitioning the forwarded keys across the
+ *     var/const bags (see `partitionSpreadProps`).
  *
- * Scope is intentionally narrow — handles the patterns that appear in the
- * qwik_react fixture:
- *   - `jsx(Tag, propsObj)` — 2-arg form, optional `children` property inside
- *     propsObj, every other prop classified as var (no const-folding).
- *   - `jsx(Tag, propsObj, keyArg)` — 3-arg form with explicit key.
- *
- * Skipped (matches SWC at `transform.rs:1166-1168`):
- *   - propsObj that isn't an ObjectExpression literal (e.g. `jsx(Tag, props)`
- *     where props is an Identifier — the optimizer leaves the call alone since
- *     it can't statically analyse the prop bag).
- *
- * Not handled here (future work if needed by other peer tools):
- *   - Spread props inside propsObj.
- *   - `bind:*` handling (no fixture exercises this in `jsx()` form).
- *   - Signal analysis on prop values (varProps are passed through verbatim).
+ * Skipped: a propsObj that isn't an ObjectExpression literal (e.g.
+ * `jsx(Tag, props)` where props is an Identifier) — the prop bag can't be
+ * statically analysed, so the call is left alone.
  */
 
 import type MagicString from 'magic-string';
 import { walk } from 'oxc-walker';
 import type { AstNode, AstProgram } from '../../ast-types.js';
+import { someAstChild } from '../ast/guards.js';
 import {
   computeJsxFlags,
   collectScopeAwareBindings,
@@ -387,6 +380,55 @@ function classifyProp(
   return 'var';
 }
 
+/**
+ * Whether a prop positioned after all spreads belongs in `_jsxSplit`'s const
+ * bag. `reactiveConst` is the prop's `classifyProp` result (already computed by
+ * the caller): it covers HTML reactive reads whose object/deps are stable and
+ * every component reactive read backed by `_wrapProp`. A static const
+ * expression joins the const bag too. On a component element every reactive
+ * read is const — the host can't override a forwarded reactive prop — so an
+ * `_fnSignal` with unstable deps that `classifyProp` left var is promoted here.
+ */
+function constBagEligible(
+  valueNode: AstNode,
+  opts: JsxCallTransformOptions,
+  isHtmlTag: boolean,
+  reactiveConst: boolean,
+  s: MagicString,
+): boolean {
+  if (reactiveConst || isConstExpr(valueNode, opts)) return true;
+  if (isHtmlTag) return false;
+  const importedNames = (opts.importedNames ?? EMPTY_SET) as Set<string>;
+  const localNames = opts.localNames as Set<string> | undefined;
+  const sig = analyzeSignalExpression(valueNode, s.original, importedNames, localNames);
+  if (sig.type === 'wrapProp') return true;
+  return sig.type === 'fnSignal' && opts.signalHoister !== undefined && isHoistableSignalExpr(valueNode);
+}
+
+/**
+ * An expression is const unless — without crossing an arrow-function boundary —
+ * it contains a call, a member access, or an identifier that is neither
+ * imported nor bound to a const. Non-computed object-property keys are labels,
+ * not value references, and are skipped.
+ */
+function isConstExpr(node: AstNode, opts: JsxCallTransformOptions): boolean {
+  const importedNames = (opts.importedNames ?? EMPTY_SET) as Set<string>;
+  const bindings = opts.bindings;
+  const check = (n: AstNode): boolean => {
+    if (n.type === 'CallExpression' || n.type === 'MemberExpression') return false;
+    if (n.type === 'ArrowFunctionExpression') return true;
+    if (n.type === 'Identifier') {
+      return isConstBindingName(n.name, importedNames, bindings, n.start ?? 0);
+    }
+    return !someAstChild(n, (child, key, parent) => isValueChild(key, parent) && !check(child));
+  };
+  return check(node);
+}
+
+function isValueChild(key: string, parent: AstNode): boolean {
+  return !(key === 'key' && parent.type === 'Property' && !parent.computed);
+}
+
 function staticPropName(member: AstNode): string | null {
   if (member.type !== 'MemberExpression' || !member.property) return null;
   if (!member.computed && member.property.type === 'Identifier') return member.property.name;
@@ -399,9 +441,76 @@ function staticPropName(member: AstNode): string | null {
 }
 
 /**
- * Build the `_jsxSorted(tag, varProps, null, children, flags, key)` string
- * for one `jsx(Tag, propsObj, ...)` call. Returns null if the call can't be
- * rewritten (caller leaves it alone).
+ * One prop in source order for the spread partition. `isConst` picks the bag
+ * the prop lands in; `rawConst` is whether the *raw value* is a const
+ * expression, which governs whether a following spread's const props merge into
+ * the var bag. The two differ for a component's reactive prop — const bag, yet
+ * its member-read value isn't a const expression.
+ */
+type PropSlot =
+  | { readonly kind: 'spread'; readonly getVar: string; readonly getConst: string }
+  | {
+      readonly kind: 'named';
+      readonly text: string;
+      readonly isConst: boolean;
+      readonly rawConst: boolean;
+    };
+
+/**
+ * Partition a spread-carrying prop list into `_jsxSplit`'s var/const bags.
+ *
+ * A named prop before any remaining spread lands in the var bag even when
+ * statically const — a later spread can override it, so the runtime must
+ * re-check. A named prop after all spreads keeps its static classification.
+ * Each spread contributes `_getVarProps(x)` to the var bag; its
+ * `_getConstProps(x)` joins the var bag when the spread is non-final or a var
+ * prop follows the last spread, and the const bag otherwise.
+ */
+function partitionSpreadProps(slots: readonly PropSlot[]): {
+  varBag: string[];
+  constBag: string[];
+} {
+  const lastSpreadIndex = slots.reduce(
+    (acc, slot, i) => (slot.kind === 'spread' ? i : acc),
+    -1,
+  );
+  const hasVarPropAfterLastSpread = slots.some(
+    (slot, i) => i > lastSpreadIndex && slot.kind === 'named' && !slot.rawConst,
+  );
+
+  let spreadRemaining = slots.filter((slot) => slot.kind === 'spread').length;
+  const varBag: string[] = [];
+  const constBag: string[] = [];
+  for (const slot of slots) {
+    if (slot.kind === 'spread') {
+      varBag.push(slot.getVar);
+      if (spreadRemaining > 1 || hasVarPropAfterLastSpread) varBag.push(slot.getConst);
+      else constBag.push(slot.getConst);
+      spreadRemaining--;
+    } else if (spreadRemaining > 0 || !slot.isConst) {
+      varBag.push(slot.text);
+    } else {
+      constBag.push(slot.text);
+    }
+  }
+  return { varBag, constBag };
+}
+
+/** A const bag holding exactly one forwarded `_getConstProps(x)` renders as the
+ * bare call; anything else is an object literal (or null when empty). */
+function renderConstBag(constBag: readonly string[]): string {
+  if (constBag.length === 0) return 'null';
+  if (constBag.length === 1 && constBag[0].startsWith('..._getConstProps(')) {
+    return constBag[0].slice('...'.length);
+  }
+  return `{ ${constBag.join(', ')} }`;
+}
+
+/**
+ * Build the `_jsxSorted`/`_jsxSplit` string for one `jsx(Tag, propsObj, ...)`
+ * call, classifying each prop into the var or const bag (and partitioning a
+ * spread's forwarded props). Returns null if the call can't be rewritten
+ * (caller leaves it alone).
  */
 function buildJsxSortedCall(
   s: MagicString,
@@ -439,7 +548,8 @@ function buildJsxSortedCall(
   let hasVarEventHandler = false;
   const varEntries: string[] = [];
   const constEntries: string[] = [];
-  const orderedEntries: string[] = [];
+  // Source-ordered prop record consumed by the spread partition below.
+  const slots: PropSlot[] = [];
   const spreadArgs: string[] = [];
   // Union of `q:p`/`q:ps` capture params across all const event handlers on
   // this element (an element with two capturing handlers shares one prop).
@@ -448,7 +558,11 @@ function buildJsxSortedCall(
     if (prop.type === 'SpreadElement') {
       const spreadArg = s.slice(prop.argument.start, prop.argument.end);
       spreadArgs.push(spreadArg);
-      orderedEntries.push(`..._getVarProps(${spreadArg})`, `..._getConstProps(${spreadArg})`);
+      slots.push({
+        kind: 'spread',
+        getVar: `..._getVarProps(${spreadArg})`,
+        getConst: `..._getConstProps(${spreadArg})`,
+      });
       continue;
     }
     if (prop.type !== 'Property') return null;
@@ -457,6 +571,15 @@ function buildJsxSortedCall(
       const value = prop.value;
       childrenText = s.slice(value.start, value.end);
       childrenIsDynamic = !isStaticChildren(value, opts.reactiveBindings ?? new Set());
+      continue;
+    }
+    // A shorthand property (`{ id }`, `{ onClick$ }`) is a plain variable
+    // reference the runtime always classifies as a var prop.
+    if (prop.shorthand === true) {
+      const entryText = s.slice(prop.start, prop.end);
+      varEntries.push(entryText);
+      slots.push({ kind: 'named', text: entryText, isConst: false, rawConst: false });
+      if (isHandlerPropKey(keyName)) hasVarEventHandler = true;
       continue;
     }
     // Rewrite event-handler prop keys on HTML tags from the marker form
@@ -473,9 +596,11 @@ function buildJsxSortedCall(
         // in the const bag, finding nothing, and never wiring the event.
         // Anything else (an inline arrow, a computed value) is a var handler
         // and drops the flag bit.
+        const eventEntry = `"${transformed}": ${valueText}`;
+        const rawConst = isConstExpr(prop.value, opts);
         if (isConstEventHandlerValue(prop.value)) {
-          constEntries.push(`"${transformed}": ${valueText}`);
-          orderedEntries.push(`"${transformed}": ${valueText}`);
+          constEntries.push(eventEntry);
+          slots.push({ kind: 'named', text: eventEntry, isConst: true, rawConst });
           // A const handler delivers its captures positionally; record them
           // so the element emits one `q:p`/`q:ps` prop below.
           const handlerQp = opts.qpByQrl?.get(valueText);
@@ -485,8 +610,8 @@ function buildJsxSortedCall(
             }
           }
         } else {
-          varEntries.push(`"${transformed}": ${valueText}`);
-          orderedEntries.push(`"${transformed}": ${valueText}`);
+          varEntries.push(eventEntry);
+          slots.push({ kind: 'named', text: eventEntry, isConst: false, rawConst });
           hasVarEventHandler = true;
         }
         continue;
@@ -494,8 +619,9 @@ function buildJsxSortedCall(
     }
     if (isHandlerPropKey(keyName)) {
       const handlerText = s.slice(prop.start, prop.end);
-      orderedEntries.push(handlerText);
-      if (isConstEventHandlerValue(prop.value)) {
+      const isConst = isConstEventHandlerValue(prop.value);
+      slots.push({ kind: 'named', text: handlerText, isConst, rawConst: isConstExpr(prop.value, opts) });
+      if (isConst) {
         constEntries.push(handlerText);
       } else {
         varEntries.push(handlerText);
@@ -504,11 +630,14 @@ function buildJsxSortedCall(
       continue;
     }
     const entryText = s.slice(prop.start, prop.end);
-    orderedEntries.push(entryText);
-    const bag = classifyProp(prop.value, opts, isHtmlTag, s) === 'const'
-      ? constEntries
-      : varEntries;
-    bag.push(entryText);
+    const reactiveConst = classifyProp(prop.value, opts, isHtmlTag, s) === 'const';
+    (reactiveConst ? constEntries : varEntries).push(entryText);
+    slots.push({
+      kind: 'named',
+      text: entryText,
+      isConst: constBagEligible(prop.value, opts, isHtmlTag, reactiveConst, s),
+      rawConst: isConstExpr(prop.value, opts),
+    });
   }
 
   // Optional 3rd arg: explicit key. Maps to the 6th `_jsxSorted` arg.
@@ -528,11 +657,12 @@ function buildJsxSortedCall(
   // The element's `q:p`/`q:ps` capture prop goes in the VAR bag (the captured
   // values can change between renders), ahead of any other var props —
   // matching SWC's emit order. Its presence sets the `moved_captures` flag.
+  let qpEntry: string | null = null;
   if (qpParams.length > 0) {
     const qp = buildCaptureProp(qpParams, true);
     if (qp) {
-      varEntries.unshift(`"${qp.propName}": ${qp.propValue}`);
-      orderedEntries.unshift(`"${qp.propName}": ${qp.propValue}`);
+      qpEntry = `"${qp.propName}": ${qp.propValue}`;
+      varEntries.unshift(qpEntry);
     }
   }
 
@@ -542,16 +672,19 @@ function buildJsxSortedCall(
     : childrenIsDynamic ? 'dynamic' : 'static';
 
   // A `{...spread}` forwards props whose var/const split isn't statically
-  // known; `_jsxSplit` lets the runtime classify the forwarded keys. Lumping
-  // the spread into a `_jsxSorted` var bag would make every forwarded prop
-  // host-reactive (over-subscribing the host on SSR).
+  // known; `_jsxSplit` lets the runtime classify the forwarded keys. Props
+  // after all spreads keep their static const/var split (a later spread can't
+  // override them); props before a spread are var (it can).
   if (spreadArgs.length > 0) {
     opts.neededImports.add('_jsxSplit');
     opts.neededImports.add('_getVarProps');
     opts.neededImports.add('_getConstProps');
+    const { varBag, constBag } = partitionSpreadProps(slots);
+    if (qpEntry !== null) varBag.unshift(qpEntry);
+    const varPropsPart = varBag.length > 0 ? `{ ${varBag.join(', ')} }` : 'null';
+    const constPropsPart = renderConstBag(constBag);
     const splitFlags = qpParams.length > 0 ? 4 : 0;
-    const bag = orderedEntries.length > 0 ? `{ ${orderedEntries.join(', ')} }` : 'null';
-    return `/*#__PURE__*/ _jsxSplit(${tag}, ${bag}, null, ${childrenSlot}, ${splitFlags}, ${keyText})`;
+    return `/*#__PURE__*/ _jsxSplit(${tag}, ${varPropsPart}, ${constPropsPart}, ${childrenSlot}, ${splitFlags}, ${keyText})`;
   }
 
   const varPropsText = varEntries.length > 0 ? `{ ${varEntries.join(', ')} }` : 'null';
