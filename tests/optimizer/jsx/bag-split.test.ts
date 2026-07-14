@@ -143,13 +143,6 @@ export const C = component$(({...rest}) => {
 });
 
 describe('_jsxSplit component with single spread partitions const props', () => {
-  // A component element with a single spread previously merged EVERY explicit
-  // prop into the var bag with a `null` const bag. Reactive props (`_fnSignal`
-  // WrappedSignals) mixed into the var bag alongside an event handler shift the
-  // runtime's positional handler resolution → a WrappedSignal is dispatched as
-  // the click handler (`fn.apply is not a function`). The const-classified
-  // props (reactive `_fnSignal` + literals) must land in the const bag while
-  // the inline event handler stays in var.
   const input = `
 import { component$, useSignal } from '@qwik.dev/core';
 import { Cmp } from './cmp';
@@ -175,8 +168,6 @@ export const C = component$((props) => {
   }
 
   function bags(call: string): { varBag: string; constBag: string } {
-    // _jsxSplit(Cmp, <varBag>, <constBag>, children, flags, key) — both bags
-    // are `{ … }` object literals; slice them by brace matching.
     const open1 = call.indexOf('{');
     const close1 = call.indexOf('}', open1);
     const open2 = call.indexOf('{', close1);
