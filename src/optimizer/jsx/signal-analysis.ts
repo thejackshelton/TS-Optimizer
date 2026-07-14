@@ -960,8 +960,6 @@ export function analyzeSignalExpression(
     return { type: 'fnSignal', deps: allDeps, hoistedFn, hoistedStr };
   }
 
-  // Compound expressions. `tryBuildFnSignal` no-ops without a reactive root,
-  // so a plain `!open` is left alone while `!signal.value` hoists.
   if (
     exprNode.type === 'BinaryExpression' ||
     exprNode.type === 'ConditionalExpression' ||

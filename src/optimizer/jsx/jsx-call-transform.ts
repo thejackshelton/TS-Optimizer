@@ -300,15 +300,10 @@ function wrapReactivePropValues(propsObj: AstNode, ctx: WrapReactiveContext): vo
   }
 }
 
-/** A `$`-suffixed prop key (`onPointerEnter$`, `onClick$`, custom `*$`) is an
- * event-handler / QRL marker whose value is a handler ref, not a reactive
- * value — it must never be `_wrapProp`/`_fnSignal`-wrapped. */
 function isHandlerPropKey(key: string | null): boolean {
   return key !== null && key.endsWith('$');
 }
 
-/** A `$`-suffixed member read (`props.onChange$`) is a QRL/handler ref, not a
- * reactive value — it stays raw rather than becoming `_wrapProp(...)`. */
 function isDollarSuffixedMemberRead(node: AstNode): boolean {
   return (
     node.type === 'MemberExpression' &&
@@ -497,8 +492,6 @@ function buildJsxSortedCall(
         continue;
       }
     }
-    // Signal-classifying a handler would route it through `_fnSignal`, which
-    // the runtime then dispatches as a reactive signal rather than a function.
     if (isHandlerPropKey(keyName)) {
       const handlerText = s.slice(prop.start, prop.end);
       orderedEntries.push(handlerText);
