@@ -396,12 +396,6 @@ function constBagEligible(
   return sig.type === 'fnSignal' && opts.signalHoister !== undefined && isHoistableSignalExpr(valueNode);
 }
 
-/**
- * An expression is const unless — without crossing an arrow-function boundary —
- * it contains a call, a member access, or an identifier that is neither
- * imported nor bound to a const. Non-computed object-property keys are labels,
- * not value references, and are skipped.
- */
 function isConstExpr(node: AstNode, opts: JsxCallTransformOptions): boolean {
   const importedNames = (opts.importedNames ?? EMPTY_SET) as Set<string>;
   const bindings = opts.bindings;
