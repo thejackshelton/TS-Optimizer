@@ -380,11 +380,6 @@ function classifyProp(
   return 'var';
 }
 
-/**
- * Whether a prop after all spreads belongs in `_jsxSplit`'s const bag. On a
- * component element a reactive read is always const — the host can't override a
- * forwarded reactive prop — so such props promote here even when left var.
- */
 function constBagEligible(
   valueNode: AstNode,
   opts: JsxCallTransformOptions,
