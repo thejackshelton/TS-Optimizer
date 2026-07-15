@@ -381,13 +381,9 @@ function classifyProp(
 }
 
 /**
- * Whether a prop positioned after all spreads belongs in `_jsxSplit`'s const
- * bag. `reactiveConst` is the prop's `classifyProp` result (already computed by
- * the caller): it covers HTML reactive reads whose object/deps are stable and
- * every component reactive read backed by `_wrapProp`. A static const
- * expression joins the const bag too. On a component element every reactive
- * read is const — the host can't override a forwarded reactive prop — so an
- * `_fnSignal` with unstable deps that `classifyProp` left var is promoted here.
+ * Whether a prop after all spreads belongs in `_jsxSplit`'s const bag. On a
+ * component element a reactive read is always const — the host can't override a
+ * forwarded reactive prop — so such props promote here even when left var.
  */
 function constBagEligible(
   valueNode: AstNode,
