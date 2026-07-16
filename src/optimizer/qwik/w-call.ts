@@ -12,6 +12,26 @@
  * `rewrite/index.ts`.
  */
 
+import type { AstNode } from '../../ast-types.js';
+
+/**
+ * True when `node` is a `q_<sym>.w([captures])` call — a capture-wrapping
+ * invocation on a hoisted QRL binding. `q_<sym>` is a module-scope const and
+ * `.w(…)` only attaches captures, so the call's identity is stable; it
+ * classifies as const in component-prop position.
+ */
+export function isCaptureWrappingQrlCall(node: AstNode): boolean {
+  if (node.type !== 'CallExpression') return false;
+  const callee = node.callee;
+  return (
+    callee?.type === 'MemberExpression' &&
+    callee.object?.type === 'Identifier' &&
+    callee.object.name.startsWith('q_') &&
+    callee.property?.type === 'Identifier' &&
+    callee.property.name === 'w'
+  );
+}
+
 /** The `.w([captures])` suffix, without the leading QRL variable. */
 export function wCallSuffix(
   captures: readonly string[],

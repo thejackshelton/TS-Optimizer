@@ -13,6 +13,7 @@ import type {
   ImportSpecifier,
 } from '../../ast-types.js';
 import { parseWithRawTransfer } from '../ast/parse.js';
+import { applyReplacements } from '../edit/range-replace.js';
 import type { ExtractionResult } from '../extraction/extract.js';
 import type { TransformModule } from '../types/types.js';
 import type { RelativePath } from '../types/brands.js';
@@ -329,20 +330,7 @@ export function applySegmentSideEffectSimplification(
     });
   }
 
-  if (replacements.length === 0) return code;
-
-  // Positions are now absolute (relative to `code`) since we parsed the
-  // full source. Apply right-to-left so prior replacements don't shift
-  // remaining offsets.
-  let result = code;
-  replacements.sort((a, b) => b.start - a.start);
-  for (const replacement of replacements) {
-    result =
-      result.slice(0, replacement.start) +
-      replacement.replacement +
-      result.slice(replacement.end);
-  }
-  return result;
+  return applyReplacements(code, replacements);
 }
 
 export function removeUnusedImports(
