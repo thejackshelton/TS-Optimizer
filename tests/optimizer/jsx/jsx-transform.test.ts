@@ -19,7 +19,7 @@ import {
   type JsxTransformContext,
 } from '../../../src/optimizer/jsx/jsx.js';
 import { SignalHoister } from '../../../src/optimizer/jsx/signal-analysis.js';
-import type { Expression, JSXElement, JSXFragment } from '../../../src/ast-types.js';
+import { parseExpr, parseJsxElement, parseJsxFragment } from '../helpers/parse-nodes.js';
 import MagicString from 'magic-string';
 
 function makeCtx(
@@ -29,47 +29,6 @@ function makeCtx(
   keyCounter: JsxKeyCounter,
 ): JsxTransformContext {
   return { source, s, importedNames, keyCounter, signalHoister: new SignalHoister() };
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function parseExpr(code: string): Expression {
-  const { program } = parseSync('test.tsx', `const x = ${code};`);
-  const decl = program.body[0];
-  if (decl.type !== 'VariableDeclaration') {
-    throw new Error(`expected VariableDeclaration, got ${decl.type}`);
-  }
-  const init = decl.declarations[0]?.init;
-  if (!init) throw new Error('expected an initializer expression');
-  return init;
-}
-
-function parseExprStatement(source: string): Expression {
-  const { program } = parseSync('test.tsx', source);
-  const stmt = program.body[0];
-  if (stmt.type !== 'ExpressionStatement') {
-    throw new Error(`expected ExpressionStatement, got ${stmt.type}`);
-  }
-  return stmt.expression;
-}
-
-// Parse bare source (not wrapped in `const x = `) so node positions align with `MagicString(source)`.
-function parseJsxElement(source: string): JSXElement {
-  const expr = parseExprStatement(source);
-  if (expr.type !== 'JSXElement') {
-    throw new Error(`expected JSXElement, got ${expr.type}`);
-  }
-  return expr;
-}
-
-function parseJsxFragment(source: string): JSXFragment {
-  const expr = parseExprStatement(source);
-  if (expr.type !== 'JSXFragment') {
-    throw new Error(`expected JSXFragment, got ${expr.type}`);
-  }
-  return expr;
 }
 
 // ---------------------------------------------------------------------------
