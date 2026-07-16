@@ -27,12 +27,6 @@ import {
 // `forEachAstChild` passes through and lets discriminated-union
 // narrowing (`node.type === 'X'`) type the field accesses below.
 
-/**
- * Walk a subtree collecting `const <name> = <literal>` values for the names in
- * `captureSet`. `init.start`/`init.end` are source-absolute; `offset` maps them
- * into `source` — the wrapper-prefix length when the body was wrapped and
- * reparsed, `0` when walking an already-parsed closure node.
- */
 function collectConstLiteralValues(
   root: AstNode | null | undefined,
   source: string,
