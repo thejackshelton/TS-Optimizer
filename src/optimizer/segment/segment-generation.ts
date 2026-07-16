@@ -33,6 +33,7 @@ import { getDirectory } from "../../paths.js";
 import { resolveEntryField } from "./entry-strategy.js";
 import { buildQrlDeclaration } from "../rewrite/rewrite-calls.js";
 import { getQrlCalleeName } from "../qwik/qrl-naming.js";
+import { isHtmlElement } from "../jsx/jsx.js";
 import { buildQrlDevDeclaration } from "./dev-mode.js";
 import { generateStrippedSegmentCode } from "./strip-ctx.js";
 import { hasUnderscorePlaceholderParams, isStrippedExtraction } from "../rewrite/predicates.js";
@@ -1623,8 +1624,7 @@ function countJsxKeysInNode(root: AstNode): number {
     if (!n || n.type !== 'JSXElement') return false;
     const name = n.openingElement?.name;
     if (!name || name.type !== 'JSXIdentifier') return false;
-    const first = name.name[0];
-    return !!first && first === first.toLowerCase() && first >= 'a' && first <= 'z';
+    return isHtmlElement(name.name);
   }
   function walk(
     n: AstNode | null | undefined,
