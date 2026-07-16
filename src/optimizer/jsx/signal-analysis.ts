@@ -264,29 +264,6 @@ function isDeepStoreAccess(
 }
 
 /**
- * Collect all non-imported identifier names from an expression.
- * Used for complex `.value` objects like `(a || b).value`.
- */
-function collectIdentifiersFromExpr(
-  node: AstMaybeNode,
-  importedNames: Set<string>,
-  seen: Set<string>,
-  roots: string[],
-): void {
-  if (node == null) return;
-  if (node.type === 'Identifier') {
-    if (!importedNames.has(node.name) && !seen.has(node.name)) {
-      seen.add(node.name);
-      roots.push(node.name);
-    }
-    return;
-  }
-  forEachAstChild(node, (child) => {
-    collectIdentifiersFromExpr(child, importedNames, seen, roots);
-  });
-}
-
-/**
  * Unified single-walk collector for signal-analysis dependencies.
  *
  * Returns both `roots` (reactive roots in order of first appearance) AND
@@ -299,7 +276,7 @@ function collectIdentifiersFromExpr(
  *   `localNames` flow through bare-ident collection (via the leftmost-
  *   Identifier visit) and appear in `allDeps` after the alphabetical sort.
  * - Complex `.value` objects (e.g. `(a || b).value`) use the
- *   `collectIdentifiersFromExpr` fallback for BOTH outputs.
+ *   `fallbackCollectIdents` fallback for BOTH outputs.
  * - The Property.key / non-computed MemberExpression.property exclusion
  *   is applied for both outputs. Safe for roots because signal/store
  *   detection happens at the MemberExpression level, not the property

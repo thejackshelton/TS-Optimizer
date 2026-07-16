@@ -64,7 +64,6 @@ export {
   propagateConstLiteralsInBody,
 } from './const-propagation.js';
 export {
-  applyRawPropsTransformDetailed,
   extractDestructuredFieldMap,
   extractDestructuredFieldDefaultsMap,
   extractDestructuredFieldInfo,
@@ -73,7 +72,6 @@ export {
   bodyConsolidatesToRawProps,
   consolidateQpCaptureValues,
   type DestructuredFieldInfo,
-  type RawPropsTransformResult,
 } from './raw-props.js';
 export { transformInlineSegmentBody } from './inline-body.js';
 
