@@ -14,6 +14,7 @@ import type {
 } from '../../ast-types.js';
 import { parseWithRawTransfer } from '../ast/parse.js';
 import { applyReplacements } from '../edit/range-replace.js';
+import { isLibModePreservedMarker } from '../qwik/qrl-naming.js';
 import type { ExtractionResult } from '../extraction/extract.js';
 import type { TransformModule } from '../types/types.js';
 import type { RelativePath } from '../types/brands.js';
@@ -450,8 +451,7 @@ export function removeUnusedImports(
       const importedName = spec.specNode.type === 'ImportSpecifier'
         ? (getImportedSpecifierName(spec.specNode) ?? spec.localName)
         : spec.localName;
-      if (importedName.length > 1 && importedName.endsWith('$') &&
-          importSource === '@qwik.dev/core') {
+      if (isLibModePreservedMarker(importedName) && importSource === '@qwik.dev/core') {
         return false;
       }
       if (importedName === 'jsx' && importSource === '@qwik.dev/core/jsx-runtime') {

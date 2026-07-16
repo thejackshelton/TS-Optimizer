@@ -27,6 +27,7 @@ import {
   needsPureAnnotation,
   getQrlCalleeName,
 } from './rewrite-calls.js';
+import { isLibModePreservedMarker } from '../qwik/qrl-naming.js';
 import { isEventHandlerOrJsxProp, isStrippedExtraction, matchesRegCtxName } from './predicates.js';
 import { transformEventPropName } from '../jsx/event-handlers.js';
 import { transformAllJsx, JsxKeyCounter, type ScopeAwareCollectResult } from '../jsx/jsx.js';
@@ -365,13 +366,7 @@ function processImports(ctx: RewriteContext): void {
       if (spec.type !== 'ImportSpecifier') continue;
       const importedName = importedSpecifierName(spec);
       if (isMarkerSpecifier(importedName, extractedCalleeNames)) {
-        // lib mode preserves the user-facing `*$`-suffix markers
-        // alongside their rewritten `*Qrl` forms — downstream library
-        // consumers may re-import `component$`, `useStyle$`, etc. for
-        // composition or re-export. The bare `$` marker is still stripped
-        // (no marker-function semantics post-extraction; SWC also strips
-        // it from its lib-mode expected output).
-        if (isLibMode && importedName.length > 1 && importedName.endsWith('$')) {
+        if (isLibMode && isLibModePreservedMarker(importedName)) {
           continue;
         }
         toRemove.push(i);
