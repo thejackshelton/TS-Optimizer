@@ -166,11 +166,6 @@ export function injectUseHmr(
   return result;
 }
 
-/**
- * Insert `_useHmr("<devFile>")` as the first statement of a component
- * function body. An expression body is rewritten into a block so the call
- * has somewhere to live; import wiring is the caller's concern.
- */
 function injectHmrCallIntoFunctionBody(
   code: string,
   fnBody: NonNullable<AstFunction['body']>,
@@ -193,16 +188,6 @@ function injectHmrCallIntoFunctionBody(
   return s.toString();
 }
 
-/**
- * Inject `_useHmr("<devFile>")` into a bare component body expression
- * (`(props) => { … }`) as emitted by the inline/hoist path, where the body
- * lives in the parent module rather than a standalone segment export. The
- * hook must be present here as well as in the segment (client) body — its
- * absence on one side leaves the component's serialized hook layout
- * inconsistent between SSR and client re-render. The `_useHmr` import is the
- * caller's concern. Returns the body unchanged if it isn't a single
- * arrow/function expression.
- */
 export function injectUseHmrIntoInlineBody(bodyText: string, devFile: string): string {
   let program: AstProgram;
   try {

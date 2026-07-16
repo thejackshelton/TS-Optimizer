@@ -371,9 +371,6 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
       sigRewrittenBody = rewriteFunctionSignature(rawBody, ext.paramNames);
     }
 
-    // The HMR hook alters a component's serialized layout, so an inline/hoist
-    // (SSR) body missing it desyncs from the segment (client) body that has
-    // it — breaking vnode ref resolution on re-render.
     if (ctx.mode === 'hmr' && ctx.devFilePath && isAnyComponentCtx(ext.ctxName)) {
       sigRewrittenBody = injectUseHmrIntoInlineBody(sigRewrittenBody, ctx.devFilePath);
       neededImports.set('_useHmr', '@qwik.dev/core');
