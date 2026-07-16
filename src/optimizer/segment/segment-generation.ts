@@ -34,6 +34,7 @@ import { resolveEntryField } from "./entry-strategy.js";
 import { buildQrlDeclaration } from "../rewrite/rewrite-calls.js";
 import { getQrlCalleeName } from "../qwik/qrl-naming.js";
 import { isHtmlElement } from "../jsx/jsx.js";
+import { resolveSameFileImportName } from "./import-collection.js";
 import { buildQrlDevDeclaration } from "./dev-mode.js";
 import { generateStrippedSegmentCode } from "./strip-ctx.js";
 import { hasUnderscorePlaceholderParams, isStrippedExtraction } from "../rewrite/predicates.js";
@@ -892,16 +893,10 @@ function resolveMovedDeclImportDeps(
     }
     if (!sameFileSymbols.has(idName) || idName === varName) continue;
     if (movedIntoThisSegment.has(idName)) continue;
-    if (defaultExportedNames.has(idName)) {
-      importDeps.push({ localName: idName, importedName: 'default', source: parentModulePath });
-      continue;
-    }
-    if (reexportedNames.has(idName)) {
-      importDeps.push({ localName: idName, importedName: `_auto_${idName}`, source: parentModulePath });
-      continue;
-    }
-    const exportedAs = renamedExports.get(idName);
-    importDeps.push({ localName: idName, importedName: exportedAs ?? idName, source: parentModulePath });
+    const importedName = resolveSameFileImportName(
+      idName, reexportedNames.has(idName), defaultExportedNames, renamedExports,
+    );
+    importDeps.push({ localName: idName, importedName, source: parentModulePath });
   }
   return importDeps;
 }
