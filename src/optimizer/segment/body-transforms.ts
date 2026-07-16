@@ -490,7 +490,6 @@ export function transformSyncCalls(bodyText: string, parts: string[]): string {
   return bodyText;
 }
 
-/** Add imports for core symbols referenced in body but not yet imported. */
 export function ensureCoreImports(bodyText: string, parts: string[]): void {
   const coreSymbols = ['_jsxSorted', '_jsxSplit', '_fnSignal', '_wrapProp', '_restProps', '_getVarProps', '_getConstProps'];
 

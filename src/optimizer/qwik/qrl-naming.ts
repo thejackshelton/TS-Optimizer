@@ -1,8 +1,3 @@
-/**
- * The bare `$`→`Qrl` name transform (`foo$` → `fooQrl`), free of marker
- * special-casing. `getQrlCalleeName` layers the bare-`$` and `sync$` cases on
- * top; callers that must not apply those cases use this directly.
- */
 export function plainQrlName(markerName: string): string {
   return markerName.slice(0, -1) + 'Qrl';
 }

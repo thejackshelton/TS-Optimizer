@@ -411,23 +411,15 @@ export function processProps(
 
       if (signalResult.type === 'fnSignal') {
         const isParam = (dep: string) => paramNames?.has(dep) ?? false;
-        if (signalResult.isObjectExpr && (propName === 'class' || propName === 'className')) {
-          // Object-expression class/className props are not _fnSignal-hoisted;
-          // fall through to classifyConstness.
-        } else if (
-          // A TemplateLiteral / CallExpression prop whose deps aren't all const
-          // stays a raw expression instead of hoisting — e.g.
-          // `<img src={`${props.src}`}/>` inside `(props) => …` on an HTML
-          // element, where the param dep is non-const. Array / Object / Binary
-          // expressions still hoist regardless.
-          (valueNode?.type === 'TemplateLiteral' ||
-            valueNode?.type === 'CallExpression') &&
-          !fnSignalDepsAllConst(
-            signalResult.deps, importedNames, bindings, valueNode.start, tagIsHtml, isParam,
-          )
-        ) {
-          // fall through to classifyConstness — emit raw expression
-        } else {
+        const isRawWhenNonConst =
+          valueNode?.type === 'TemplateLiteral' || valueNode?.type === 'CallExpression';
+        const excludedFromHoist =
+          (signalResult.isObjectExpr && (propName === 'class' || propName === 'className')) ||
+          (isRawWhenNonConst &&
+            !fnSignalDepsAllConst(
+              signalResult.deps, importedNames, bindings, valueNode.start, tagIsHtml, isParam,
+            ));
+        if (!excludedFromHoist) {
           const hfName = signalHoister.hoist(signalResult.hoistedFn, signalResult.hoistedStr, valueNode.start ?? 0);
           const fnSignalCall = `_fnSignal(${hfName}, [${signalResult.deps.join(', ')}], ${hfName}_str)`;
           const formattedName = formatPropName(propName);

@@ -221,11 +221,9 @@ export function isConstBindingName(
 }
 
 /**
- * Whether every dep of a hoistable `_fnSignal` expression is const-stable, so
- * the prop can join the const-props bag. A dep qualifies if it is imported, a
- * const binding, or — on component elements only — a closure parameter: params
- * are stable within the segment, but on an HTML element a param-dependent prop
- * stays var because the DOM node re-renders on every prop change.
+ * A closure parameter counts as a const-stable dep only on component elements:
+ * on an HTML element a param-dependent prop stays var because the DOM node
+ * re-renders on every prop change.
  */
 export function fnSignalDepsAllConst(
   deps: readonly string[],
