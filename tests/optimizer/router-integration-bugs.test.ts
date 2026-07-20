@@ -181,9 +181,7 @@ export const App = component$(() => {
 	});
 });
 
-describe('reexported `const X = server$(…)` keeps its binding', () => {
-	// `it` wording retained verbatim for regression-gate ID stability; the
-	// asserted contract is the MOVE into the single consumer.
+describe('single-consumer `const X = server$(…)` migrates to its one consumer', () => {
 	const code = `import { component$, useSignal } from '@qwik.dev/core';
 import { server$ } from '@qwik.dev/router';
 
@@ -213,7 +211,7 @@ export default component$(() => {
 	}
 
 	for (const isServer of [true, false]) {
-		test(`parent keeps \`const testServer$ = serverQrl(…)\` (isServer=${isServer})`, () => {
+		test(`testServer$ is moved into the handler segment, not kept in the parent (isServer=${isServer})`, () => {
 			const result = run(isServer);
 			const parent = result.modules.find((m) => m.kind === 'parent') ?? result.modules[0]!;
 			const handler = result.modules.find(

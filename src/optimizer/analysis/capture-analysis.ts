@@ -75,8 +75,6 @@ export function excludeNestedExtractionCaptures(
   if (captureNames.length === 0 || childRanges.length === 0) {
     return [...captureNames];
   }
-  // Enclosing-function bindings stay captured (they thread the `_captures`
-  // chain); only module-level names can be owned by the nested child instead.
   const moduleLevelCaptures = new Set(
     captureNames.filter((n) => moduleScopeNames.has(n)),
   );

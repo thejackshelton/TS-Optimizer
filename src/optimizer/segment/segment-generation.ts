@@ -782,8 +782,6 @@ function tryBuildMarkerDeclMove(
   wrapDecl: string;
   importDeps: Array<{ localName: string; importedName: string; source: string }>;
 } | null {
-  // escapeSymbol matches how displayName is built, so a `$`-suffixed decl
-  // (`testServer$` → `…_testServer_server`) resolves to its extraction.
   const fileStem = relPath.split("/").pop() ?? relPath;
   const exactDisplayName = `${fileStem}_${escapeSymbol(decl.name)}`;
   const prefixDisplayName = `${exactDisplayName}_`;
