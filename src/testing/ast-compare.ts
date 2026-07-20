@@ -13,12 +13,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** The value as a mutable array (same reference) when it is one, else undefined. */
 function asArray(value: unknown): unknown[] | undefined {
   return Array.isArray(value) ? value : undefined;
 }
 
-/** The value as a string when it is one, else undefined. */
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
