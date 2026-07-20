@@ -66,6 +66,44 @@ export function analyzeCaptures(
   };
 }
 
+/**
+ * Drop a parent extraction's captures whose every occurrence falls inside a
+ * nested child's `[argStart, argEnd)` range. The parent emits a `q_<symbol>`
+ * reference there, so such a name is the child's consumer, not the parent's —
+ * counting it for the parent makes migration see two consumers for a
+ * single-consumer binding and re-export instead of move.
+ *
+ * Only module-level names are candidates: an enclosing-function binding stays
+ * captured even when it appears only inside a child, because that is the
+ * `_captures` chain threading an outer value down to the innermost segment.
+ */
+export function excludeNestedExtractionCaptures(
+  closureNode: AstFunction,
+  captureNames: readonly string[],
+  childRanges: ReadonlyArray<readonly [number, number]>,
+  moduleScopeNames: ReadonlySet<string>,
+): string[] {
+  if (captureNames.length === 0 || childRanges.length === 0) {
+    return [...captureNames];
+  }
+  const candidates = captureNames.filter((n) => moduleScopeNames.has(n));
+  if (candidates.length === 0) return [...captureNames];
+
+  const wanted = new Set(candidates);
+  const usedOutsideChild = new Set<string>();
+  walk(closureNode, {
+    enter(node: AstNode) {
+      if (node.type !== 'Identifier' && node.type !== 'JSXIdentifier') return;
+      if (!wanted.has(node.name) || usedOutsideChild.has(node.name)) return;
+      const insideChild = childRanges.some(
+        ([s, e]) => node.start >= s && node.start < e,
+      );
+      if (!insideChild) usedOutsideChild.add(node.name);
+    },
+  });
+  return captureNames.filter((n) => !wanted.has(n) || usedOutsideChild.has(n));
+}
+
 /** Extract all binding names from function parameter AST nodes. */
 function collectParamNames(params: AstParamPattern[]): string[] {
   const names: string[] = [];
