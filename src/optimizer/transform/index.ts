@@ -584,9 +584,6 @@ function analyzeModuleCaptures(
 
   const enclosingExtMap = buildParentExtractionMap(extractions);
 
-  // `excludeNestedExtractionCaptures` assumes the child body leaves the parent
-  // into its own file. Under inline/hoist it stays inline (`q_X.s(IDENT)`), so
-  // the parent still references the name — skip the exclusion there.
   const emitsChildFiles =
     entryStrategy.type !== "inline" && entryStrategy.type !== "hoist";
   const childRangesByParent = new Map<string, Array<readonly [number, number]>>();

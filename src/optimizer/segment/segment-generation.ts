@@ -694,12 +694,9 @@ export function buildNestedQrlDeclarations(
 }
 
 /**
- * The `const q_<sym> = …` declaration a segment owns for an extraction whose
- * source decl moved into it, plus the core helper the declaration imports.
- * A stripped body has no chunk, so it registers a `_noopQrl` the same way the
- * parent rewrite does — emitting `qrl(()=>import(strippedChunk))` would point
- * the moved binding at a chunk that never ships. Dev builds use the `*DEV`
- * form with source metadata.
+ * A moved extraction's owned QRL declaration + the core helper it imports.
+ * A stripped body has no chunk, so it registers a `_noopQrl` rather than a
+ * `qrl(()=>import(strippedChunk))` that would resolve to the chunk's `null`.
  */
 function buildMovedQrlDecl(
   ext: ConsolidatedSegment,
@@ -785,9 +782,8 @@ function tryBuildMarkerDeclMove(
   wrapDecl: string;
   importDeps: Array<{ localName: string; importedName: string; source: string }>;
 } | null {
-  // Escape the declName the same way the naming pass builds displayName, so a
-  // `$`-suffixed binding (`testServer$` → displayName portion `testServer`)
-  // matches its extraction instead of falling through to a raw-text move.
+  // escapeSymbol matches how displayName is built, so a `$`-suffixed decl
+  // (`testServer$` → `…_testServer_server`) resolves to its extraction.
   const fileStem = relPath.split("/").pop() ?? relPath;
   const exactDisplayName = `${fileStem}_${escapeSymbol(decl.name)}`;
   const prefixDisplayName = `${exactDisplayName}_`;

@@ -84,13 +84,9 @@ describe('pre-transformed `_jsxDEV` event-handler extraction', () => {
     expect(component!.code).toMatch(/"q-e:click":\s*q_/);
     expect(component!.code).not.toContain('=> testServer$()');
 
-    // The `const testServer$ = serverQrl(…)` binding survives — it has one
-    // consumer (this handler), so it MOVES into the handler segment,
-    // self-contained. The parent no longer owns it, and never leaves a
-    // dropped/dangling `serverQrl(q_…);` statement (the original crash shape).
-    expect(handler!.code).toMatch(/const testServer\$ = serverQrl\(q_/);
-    expect(parent.code).not.toMatch(/const testServer\$ =/);
-    expect(parent.code).not.toMatch(/^\s*serverQrl\(/m);
+    expect(handler!.code, 'binding survives via MOVE, not a parent reexport').toMatch(/const testServer\$ = serverQrl\(q_/);
+    expect(parent.code, 'parent no longer owns the binding').not.toMatch(/const testServer\$ =/);
+    expect(parent.code, 'no dropped-binding `serverQrl(q_…);` statement').not.toMatch(/^\s*serverQrl\(/m);
   });
 
   test('server/hoist+stripEventHandlers: no JSX-attribute syntax leaks into the object literal', () => {
