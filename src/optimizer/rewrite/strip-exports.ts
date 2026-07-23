@@ -1,8 +1,7 @@
 /**
- * Only the export *bodies* are rewritten — never imports. Import cleanup
- * happens later in `filterUnusedImports` against the post-strip body;
- * pruning here would re-add imports onto ranges already removed, emitting
- * each surviving import twice.
+ * Only the export _bodies_ are rewritten — never imports. Import cleanup happens later in
+ * `filterUnusedImports` against the post-strip body; pruning here would re-add imports onto ranges
+ * already removed, emitting each surviving import twice.
  */
 
 import type MagicString from 'magic-string';
@@ -18,7 +17,7 @@ interface StripExportsResult {
 export function stripExportDeclarations(
   s: MagicString,
   program: AstProgram,
-  stripExports: readonly string[],
+  stripExports: readonly string[]
 ): StripExportsResult {
   if (stripExports.length === 0) {
     return { strippedNames: [] };

@@ -1,4 +1,3 @@
-
 import { walk } from 'oxc-walker';
 import type {
   AstFunction,
@@ -25,7 +24,7 @@ export interface CaptureAnalysisResult {
 export function analyzeCaptures(
   closureNode: AstFunction,
   parentScopeIdentifiers: Set<string>,
-  freeIdentifiers: readonly string[],
+  freeIdentifiers: readonly string[]
 ): CaptureAnalysisResult {
   const paramNames = collectParamNames(closureNode.params ?? []);
   const undeclared = freeIdentifiers;
@@ -33,11 +32,9 @@ export function analyzeCaptures(
   // Parent-scope membership wins even when a same-name import exists: same-scope
   // import + decl is illegal, so the name must be an inner-scope shadow whose
   // value crosses the boundary — excluding it would drop a real capture.
-  const captureNames = [...new Set(
-    undeclared
-      .filter((name) => parentScopeIdentifiers.has(name))
-      .sort()
-  )];
+  const captureNames = [
+    ...new Set(undeclared.filter((name) => parentScopeIdentifiers.has(name)).sort()),
+  ];
 
   return {
     captureNames,
@@ -50,14 +47,12 @@ export function excludeNestedExtractionCaptures(
   closureNode: AstFunction,
   captureNames: readonly string[],
   childRanges: ReadonlyArray<readonly [number, number]>,
-  moduleScopeNames: ReadonlySet<string>,
+  moduleScopeNames: ReadonlySet<string>
 ): string[] {
   if (captureNames.length === 0 || childRanges.length === 0) {
     return [...captureNames];
   }
-  const moduleLevelCaptures = new Set(
-    captureNames.filter((n) => moduleScopeNames.has(n)),
-  );
+  const moduleLevelCaptures = new Set(captureNames.filter((n) => moduleScopeNames.has(n)));
   if (moduleLevelCaptures.size === 0) return [...captureNames];
 
   const usedOutsideAnyChild = new Set<string>();
@@ -71,9 +66,7 @@ export function excludeNestedExtractionCaptures(
       }
     },
   });
-  return captureNames.filter(
-    (n) => !moduleLevelCaptures.has(n) || usedOutsideAnyChild.has(n),
-  );
+  return captureNames.filter((n) => !moduleLevelCaptures.has(n) || usedOutsideAnyChild.has(n));
 }
 
 function collectParamNames(params: AstParamPattern[]): string[] {
@@ -87,7 +80,7 @@ function collectParamNames(params: AstParamPattern[]): string[] {
 export function collectScopeIdentifiers(
   containerNode: AstProgram | BlockStatement | FunctionBody | AstFunction,
   _source: string,
-  _relPath: string,
+  _relPath: string
 ): Set<string> {
   const ids = new Set<string>();
   collectDeclarationsFromNode(containerNode, ids);
@@ -96,7 +89,7 @@ export function collectScopeIdentifiers(
 
 function collectDeclarationsFromNode(
   node: AstMaybeNode | Statement | FunctionBody | AstFunction,
-  ids: Set<string>,
+  ids: Set<string>
 ): void {
   if (!node) return;
 
@@ -134,15 +127,14 @@ function collectDeclarationsFromNode(
 }
 
 /**
- * Differential oracle for the gather walk's lexical-scope projection: for each
- * tracked closure, the flat union of every enclosing scope plus the module
- * scope. The per-closure union is deferred until after the walk so enclosing
- * declarations that textually follow the closure (hoisted names, later
- * `const`s) are still included.
+ * Differential oracle for the gather walk's lexical-scope projection: for each tracked closure, the
+ * flat union of every enclosing scope plus the module scope. The per-closure union is deferred
+ * until after the walk so enclosing declarations that textually follow the closure (hoisted names,
+ * later `const`s) are still included.
  */
 export function buildClosureLexicalScopes(
   program: AstProgram,
-  closureNodes: ReadonlyMap<string, AstFunction>,
+  closureNodes: ReadonlyMap<string, AstFunction>
 ): Map<string, Set<string>> {
   const result = new Map<string, Set<string>>();
 
@@ -193,10 +185,9 @@ function isFunctionLikeNode(node: AstNode): boolean {
 }
 
 /**
- * Add the binding names a single node declares to its enclosing function scope.
- * Non-recursive: the caller's walk provides traversal, so a function/class
- * declaration name lands in the enclosing scope while its params/body are a
- * separate scope the walk visits under its own frame.
+ * Add the binding names a single node declares to its enclosing function scope. Non-recursive: the
+ * caller's walk provides traversal, so a function/class declaration name lands in the enclosing
+ * scope while its params/body are a separate scope the walk visits under its own frame.
  */
 export function addScopeDeclarations(node: AstNode, ids: Set<string>): void {
   switch (node.type) {

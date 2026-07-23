@@ -1,16 +1,12 @@
 /**
- * Replaces isServer/isBrowser/isDev identifiers imported from Qwik packages
- * with boolean literals based on build configuration.
+ * Replaces isServer/isBrowser/isDev identifiers imported from Qwik packages with boolean literals
+ * based on build configuration.
  */
 
 import MagicString from 'magic-string';
 import { parseSync } from 'oxc-parser';
 import { walk } from 'oxc-walker';
-import type {
-  AstNode,
-  AstParentNode,
-  AstProgram,
-} from '../../ast-types.js';
+import type { AstNode, AstParentNode, AstProgram } from '../../ast-types.js';
 import { RAW_TRANSFER_PARSER_OPTIONS } from '../../ast-types.js';
 import type { EmitMode } from '../types/types.js';
 import type { ImportInfo } from '../extraction/marker-detection.js';
@@ -40,7 +36,7 @@ export function deriveIsDev(mode: EmitMode | undefined): boolean | undefined {
 export function buildConstReplacementMap(
   importMap: Map<string, ImportInfo>,
   isServer?: boolean,
-  isDev?: boolean,
+  isDev?: boolean
 ): Map<string, string> {
   const replacements = new Map<string, string>();
 
@@ -66,7 +62,7 @@ function applyReplacements(
   s: MagicString,
   program: AstProgram,
   replacements: Map<string, string>,
-  importRanges?: ReadonlySet<string>,
+  importRanges?: ReadonlySet<string>
 ): number {
   let replacedCount = 0;
 
@@ -78,7 +74,8 @@ function applyReplacements(
       if (replacement === undefined) return;
 
       if (importRanges?.has(`${node.start}:${node.end}`)) return;
-      if (parent?.type === 'MemberExpression' && parent.property === node && !parent.computed) return;
+      if (parent?.type === 'MemberExpression' && parent.property === node && !parent.computed)
+        return;
       if (parent?.type === 'VariableDeclarator' && parent.id === node) return;
       if (parent?.type === 'ImportSpecifier' && parent.imported === node) return;
 
@@ -91,15 +88,15 @@ function applyReplacements(
 }
 
 /**
- * Replace isServer/isBrowser/isDev identifiers with boolean literals.
- * Only replaces identifiers that trace to actual Qwik package imports.
+ * Replace isServer/isBrowser/isDev identifiers with boolean literals. Only replaces identifiers
+ * that trace to actual Qwik package imports.
  */
 export function replaceConstants(
   s: MagicString,
   program: AstProgram,
   importMap: Map<string, ImportInfo>,
   isServer?: boolean,
-  isDev?: boolean,
+  isDev?: boolean
 ): ConstReplacementResult {
   const replacements = buildConstReplacementMap(importMap, isServer, isDev);
 
@@ -124,22 +121,24 @@ export function replaceConstants(
 }
 
 /**
- * Fold isServer/isBrowser/isDev in an inline/hoist body. These bodies are
- * re-emitted outside the parent MagicString, so `replaceConstants` never
- * reaches them.
+ * Fold isServer/isBrowser/isDev in an inline/hoist body. These bodies are re-emitted outside the
+ * parent MagicString, so `replaceConstants` never reaches them.
  */
 export function foldConstantsInBodyText(
   body: string,
   importMap: Map<string, ImportInfo>,
   isServer?: boolean,
-  isDev?: boolean,
+  isDev?: boolean
 ): string {
   const replacements = buildConstReplacementMap(importMap, isServer, isDev);
   if (replacements.size === 0) return body;
 
   let mentionsCandidate = false;
   for (const name of replacements.keys()) {
-    if (body.includes(name)) { mentionsCandidate = true; break; }
+    if (body.includes(name)) {
+      mentionsCandidate = true;
+      break;
+    }
   }
   if (!mentionsCandidate) return body;
 

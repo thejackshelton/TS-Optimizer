@@ -44,6 +44,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "verify:publish": "vitest run --reporter=json --outputFile=local.json; node scripts/check-regression.mjs local.json",
     "prepublishOnly": "pnpm build && pnpm verify:publish",
     "ci:baseline:check": "node scripts/check-regression.mjs",
@@ -62,6 +64,8 @@
   "devDependencies": {
     "@types/node": "^25.6.0",
     "fast-deep-equal": "^3.1.3",
+    "prettier": "3.7.4",
+    "prettier-plugin-jsdoc": "1.8.0",
     "tsdown": "^0.22.3",
     "typescript": "^5.7.0",
     "vitest": "^4.1.4"

@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -72,8 +71,17 @@ function mapOfSetsToPlain(m: ReadonlyMap<string, Set<string>>): Record<string, s
 }
 
 function loopMapToComparable(
-  m: ReadonlyMap<string, Array<{ type: string; iterVars: string[]; loopNode: unknown; loopBodyStart: number; loopBodyEnd: number }>>,
-  nodeIds: Map<unknown, number>,
+  m: ReadonlyMap<
+    string,
+    Array<{
+      type: string;
+      iterVars: string[];
+      loopNode: unknown;
+      loopBodyStart: number;
+      loopBodyEnd: number;
+    }>
+  >,
+  nodeIds: Map<unknown, number>
 ): Record<string, Array<Record<string, unknown>>> {
   const out: Record<string, Array<Record<string, unknown>>> = {};
   for (const [k, stack] of m) {
@@ -127,24 +135,28 @@ function diffFixture(source: string, filename: string): string[] {
   const oracleLoop = buildExtractionLoopMap(
     program,
     extractions as unknown as ExtractionResult[],
-    source,
+    source
   );
   const nodeIds = new Map<unknown, number>();
   check(
     'extractionLoopMap',
     loopMapToComparable(facts.extractionLoopMap, nodeIds),
-    loopMapToComparable(oracleLoop.extractionLoopMap, nodeIds),
+    loopMapToComparable(oracleLoop.extractionLoopMap, nodeIds)
   );
   check(
     'loopBodyVarDecls',
     Object.fromEntries(facts.loopBodyVarDecls),
-    Object.fromEntries(oracleLoop.loopBodyVarDecls),
+    Object.fromEntries(oracleLoop.loopBodyVarDecls)
   );
 
   check('allScopeEntries', facts.allScopeEntries, collectAllScopeEntries(program));
 
   const oracleUsage = computeSegmentUsage(program, extractions);
-  check('segmentUsage', mapOfSetsToPlain(facts.segmentUsage), mapOfSetsToPlain(oracleUsage.segmentUsage));
+  check(
+    'segmentUsage',
+    mapOfSetsToPlain(facts.segmentUsage),
+    mapOfSetsToPlain(oracleUsage.segmentUsage)
+  );
   check('rootUsage', [...facts.rootUsage].sort(), [...oracleUsage.rootUsage].sort());
 
   const oracleBindings = collectScopeAwareBindings(program);
@@ -155,7 +167,7 @@ function diffFixture(source: string, filename: string): string[] {
     check(
       'allLocalNames',
       [...fusedBindings.allLocalNames].sort(),
-      [...oracleBindings.allLocalNames].sort(),
+      [...oracleBindings.allLocalNames].sort()
     );
     const classifyDiffs: string[] = [];
     walk(program, {
@@ -186,7 +198,7 @@ function syntheticManyExtractionSource(count: number): string {
   const lines: string[] = ['const shared = 1;'];
   for (let i = 0; i < count; i++) {
     lines.push(
-      `export const c${i} = $(() => { const l${i} = ${i}; return g${i} + l${i} + shared; });`,
+      `export const c${i} = $(() => { const l${i} = ${i}; return g${i} + l${i} + shared; });`
     );
   }
   return lines.join('\n');
@@ -251,7 +263,9 @@ const laterDecl = 7;
     const sb = facts.scopeAwareBindings;
     expect(sb).toBeDefined();
     expect(sb!.allLocalNames.has('moduleVar')).toBe(true);
-    expect(sb!.bindings.classify('item', source.indexOf('inner + item') + 'inner + '.length)).toBe('const');
+    expect(sb!.bindings.classify('item', source.indexOf('inner + item') + 'inner + '.length)).toBe(
+      'const'
+    );
     expect(sb!.bindings.classify('counter', source.indexOf('counter++'))).toBe('var');
   });
 
@@ -295,7 +309,7 @@ describe('segment-usage projection bounded behavior', () => {
             reads++;
             return Reflect.get(target, prop, receiver);
           },
-        }),
+        })
     );
     const facts = gatherModuleFacts({ program, usageExtractions: counted });
 

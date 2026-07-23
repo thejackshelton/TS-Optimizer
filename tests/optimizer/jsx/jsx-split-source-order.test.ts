@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
@@ -16,7 +15,7 @@ function findComponentSegment(result: ReturnType<typeof transform>, namePrefix: 
     (m) =>
       m.kind === 'segment' &&
       m.segment.name.startsWith(namePrefix) &&
-      m.segment.ctxName === 'component$',
+      m.segment.ctxName === 'component$'
   );
 }
 
@@ -45,7 +44,7 @@ export default component$((props) => {
     expect(seg.code).toMatch(/\.\.\.props\.rest/);
 
     expect(seg.code).toMatch(
-      /"q-e:hi":[^,]+,\s*\.\.\.props\.foo,\s*"q-e:hello":[^,]+,\s*\.\.\.props\.rest/,
+      /"q-e:hi":[^,]+,\s*\.\.\.props\.foo,\s*"q-e:hello":[^,]+,\s*\.\.\.props\.rest/
     );
 
     expect(seg.code).toMatch(/"q-e:const":[^,}]+,\s*asd:\s*['"]1['"]/);

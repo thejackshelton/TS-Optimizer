@@ -83,7 +83,24 @@ someLine();`;
 describe('filterSuppressedDiagnostics', () => {
   it('removes diagnostics matching directive codes', () => {
     const diags: Diagnostic[] = [
-      { category: 'error', code: 'C03', file: 'test.tsx', message: 'test', highlights: [{ lo: mkByteOffset(0), hi: mkByteOffset(10), startLine: mkLineNumber(3), startCol: mkColumnNumber(1), endLine: mkLineNumber(3), endCol: mkColumnNumber(10) }], suggestions: null, scope: 'optimizer' },
+      {
+        category: 'error',
+        code: 'C03',
+        file: 'test.tsx',
+        message: 'test',
+        highlights: [
+          {
+            lo: mkByteOffset(0),
+            hi: mkByteOffset(10),
+            startLine: mkLineNumber(3),
+            startCol: mkColumnNumber(1),
+            endLine: mkLineNumber(3),
+            endCol: mkColumnNumber(10),
+          },
+        ],
+        suggestions: null,
+        scope: 'optimizer',
+      },
     ];
     const directives = new Map<number, Set<string>>();
     directives.set(3, new Set(['C03']));
@@ -92,9 +109,7 @@ describe('filterSuppressedDiagnostics', () => {
   });
 
   it('keeps diagnostics not matching directive codes', () => {
-    const diags: Diagnostic[] = [
-      emitC02('hola', 'test.tsx', false),
-    ];
+    const diags: Diagnostic[] = [emitC02('hola', 'test.tsx', false)];
     const directives = new Map<number, Set<string>>();
     directives.set(5, new Set(['C05']));
     const result = filterSuppressedDiagnostics(diags, directives);
@@ -103,8 +118,42 @@ describe('filterSuppressedDiagnostics', () => {
 
   it('suppresses only the NEXT line, not subsequent lines', () => {
     const diags: Diagnostic[] = [
-      { category: 'error', code: 'C03', file: 'test.tsx', message: 'uses local values (a)', highlights: [{ lo: mkByteOffset(20), hi: mkByteOffset(30), startLine: mkLineNumber(3), startCol: mkColumnNumber(1), endLine: mkLineNumber(3), endCol: mkColumnNumber(10) }], suggestions: null, scope: 'optimizer' },
-      { category: 'error', code: 'C03', file: 'test.tsx', message: 'uses local values (b)', highlights: [{ lo: mkByteOffset(40), hi: mkByteOffset(50), startLine: mkLineNumber(4), startCol: mkColumnNumber(1), endLine: mkLineNumber(4), endCol: mkColumnNumber(10) }], suggestions: null, scope: 'optimizer' },
+      {
+        category: 'error',
+        code: 'C03',
+        file: 'test.tsx',
+        message: 'uses local values (a)',
+        highlights: [
+          {
+            lo: mkByteOffset(20),
+            hi: mkByteOffset(30),
+            startLine: mkLineNumber(3),
+            startCol: mkColumnNumber(1),
+            endLine: mkLineNumber(3),
+            endCol: mkColumnNumber(10),
+          },
+        ],
+        suggestions: null,
+        scope: 'optimizer',
+      },
+      {
+        category: 'error',
+        code: 'C03',
+        file: 'test.tsx',
+        message: 'uses local values (b)',
+        highlights: [
+          {
+            lo: mkByteOffset(40),
+            hi: mkByteOffset(50),
+            startLine: mkLineNumber(4),
+            startCol: mkColumnNumber(1),
+            endLine: mkLineNumber(4),
+            endCol: mkColumnNumber(10),
+          },
+        ],
+        suggestions: null,
+        scope: 'optimizer',
+      },
     ];
     const directives = new Map<number, Set<string>>();
     directives.set(3, new Set(['C03']));

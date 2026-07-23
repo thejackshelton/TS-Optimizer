@@ -42,16 +42,19 @@ describe('inlinedQrl nested inside another inlinedQrl captures array', () => {
 
   it('does not extract the capture-position QRL into its own segment', () => {
     const names = segments.map((m) => (m.kind === 'segment' ? m.segment.name : ''));
-    expect(names.some((n) => /kbFhYQZkoVA/.test(n)), `segments: ${names.join(', ')}`).toBe(false);
+    expect(
+      names.some((n) => /kbFhYQZkoVA/.test(n)),
+      `segments: ${names.join(', ')}`
+    ).toBe(false);
   });
 
   it('hoists the capture-position QRL body to a top-level _inlined_ const and keeps the call inline', () => {
-    const owner = segments.find(
-      (m) => m.kind === 'segment' && /HTDRsvUbLiE/.test(m.segment.name),
-    );
+    const owner = segments.find((m) => m.kind === 'segment' && /HTDRsvUbLiE/.test(m.segment.name));
     if (owner?.kind !== 'segment') throw new Error('owner segment not found');
     expect(owner.code).toMatch(/const _inlined_C_component_isActive_useComputed_kbFhYQZkoVA\s*=/);
-    expect(owner.code).toMatch(/inlinedQrl\(_inlined_C_component_isActive_useComputed_kbFhYQZkoVA,/);
+    expect(owner.code).toMatch(
+      /inlinedQrl\(_inlined_C_component_isActive_useComputed_kbFhYQZkoVA,/
+    );
     expect(owner.code).not.toMatch(/q_s_kbFhYQZkoVA/);
   });
 });

@@ -14,10 +14,7 @@ import {
 } from '../../src/testing/batch-runner.js';
 import { resolve } from 'node:path';
 
-const SNAP_DIR = resolve(
-  import.meta.dirname,
-  '../../match-these-snaps',
-);
+const SNAP_DIR = resolve(import.meta.dirname, '../../match-these-snaps');
 
 describe('batch-runner', () => {
   let tmpDir: string;

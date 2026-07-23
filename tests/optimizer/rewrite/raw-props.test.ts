@@ -14,7 +14,7 @@ describe('raw-props', () => {
     const result = applyRawPropsTransform(body);
 
     expect(result).toBe(
-      '(_rawProps) => ({ count: _rawProps.count, label: _rawProps.label ?? "x", total: _rawProps.count + 1 })',
+      '(_rawProps) => ({ count: _rawProps.count, label: _rawProps.label ?? "x", total: _rawProps.count + 1 })'
     );
   });
 
@@ -40,7 +40,7 @@ describe('raw-props', () => {
     const result = applyRawPropsTransform(body);
 
     expect(result).toBe(
-      '(props) => {\nconst rest = _restProps(props, [\n    "count"\n]);\n  return { count: props.count, rest };\n}',
+      '(props) => {\nconst rest = _restProps(props, [\n    "count"\n]);\n  return { count: props.count, rest };\n}'
     );
   });
 
@@ -73,14 +73,12 @@ describe('raw-props', () => {
 
     const result = applyRawPropsTransform(body);
 
-    expect(result).toBe(
-      '(_rawProps) => {\nconst rest = _restProps(_rawProps);\nreturn rest;\n}',
-    );
+    expect(result).toBe('(_rawProps) => {\nconst rest = _restProps(_rawProps);\nreturn rest;\n}');
   });
 
   it('extracts destructured field names for the shared session path', () => {
     const result = extractDestructuredFieldMap(
-      '({ foo, "bind:value": bindValue, bar = 1, ...rest }) => foo + bindValue + bar + rest.baz',
+      '({ foo, "bind:value": bindValue, bar = 1, ...rest }) => foo + bindValue + bar + rest.baz'
     );
 
     expect(result).toEqual(
@@ -88,13 +86,13 @@ describe('raw-props', () => {
         ['foo', 'foo'],
         ['bindValue', 'bind:value'],
         ['bar', 'bar'],
-      ]),
+      ])
     );
   });
 
   it('consolidates raw props captures after the rewrite', () => {
     const result = consolidateRawPropsInWCalls(
-      'qrl(() => 1).w([a, _rawProps.count, _rawProps.label, b])',
+      'qrl(() => 1).w([a, _rawProps.count, _rawProps.label, b])'
     );
 
     expect(result).toBe('qrl(() => 1).w([\n        a,\n        _rawProps,\n        b\n    ])');
@@ -102,18 +100,16 @@ describe('raw-props', () => {
 
   it('consolidates raw props captures without splitting nested comma expressions', () => {
     const result = consolidateRawPropsInWCalls(
-      'qrl(() => 1).w([useStore([a, b]), _rawProps.count, fn(x, y), _rawProps[dynamicKey]])',
+      'qrl(() => 1).w([useStore([a, b]), _rawProps.count, fn(x, y), _rawProps[dynamicKey]])'
     );
 
     expect(result).toBe(
-      'qrl(() => 1).w([\n        useStore([a, b]),\n        _rawProps,\n        fn(x, y)\n    ])',
+      'qrl(() => 1).w([\n        useStore([a, b]),\n        _rawProps,\n        fn(x, y)\n    ])'
     );
   });
 
   it('consolidates computed-member-only captures (prefilter must not gate them out)', () => {
-    const result = consolidateRawPropsInWCalls(
-      'qrl(() => 1).w([a, _rawProps[key]])',
-    );
+    const result = consolidateRawPropsInWCalls('qrl(() => 1).w([a, _rawProps[key]])');
 
     expect(result).toBe('qrl(() => 1).w([\n        a,\n        _rawProps\n    ])');
   });
@@ -137,7 +133,7 @@ describe('raw-props', () => {
         ['bindValue', 'bind:value'],
         ['bar', 'bar'],
         ['baz', 'baz'],
-      ]),
+      ])
     );
     expect(info.fieldDefaults).toEqual(new Map([['bar', '1 + 2']]));
 
@@ -146,9 +142,7 @@ describe('raw-props', () => {
   });
 
   it('combined extractor honors the all-or-nothing unsafe gate for both maps', () => {
-    const info = extractDestructuredFieldInfo(
-      '({ count, label = getLabel() }) => count + label',
-    );
+    const info = extractDestructuredFieldInfo('({ count, label = getLabel() }) => count + label');
 
     expect(info.fieldMap.size).toBe(0);
     expect(info.fieldDefaults.size).toBe(0);

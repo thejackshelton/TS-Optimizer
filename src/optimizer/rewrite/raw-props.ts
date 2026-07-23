@@ -1,6 +1,6 @@
 /**
- * Raw props transformation for component$ extractions: rewrites destructured
- * parameters to `(_rawProps) => ... _rawProps.<field> ...`.
+ * Raw props transformation for component$ extractions: rewrites destructured parameters to
+ * `(_rawProps) => ... _rawProps.<field> ...`.
  */
 
 import type {
@@ -44,7 +44,9 @@ import {
 } from '../edit/range-replace.js';
 import type { DevSuffixOptions } from '../jsx/jsx.js';
 
-function isRawPropsMemberExpression(node: unknown): node is AstCompatNode & { object: AstIdentifierNode } {
+function isRawPropsMemberExpression(
+  node: unknown
+): node is AstCompatNode & { object: AstIdentifierNode } {
   return (
     isAstNode(node) &&
     (node.type === 'MemberExpression' || node.type === 'StaticMemberExpression') &&
@@ -54,7 +56,7 @@ function isRawPropsMemberExpression(node: unknown): node is AstCompatNode & { ob
 }
 
 function isWCallWithArrayArg(
-  node: unknown,
+  node: unknown
 ): node is CallExpression & { arguments: [ArrayExpression & AstRangedNode] } {
   if (!isAstNode(node) || node.type !== 'CallExpression') return false;
   if (!isAstNode(node.callee) || node.callee.type !== 'MemberExpression') return false;
@@ -65,9 +67,8 @@ function isWCallWithArrayArg(
 }
 
 /**
- * Options for JSX transpilation within inline .s() body text. `source` is
- * required only when `devOptions` is set — used to compute source-relative
- * dev-info positions.
+ * Options for JSX transpilation within inline .s() body text. `source` is required only when
+ * `devOptions` is set — used to compute source-relative dev-info positions.
  */
 export interface InlineSegmentJsxOptions {
   enableJsx: boolean;
@@ -94,9 +95,9 @@ interface RawPropsField {
 }
 
 /**
- * `unsafe` is true when the destructure has a shape consolidation cannot express
- * (nested pattern, non-const default, or non-identifier rest); the caller must
- * then abort and preserve the source destructure verbatim.
+ * `unsafe` is true when the destructure has a shape consolidation cannot express (nested pattern,
+ * non-const default, or non-identifier rest); the caller must then abort and preserve the source
+ * destructure verbatim.
  */
 interface RawPropsBindingInfo {
   fields: RawPropsField[];
@@ -122,15 +123,15 @@ interface RawPropsTransformPlan {
 
 /** Both destructured-first-param projections, computed from one parse. */
 export interface DestructuredFieldInfo {
-  /** local binding name → property key name (`bindValue` → `"bind:value"`). */
+  /** Local binding name → property key name (`bindValue` → `"bind:value"`). */
   readonly fieldMap: Map<string, string>;
-  /** local binding name → destructure-default source text (`some` → `1+2`). */
+  /** Local binding name → destructure-default source text (`some` → `1+2`). */
   readonly fieldDefaults: Map<string, string>;
 }
 
 /**
- * Extract the field-key map and the defaults map from a destructured first
- * parameter in a single parse.
+ * Extract the field-key map and the defaults map from a destructured first parameter in a single
+ * parse.
  */
 export function extractDestructuredFieldInfo(body: string): DestructuredFieldInfo {
   const fieldMap = new Map<string, string>();
@@ -162,16 +163,17 @@ export function extractDestructuredFieldInfo(body: string): DestructuredFieldInf
 
 /**
  * Extract a map from local binding name to property key name from a destructured first parameter.
- * Given `({foo, "bind:value": bindValue}) => ...`, returns Map { "foo" -> "foo", "bindValue" -> "bind:value" }.
+ * Given `({foo, "bind:value": bindValue}) => ...`, returns Map { "foo" -> "foo", "bindValue" ->
+ * "bind:value" }.
  */
 export function extractDestructuredFieldMap(body: string): Map<string, string> {
   return extractDestructuredFieldInfo(body).fieldMap;
 }
 
 /**
- * Extract destructure-time default expressions from a function whose first
- * parameter is an ObjectPattern (e.g. `some` → `1+2`). Empty map when the
- * destructure aborts under the safe-consolidation gate.
+ * Extract destructure-time default expressions from a function whose first parameter is an
+ * ObjectPattern (e.g. `some` → `1+2`). Empty map when the destructure aborts under the
+ * safe-consolidation gate.
  */
 export function extractDestructuredFieldDefaultsMap(body: string): Map<string, string> {
   return extractDestructuredFieldInfo(body).fieldDefaults;
@@ -180,7 +182,7 @@ export function extractDestructuredFieldDefaultsMap(body: string): Map<string, s
 function collectPatternBindings(
   pattern: unknown,
   sourceText?: string,
-  offset = 0,
+  offset = 0
 ): RawPropsBindingInfo {
   const fields: RawPropsField[] = [];
   const defaultNodes: (unknown | undefined)[] = [];
@@ -245,10 +247,9 @@ function collectPatternBindings(
 }
 
 /**
- * A destructure default is non-const — not inline-safe — when its expression
- * contains a call, a member access, or a sibling-binding reference (which would
- * dangle once the destructure is eliminated). Arrow/function bodies aren't
- * descended; object-literal keys aren't references.
+ * A destructure default is non-const — not inline-safe — when its expression contains a call, a
+ * member access, or a sibling-binding reference (which would dangle once the destructure is
+ * eliminated). Arrow/function bodies aren't descended; object-literal keys aren't references.
  */
 function defaultExprIsNonConst(node: unknown, bindingLocals: ReadonlySet<string>): boolean {
   if (!isAstNode(node)) return false;
@@ -262,8 +263,7 @@ function defaultExprIsNonConst(node: unknown, bindingLocals: ReadonlySet<string>
   forEachAstChild(node, (child, key, parent) => {
     if (found) return;
     const parentComputed = (parent as { computed?: boolean }).computed;
-    const isPropertyKey =
-      key === 'key' && parent.type === 'Property' && parentComputed !== true;
+    const isPropertyKey = key === 'key' && parent.type === 'Property' && parentComputed !== true;
     if (isPropertyKey) return;
     if (defaultExprIsNonConst(child, bindingLocals)) found = true;
   });
@@ -288,7 +288,11 @@ function toFieldLocalToDefault(fields: RawPropsField[]): Map<string, string> {
   return fieldLocalToDefault;
 }
 
-function buildRestPropsLine(baseName: string, restElementName: string, fields: RawPropsField[]): string {
+function buildRestPropsLine(
+  baseName: string,
+  restElementName: string,
+  fields: RawPropsField[]
+): string {
   if (fields.length === 0) {
     return `const ${restElementName} = _restProps(${baseName});`;
   }
@@ -300,7 +304,7 @@ function buildRestPropsLine(baseName: string, restElementName: string, fields: R
 function getStatementRemovalRange(
   body: string,
   stmt: { start: number; end: number },
-  offset: number,
+  offset: number
 ): SourceRange {
   const stmtStart = stmt.start - offset;
   const stmtEnd = stmt.end - offset;
@@ -331,7 +335,7 @@ function arrowBodyLooksLikeComponent(body: AstMaybeNode): boolean {
 
 function analyzeRawPropsTransform(
   session: FunctionTransformSession,
-  body: string,
+  body: string
 ): RawPropsTransformPlan | null {
   const { fn, offset } = session;
   const firstParam = fn.params[0];
@@ -368,7 +372,7 @@ function analyzeBodyDestructurePlan(
   baseName: string,
   fnBody: FunctionTransformSession['fn']['body'],
   body: string,
-  offset: number,
+  offset: number
 ): RawPropsTransformPlan | null {
   if (!fnBody || fnBody.type !== 'BlockStatement') return null;
 
@@ -381,7 +385,14 @@ function analyzeBodyDestructurePlan(
     if (stmt.type !== 'VariableDeclaration' || !hasRange(stmt)) continue;
 
     for (const declarator of stmt.declarations ?? []) {
-      const plan = analyzeBodyDestructureDeclarator(propsDerived, baseName, declarator, stmt, body, offset);
+      const plan = analyzeBodyDestructureDeclarator(
+        propsDerived,
+        baseName,
+        declarator,
+        stmt,
+        body,
+        offset
+      );
       if (plan) return plan;
     }
   }
@@ -389,10 +400,7 @@ function analyzeBodyDestructurePlan(
   return null;
 }
 
-function collectPropsDerivedLocals(
-  baseName: string,
-  statements: readonly unknown[],
-): Set<string> {
+function collectPropsDerivedLocals(baseName: string, statements: readonly unknown[]): Set<string> {
   const derived = new Set<string>([baseName]);
   for (const stmt of statements) {
     if (!isAstNode(stmt) || stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') continue;
@@ -416,7 +424,7 @@ function analyzeBodyDestructureDeclarator(
   declarator: unknown,
   stmt: { start: number; end: number },
   body: string,
-  offset: number,
+  offset: number
 ): RawPropsTransformPlan | null {
   if (!isVariableDeclaratorNode(declarator)) return null;
   if (!isAstNode(declarator.id) || declarator.id.type !== 'ObjectPattern') return null;
@@ -444,7 +452,7 @@ function analyzeBodyDestructureDeclarator(
 
 function isExcludedRange(
   node: { start: number; end: number },
-  excludedRanges?: Array<{ start: number; end: number }>,
+  excludedRanges?: Array<{ start: number; end: number }>
 ): boolean {
   if (!excludedRanges || excludedRanges.length === 0) return false;
   return excludedRanges.some((range) => node.start >= range.start && node.end <= range.end);
@@ -452,18 +460,21 @@ function isExcludedRange(
 
 /**
  * Collector matching Identifier references to destructured prop locals, emitting
- * `IdentifierReplacement` records for the `_rawProps.<key>` rewrite. Uses the
- * local shape (not generic `RangeReplacement`) because the apply step needs the
- * original `local`/`key` to compose the accessor + default at emit time.
+ * `IdentifierReplacement` records for the `_rawProps.<key>` rewrite. Uses the local shape (not
+ * generic `RangeReplacement`) because the apply step needs the original `local`/`key` to compose
+ * the accessor + default at emit time.
  */
 function buildIdentifierReplacementsCollector(
   fieldLocalToKey: ReadonlyMap<string, string>,
   offset: number,
   out: IdentifierReplacement[],
-  excludedRanges?: ReadonlyArray<{ start: number; end: number }>,
+  excludedRanges?: ReadonlyArray<{ start: number; end: number }>
 ): RangeReplacementCollector {
   return (node, ctx) => {
-    if (hasRange(node) && isExcludedRange(node, excludedRanges as Array<{ start: number; end: number }> | undefined)) {
+    if (
+      hasRange(node) &&
+      isExcludedRange(node, excludedRanges as Array<{ start: number; end: number }> | undefined)
+    ) {
       return { replacements: [], skipSubtree: true };
     }
     // A JSXIdentifier in tag-name position is a reference to the same binding
@@ -476,8 +487,7 @@ function buildIdentifierReplacementsCollector(
       hasRange(node) &&
       typeof (node as { name?: unknown }).name === 'string' &&
       ctx.parentKey === 'name' &&
-      (ctx.parentNode?.type === 'JSXOpeningElement' ||
-        ctx.parentNode?.type === 'JSXClosingElement')
+      (ctx.parentNode?.type === 'JSXOpeningElement' || ctx.parentNode?.type === 'JSXClosingElement')
     ) {
       const jsxName = (node as { name: string }).name;
       const jsxKey = fieldLocalToKey.get(jsxName);
@@ -531,7 +541,7 @@ function collectIdentifierReplacements(
   root: unknown,
   fieldLocalToKey: Map<string, string>,
   offset: number,
-  excludedRanges?: Array<{ start: number; end: number }>,
+  excludedRanges?: Array<{ start: number; end: number }>
 ): IdentifierReplacement[] {
   if (!isAstNode(root)) return [];
   const out: IdentifierReplacement[] = [];
@@ -547,7 +557,7 @@ function applyIdentifierReplacements(
   session: TransformSession,
   replacements: IdentifierReplacement[],
   baseName: string,
-  defaultValues?: Map<string, string>,
+  defaultValues?: Map<string, string>
 ): void {
   for (const replacement of replacements) {
     const baseAccessor = buildPropertyAccessor(baseName, replacement.key);
@@ -630,9 +640,9 @@ function collectRawPropsWCallReplacements(session: TransformSession): Array<{
 }
 
 /**
- * Consolidate `.w([...])` arrays after the _rawProps transform: any `_rawProps.x`
- * entries collapse to a single deduped `_rawProps`.
- * e.g. `.w([arg0, _rawProps.foo, _rawProps.bar])` → `.w([arg0, _rawProps])`
+ * Consolidate `.w([...])` arrays after the _rawProps transform: any `_rawProps.x` entries collapse
+ * to a single deduped `_rawProps`. e.g. `.w([arg0, _rawProps.foo, _rawProps.bar])` → `.w([arg0,
+ * _rawProps])`
  */
 export function consolidateRawPropsInWCalls(body: string): string {
   // Textual prefilter: any body this pass could change contains both `_rawProps`
@@ -659,7 +669,11 @@ export function applyRawPropsTransform(body: string): string {
   if (!plan) return body;
 
   if (plan.replacementParamRange) {
-    session.edits.overwrite(plan.replacementParamRange.start, plan.replacementParamRange.end, '_rawProps');
+    session.edits.overwrite(
+      plan.replacementParamRange.start,
+      plan.replacementParamRange.end,
+      '_rawProps'
+    );
   }
   if (plan.removeRange) {
     // A props-derived local declared mid-body would hit a TDZ if the rest line
@@ -678,13 +692,13 @@ export function applyRawPropsTransform(body: string): string {
       session.program,
       plan.fieldLocalToKey,
       session.offset,
-      plan.excludedRanges,
+      plan.excludedRanges
     );
     applyIdentifierReplacements(
       session,
       replacements,
       plan.replacementBaseName,
-      plan.fieldLocalToDefault,
+      plan.fieldLocalToDefault
     );
   }
 
@@ -699,7 +713,7 @@ export function bodyConsolidatesToRawProps(body: string): boolean {
 
 export function consolidateQpCaptureValues(
   params: readonly string[],
-  fieldMap: ReadonlyMap<string, string>,
+  fieldMap: ReadonlyMap<string, string>
 ): string[] {
   return params.map((p) => {
     const key = fieldMap.get(p);
@@ -708,14 +722,14 @@ export function consolidateQpCaptureValues(
 }
 
 /**
- * Replace field-name references with `_rawProps.<field>` in a body string, for
- * child segments whose captures were consolidated into a single `_rawProps`.
- * With `defaultValues`, defaulted fields emit `(_rawProps.<key> ?? <default>)`.
+ * Replace field-name references with `_rawProps.<field>` in a body string, for child segments whose
+ * captures were consolidated into a single `_rawProps`. With `defaultValues`, defaulted fields emit
+ * `(_rawProps.<key> ?? <default>)`.
  */
 export function replacePropsFieldReferencesInBody(
   body: string,
   fieldMap: Map<string, string>,
-  defaultValues?: ReadonlyMap<string, string>,
+  defaultValues?: ReadonlyMap<string, string>
 ): string {
   return rewritePropsFieldReferences(body, fieldMap, {
     memberPropertyMode: 'nonComputed',

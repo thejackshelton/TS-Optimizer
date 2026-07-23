@@ -19,10 +19,7 @@ export interface LoopContext {
   loopBodyEnd: number;
 }
 
-export function detectLoopContext(
-  node: AstNode,
-  _source: string,
-): LoopContext | null {
+export function detectLoopContext(node: AstNode, _source: string): LoopContext | null {
   switch (node.type) {
     case 'CallExpression':
       return detectMapCall(node);
@@ -82,12 +79,7 @@ function detectMapCall(node: CallExpression): LoopContext | null {
 function buildLoopContext(
   type: LoopContext['type'],
   iterVars: string[],
-  node:
-    | ForStatement
-    | ForOfStatement
-    | ForInStatement
-    | WhileStatement
-    | DoWhileStatement,
+  node: ForStatement | ForOfStatement | ForInStatement | WhileStatement | DoWhileStatement
 ): LoopContext {
   const body = node.body;
   return {
@@ -104,13 +96,13 @@ export function generateParamPadding(loopVarNames: string[]): string[] {
 }
 
 /**
- * The lexical-capture params an event handler receives positionally — its
- * params after the `_, _1` (event, element) prefix, excluding padding (`_2`,
- * `_3`, … and bare `_`). Returns `[]` when there's no `_, _1` prefix.
+ * The lexical-capture params an event handler receives positionally — its params after the `_, _1`
+ * (event, element) prefix, excluding padding (`_2`, `_3`, … and bare `_`). Returns `[]` when
+ * there's no `_, _1` prefix.
  *
- * A bare `_` at index ≥2 is never a lifted param — only an author-written
- * placeholder — so it's excluded defensively (with the `_, _1` prefix present
- * it would also be a duplicate-param SyntaxError in module code).
+ * A bare `_` at index ≥2 is never a lifted param — only an author-written placeholder — so it's
+ * excluded defensively (with the `_, _1` prefix present it would also be a duplicate-param
+ * SyntaxError in module code).
  */
 export function eventHandlerQpParams(paramNames: readonly string[]): string[] {
   if (paramNames.length < 2 || paramNames[0] !== '_' || paramNames[1] !== '_1') {
@@ -127,7 +119,7 @@ export function eventHandlerQpParams(paramNames: readonly string[]): string[] {
 
 export function buildCaptureProp(
   loopVars: string[],
-  preserveOrder: boolean = false,
+  preserveOrder: boolean = false
 ): { propName: string; propValue: string } | null {
   if (loopVars.length === 0) return null;
 

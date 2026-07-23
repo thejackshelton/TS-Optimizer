@@ -8,7 +8,7 @@ describe('props-field-rewrite', () => {
       new Map([['count', 'count']]),
       {
         memberPropertyMode: 'all',
-      },
+      }
     );
 
     expect(result).toBe('obj[count] + _rawProps.count');
@@ -20,20 +20,16 @@ describe('props-field-rewrite', () => {
       new Map([['count', 'count']]),
       {
         memberPropertyMode: 'nonComputed',
-      },
+      }
     );
 
     expect(result).toBe('obj[_rawProps.count] + _rawProps.count');
   });
 
   it('rewrites shorthand object properties with explicit keys', () => {
-    const result = rewritePropsFieldReferences(
-      '({ count })',
-      new Map([['count', 'count']]),
-      {
-        memberPropertyMode: 'all',
-      },
-    );
+    const result = rewritePropsFieldReferences('({ count })', new Map([['count', 'count']]), {
+      memberPropertyMode: 'all',
+    });
 
     expect(result).toBe('({ count: _rawProps.count })');
   });

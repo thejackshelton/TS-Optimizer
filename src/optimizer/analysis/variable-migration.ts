@@ -1,6 +1,6 @@
 /**
- * Variable migration analysis: decide whether each module-level declaration is
- * moved into a segment, re-exported as `_auto_<name>`, or kept at root.
+ * Variable migration analysis: decide whether each module-level declaration is moved into a
+ * segment, re-exported as `_auto_<name>`, or kept at root.
  */
 
 import { walk } from 'oxc-walker';
@@ -76,7 +76,11 @@ function isInitializerSafe(node: AstMaybeNode): boolean {
       return isInitializerSafe(node.left) && isInitializerSafe(node.right);
 
     case 'ConditionalExpression':
-      return isInitializerSafe(node.test) && isInitializerSafe(node.consequent) && isInitializerSafe(node.alternate);
+      return (
+        isInitializerSafe(node.test) &&
+        isInitializerSafe(node.consequent) &&
+        isInitializerSafe(node.alternate)
+      );
 
     case 'MemberExpression':
       // Could trigger getters, but treated as safe for migration.
@@ -108,7 +112,10 @@ function countBindings(node: BindingPatternLike | null | undefined): number {
   return collectBindingNamesFromPattern(node).length;
 }
 
-function unwrapExport(stmt: AstProgram['body'][number]): { declaration: AstNode; isExported: boolean } {
+function unwrapExport(stmt: AstProgram['body'][number]): {
+  declaration: AstNode;
+  isExported: boolean;
+} {
   if (
     (stmt.type === 'ExportNamedDeclaration' || stmt.type === 'ExportDefaultDeclaration') &&
     stmt.declaration
@@ -118,10 +125,7 @@ function unwrapExport(stmt: AstProgram['body'][number]): { declaration: AstNode;
   return { declaration: stmt, isExported: false };
 }
 
-export function collectModuleLevelDecls(
-  program: AstProgram,
-  source: string,
-): ModuleLevelDecl[] {
+export function collectModuleLevelDecls(program: AstProgram, source: string): ModuleLevelDecl[] {
   const decls: ModuleLevelDecl[] = [];
 
   for (const stmt of program.body ?? []) {
@@ -144,7 +148,12 @@ export function collectModuleLevelDecls(
 
         for (const name of names) {
           decls.push({
-            name, declStart, declEnd, declText, isExported, hasSideEffects,
+            name,
+            declStart,
+            declEnd,
+            declText,
+            isExported,
+            hasSideEffects,
             isPartOfSharedDestructuring: isShared,
             kind,
           });
@@ -154,7 +163,11 @@ export function collectModuleLevelDecls(
       const name = declaration.id?.name;
       if (name) {
         decls.push({
-          name, declStart, declEnd, declText, isExported,
+          name,
+          declStart,
+          declEnd,
+          declText,
+          isExported,
           hasSideEffects: false,
           isPartOfSharedDestructuring: false,
           kind: 'function',
@@ -164,7 +177,11 @@ export function collectModuleLevelDecls(
       const name = declaration.id?.name;
       if (name) {
         decls.push({
-          name, declStart, declEnd, declText, isExported,
+          name,
+          declStart,
+          declEnd,
+          declText,
+          isExported,
           hasSideEffects: false,
           isPartOfSharedDestructuring: false,
           kind: 'class',
@@ -174,7 +191,11 @@ export function collectModuleLevelDecls(
       const name = declaration.id?.name;
       if (name) {
         decls.push({
-          name, declStart, declEnd, declText, isExported,
+          name,
+          declStart,
+          declEnd,
+          declText,
+          isExported,
           hasSideEffects: false,
           isPartOfSharedDestructuring: false,
           kind: 'const', // enums behave like const for migration
@@ -189,7 +210,7 @@ export function collectModuleLevelDecls(
       for (const spec of stmt.specifiers) {
         const localName = spec.local?.type === 'Identifier' ? spec.local.name : spec.local?.value;
         if (!localName) continue;
-        const decl = decls.find(d => d.name === localName);
+        const decl = decls.find((d) => d.name === localName);
         if (decl) decl.isExported = true;
       }
     }
@@ -199,8 +220,8 @@ export function collectModuleLevelDecls(
 }
 
 /**
- * Add the binding names a single node declares to `target`. Shared with the
- * gather walk's segment-usage projection.
+ * Add the binding names a single node declares to `target`. Shared with the gather walk's
+ * segment-usage projection.
  */
 export function addDeclaredNamesFromNode(node: AstNode, target: Set<string>): void {
   const type = node.type;
@@ -243,18 +264,16 @@ export const DECLARATION_TYPES = new Set([
 ]);
 
 /**
- * True when an Identifier is not a binding reference: a non-computed member
- * property (`obj.x`), a non-shorthand non-computed object-property key
- * (`{ x: v }`), or a non-computed class-member key. Usage attribution is
- * reference-semantic and must skip these — counting them fabricates phantom
- * usage for any module-level decl whose name collides with a property name
- * (e.g. a root `startViewTransition` vs `document.startViewTransition`), which
- * wrongly demotes a single-segment MOVE to a dual-use REEXPORT. Shared with the
- * gather walk's segment-usage projection.
+ * True when an Identifier is not a binding reference: a non-computed member property (`obj.x`), a
+ * non-shorthand non-computed object-property key (`{ x: v }`), or a non-computed class-member key.
+ * Usage attribution is reference-semantic and must skip these — counting them fabricates phantom
+ * usage for any module-level decl whose name collides with a property name (e.g. a root
+ * `startViewTransition` vs `document.startViewTransition`), which wrongly demotes a single-segment
+ * MOVE to a dual-use REEXPORT. Shared with the gather walk's segment-usage projection.
  */
 export function isNonReferenceIdentifier(
   node: AstNode,
-  parent: AstNode | null | undefined,
+  parent: AstNode | null | undefined
 ): boolean {
   if (!parent) return false;
   if (parent.type === 'MemberExpression') {
@@ -270,9 +289,8 @@ export function isNonReferenceIdentifier(
 }
 
 /**
- * Positions of top-level declaration-site identifiers, skipped during usage
- * attribution so they don't count as root usage. Shared with the gather walk's
- * segment-usage projection.
+ * Positions of top-level declaration-site identifiers, skipped during usage attribution so they
+ * don't count as root usage. Shared with the gather walk's segment-usage projection.
  */
 export function collectRootDeclPositions(program: AstProgram): Set<number> {
   const positions = new Set<number>();
@@ -296,7 +314,7 @@ export function collectRootDeclPositions(program: AstProgram): Set<number> {
 
 function collectBindingPositions(
   node: BindingPatternLike | null | undefined,
-  positions: Set<number>,
+  positions: Set<number>
 ): void {
   if (!node) return;
 
@@ -341,19 +359,17 @@ function collectBindingPositions(
 }
 
 /**
- * Attribute every identifier reference to a segment or root scope, filtering
- * locally-declared names within segments and root declaration-site identifiers.
- * Classification can't happen inline during `enter`: in DFS order a reference
- * can be visited before its hoisted declaration
- * (`function f() { g(); function g() {} }`), so visits are buffered and
- * classified post-walk once the locals map is complete.
+ * Attribute every identifier reference to a segment or root scope, filtering locally-declared names
+ * within segments and root declaration-site identifiers. Classification can't happen inline during
+ * `enter`: in DFS order a reference can be visited before its hoisted declaration (`function f() {
+ * g(); function g() {} }`), so visits are buffered and classified post-walk once the locals map is
+ * complete.
  *
- * Retained as the differential oracle for the gather walk's segment-usage
- * projection.
+ * Retained as the differential oracle for the gather walk's segment-usage projection.
  */
 export function computeSegmentUsage(
   program: AstProgram,
-  extractions: Array<{ symbolName: string; argStart: number; argEnd: number }>,
+  extractions: Array<{ symbolName: string; argStart: number; argEnd: number }>
 ): { segmentUsage: Map<string, Set<string>>; rootUsage: Set<string> } {
   const segmentUsage = new Map<string, Set<string>>();
   const rootUsage = new Set<string>();
@@ -420,14 +436,16 @@ export function computeSegmentUsage(
 }
 
 /**
- * Reasons returned in `MigrationDecision.reason`. Centralised so the same MIG
- * code never appears as a free-floating string in two places. Keys follow
- * `<ACTION>_<DISCRIMINATOR>` so the action is visible at the call site.
+ * Reasons returned in `MigrationDecision.reason`. Centralised so the same MIG code never appears as
+ * a free-floating string in two places. Keys follow `<ACTION>_<DISCRIMINATOR>` so the action is
+ * visible at the call site.
  */
 export const MIG_REASON = {
   MOVE_SINGLE_SEGMENT: 'single-use safe variable (MIG-01)',
-  MOVE_SHARED_DESTRUCTURE_UNIFIED: 'all bindings of shared destructure flow to same single segment (MIG-05a)',
-  MOVE_TRANSITIVE_DEP: 'dependency of a moved decl, used only by movers to the same segment (MIG-06a)',
+  MOVE_SHARED_DESTRUCTURE_UNIFIED:
+    'all bindings of shared destructure flow to same single segment (MIG-05a)',
+  MOVE_TRANSITIVE_DEP:
+    'dependency of a moved decl, used only by movers to the same segment (MIG-06a)',
   REEXPORT_EXPORTED: 'exported variable used by segment (MIG-03)',
   REEXPORT_DUAL_USE: 'used by both root code and segment(s)',
   REEXPORT_MULTI_SEGMENT: 'used by multiple segments (MIG-02)',
@@ -445,37 +463,35 @@ const INLINE_STRATEGY_REEXPORT_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Inline/hoist strategy keeps segment bodies in the parent, so a decl a segment
- * consumes is already in scope. Only reexports needed beyond this module survive
- * — exported (MIG-03) and multi-consumer (MIG-02). Side-effect (MIG-04),
- * shared-destructure (MIG-05) and moved-dep (MIG-06) reexports are redundant
- * here and dropped, as is every `move` (which would delete a decl the in-parent
- * body still references).
+ * Inline/hoist strategy keeps segment bodies in the parent, so a decl a segment consumes is already
+ * in scope. Only reexports needed beyond this module survive — exported (MIG-03) and multi-consumer
+ * (MIG-02). Side-effect (MIG-04), shared-destructure (MIG-05) and moved-dep (MIG-06) reexports are
+ * redundant here and dropped, as is every `move` (which would delete a decl the in-parent body
+ * still references).
  */
 export function filterInlineStrategyMigrations(
-  decisions: readonly MigrationDecision[],
+  decisions: readonly MigrationDecision[]
 ): MigrationDecision[] {
   return decisions.filter(
-    (d) => d.action === 'reexport' && INLINE_STRATEGY_REEXPORT_REASONS.has(d.reason),
+    (d) => d.action === 'reexport' && INLINE_STRATEGY_REEXPORT_REASONS.has(d.reason)
   );
 }
 
 /**
- * Identifier names referenced within a module-level declaration's byte range.
- * Walks the enclosing top-level statement; the range filter stays because the
- * decl range can be narrower than the statement (one declarator of many).
- * `referencesOnly` skips property-position identifiers (for binding-level
- * decisions); the default keeps the name-harvest semantics `wireMigration` uses
- * for import wiring.
+ * Identifier names referenced within a module-level declaration's byte range. Walks the enclosing
+ * top-level statement; the range filter stays because the decl range can be narrower than the
+ * statement (one declarator of many). `referencesOnly` skips property-position identifiers (for
+ * binding-level decisions); the default keeps the name-harvest semantics `wireMigration` uses for
+ * import wiring.
  */
 export function collectDeclIdentifiers(
   program: AstProgram,
   decl: Pick<ModuleLevelDecl, 'declStart' | 'declEnd'>,
-  referencesOnly = false,
+  referencesOnly = false
 ): Set<string> {
   const names = new Set<string>();
   const enclosingStmt = (program.body ?? []).find(
-    (stmt) => stmt.start <= decl.declStart && stmt.end >= decl.declEnd,
+    (stmt) => stmt.start <= decl.declStart && stmt.end >= decl.declEnd
   );
   walk(enclosingStmt ?? program, {
     enter(node: AstNode, parent) {
@@ -502,53 +518,52 @@ function usingSegmentsOf(name: string, segmentUsage: Map<string, Set<string>>): 
 
 /**
  * Decision tree for each module-level declaration (order matters):
- * 1. exported + used by segment -> reexport
- * 2. exported + unused by segments -> keep
- * 3. used by root + segment -> reexport
- * 4. used by multiple segments -> reexport
- * 5. has side effects -> reexport
- * 6. shared destructuring -> reexport
- * 7. used by exactly one segment -> move
- * 8. unused by any segment -> keep
  *
- * Post-pass MIG-05a: when every binding in a shared-destructure declaration
- * is `reexport`-ed solely because of MIG-05 *and* they all flow to the same
- * single segment with no root/multi-segment/export/side-effect interference,
- * the whole destructure can be moved together into that segment instead.
+ * 1. Exported + used by segment -> reexport
+ * 2. Exported + unused by segments -> keep
+ * 3. Used by root + segment -> reexport
+ * 4. Used by multiple segments -> reexport
+ * 5. Has side effects -> reexport
+ * 6. Shared destructuring -> reexport
+ * 7. Used by exactly one segment -> move
+ * 8. Unused by any segment -> keep
  *
- * Post-pass MIG-06: a `move`d declaration's body can still reference other
- * module-level declarations after it leaves the parent. Any such dependency that
- * would otherwise stay un-exported (`keep`) — or would move to a different
- * segment — flips to `reexport` so the migrated body can import it.
+ * Post-pass MIG-05a: when every binding in a shared-destructure declaration is `reexport`-ed solely
+ * because of MIG-05 _and_ they all flow to the same single segment with no
+ * root/multi-segment/export/side-effect interference, the whole destructure can be moved together
+ * into that segment instead.
+ *
+ * Post-pass MIG-06: a `move`d declaration's body can still reference other module-level
+ * declarations after it leaves the parent. Any such dependency that would otherwise stay
+ * un-exported (`keep`) — or would move to a different segment — flips to `reexport` so the migrated
+ * body can import it.
  */
 export function analyzeMigration(
   decls: ModuleLevelDecl[],
   segmentUsage: Map<string, Set<string>>,
   rootUsage: Set<string>,
-  program?: AstProgram,
+  program?: AstProgram
 ): MigrationDecision[] {
-  const decisions = decls.map(decl => decideMigration(decl, segmentUsage, rootUsage));
+  const decisions = decls.map((decl) => decideMigration(decl, segmentUsage, rootUsage));
   promoteSharedDestructureGroups(decls, decisions, segmentUsage, rootUsage);
   if (program) reexportMovedDeclDependencies(decls, decisions, program, segmentUsage);
   return decisions;
 }
 
 /**
- * MIG-06 post-pass — see {@link analyzeMigration}. Mutates `decisions` in place,
- * in two stages:
+ * MIG-06 post-pass — see {@link analyzeMigration}. Mutates `decisions` in place, in two stages:
  *
- * 1. Demote to fixpoint: a `move` whose decl is referenced by another `move`
- *    targeting a *different* segment can't leave the parent — demote it to
- *    `reexport`. Iterated because each demotion can strand a previously-
- *    compatible mover.
- * 2. Flip orphaned keeps: any `keep` dependency of a surviving `move` flips to
- *    `reexport` so the migrated body can import it from the parent.
+ * 1. Demote to fixpoint: a `move` whose decl is referenced by another `move` targeting a _different_
+ *    segment can't leave the parent — demote it to `reexport`. Iterated because each demotion can
+ *    strand a previously- compatible mover.
+ * 2. Flip orphaned keeps: any `keep` dependency of a surviving `move` flips to `reexport` so the
+ *    migrated body can import it from the parent.
  */
 function reexportMovedDeclDependencies(
   decls: ModuleLevelDecl[],
   decisions: MigrationDecision[],
   program: AstProgram,
-  segmentUsage: Map<string, Set<string>>,
+  segmentUsage: Map<string, Set<string>>
 ): void {
   const indexByName = new Map<string, number>();
   for (let i = 0; i < decls.length; i++) indexByName.set(decls[i].name, i);
@@ -582,10 +597,7 @@ function reexportMovedDeclDependencies(
         const depIdx = indexByName.get(dep);
         if (depIdx === undefined || decls[depIdx].isExported) continue;
         const depDecision = decisions[depIdx];
-        if (
-          depDecision.action === 'move' &&
-          depDecision.targetSegment !== decision.targetSegment
-        ) {
+        if (depDecision.action === 'move' && depDecision.targetSegment !== decision.targetSegment) {
           flipToReexport(depIdx);
           changed = true;
         }
@@ -598,7 +610,10 @@ function reexportMovedDeclDependencies(
     for (const dep of collectDeclIdentifiers(program, decls[j], true)) {
       if (dep === decls[j].name) continue;
       let refs = referencedByDecls.get(dep);
-      if (!refs) { refs = new Set(); referencedByDecls.set(dep, refs); }
+      if (!refs) {
+        refs = new Set();
+        referencedByDecls.set(dep, refs);
+      }
       refs.add(j);
     }
   }
@@ -648,13 +663,9 @@ function reexportMovedDeclDependencies(
   }
 }
 
-function collectTopLevelStatementRefs(
-  program: AstProgram,
-  decls: ModuleLevelDecl[],
-): Set<string> {
+function collectTopLevelStatementRefs(program: AstProgram, decls: ModuleLevelDecl[]): Set<string> {
   const ranges = decls.map((d) => [d.declStart, d.declEnd] as const);
-  const inDecl = (pos: number): boolean =>
-    ranges.some(([s, e]) => pos >= s && pos < e);
+  const inDecl = (pos: number): boolean => ranges.some(([s, e]) => pos >= s && pos < e);
   const refs = new Set<string>();
   walk(program, {
     enter(node: AstNode, parent) {
@@ -673,7 +684,7 @@ function collectTopLevelStatementRefs(
 function decideMigration(
   decl: ModuleLevelDecl,
   segmentUsage: Map<string, Set<string>>,
-  rootUsage: Set<string>,
+  rootUsage: Set<string>
 ): MigrationDecision {
   const usingSegments = usingSegmentsOf(decl.name, segmentUsage);
   const usedByAnySegment = usingSegments.length > 0;
@@ -695,35 +706,46 @@ function decideMigration(
     return { action: 'reexport', varName: decl.name, reason: MIG_REASON.REEXPORT_SIDE_EFFECTS };
   }
   if (decl.isPartOfSharedDestructuring && usedByAnySegment) {
-    return { action: 'reexport', varName: decl.name, reason: MIG_REASON.REEXPORT_SHARED_DESTRUCTURE };
+    return {
+      action: 'reexport',
+      varName: decl.name,
+      reason: MIG_REASON.REEXPORT_SHARED_DESTRUCTURE,
+    };
   }
   if (usingSegments.length === 1) {
-    return { action: 'move', varName: decl.name, targetSegment: usingSegments[0], reason: MIG_REASON.MOVE_SINGLE_SEGMENT };
+    return {
+      action: 'move',
+      varName: decl.name,
+      targetSegment: usingSegments[0],
+      reason: MIG_REASON.MOVE_SINGLE_SEGMENT,
+    };
   }
   return { action: 'keep', varName: decl.name, reason: MIG_REASON.KEEP_UNUSED };
 }
 
 /**
- * MIG-05a post-pass. When every binding in a shared-destructure declaration
- * flows to the same single segment with no root/multi-segment/export/side-effect
- * interference, promote them all from `reexport` to `move` targeting that
- * segment. Mutates `decisions` in place; no-op otherwise.
+ * MIG-05a post-pass. When every binding in a shared-destructure declaration flows to the same
+ * single segment with no root/multi-segment/export/side-effect interference, promote them all from
+ * `reexport` to `move` targeting that segment. Mutates `decisions` in place; no-op otherwise.
  *
- * Preconditions per binding: not exported, no side effects, not used by root;
- * used by exactly one segment; all siblings target the same segment.
+ * Preconditions per binding: not exported, no side effects, not used by root; used by exactly one
+ * segment; all siblings target the same segment.
  */
 function promoteSharedDestructureGroups(
   decls: ModuleLevelDecl[],
   decisions: MigrationDecision[],
   segmentUsage: Map<string, Set<string>>,
-  rootUsage: Set<string>,
+  rootUsage: Set<string>
 ): void {
   const groupsByDeclSpan = new Map<string, number[]>();
   for (let i = 0; i < decls.length; i++) {
     if (!decls[i].isPartOfSharedDestructuring) continue;
     const key = `${decls[i].declStart}:${decls[i].declEnd}`;
     let group = groupsByDeclSpan.get(key);
-    if (!group) { group = []; groupsByDeclSpan.set(key, group); }
+    if (!group) {
+      group = [];
+      groupsByDeclSpan.set(key, group);
+    }
     group.push(i);
   }
 
@@ -744,14 +766,14 @@ function promoteSharedDestructureGroups(
 }
 
 /**
- * Returns the single segment all siblings flow to, or null if any sibling
- * fails the MIG-05a preconditions.
+ * Returns the single segment all siblings flow to, or null if any sibling fails the MIG-05a
+ * preconditions.
  */
 function unifiedSingleSegmentTarget(
   indices: number[],
   decls: ModuleLevelDecl[],
   segmentUsage: Map<string, Set<string>>,
-  rootUsage: Set<string>,
+  rootUsage: Set<string>
 ): string | null {
   let target: string | null = null;
 

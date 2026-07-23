@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  compareMetadata,
-  type MetadataCompareResult,
-} from '../../src/testing/metadata-compare.js';
+import { compareMetadata, type MetadataCompareResult } from '../../src/testing/metadata-compare.js';
 import type { SegmentMetadata } from '../../src/testing/snapshot-parser.js';
 
 function makeMetadata(overrides: Partial<SegmentMetadata> = {}): SegmentMetadata {

@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import type {
@@ -84,9 +83,7 @@ export const C = component$((props) => {
 `;
     const result = transform(src);
     const segs = result.modules.filter((m) => m.kind === 'segment');
-    const inner = segs.find((m) =>
-      m.kind === 'segment' && m.segment.ctxName === 'useTask$'
-    );
+    const inner = segs.find((m) => m.kind === 'segment' && m.segment.ctxName === 'useTask$');
     if (!inner) {
       throw new Error('expected a useTask$ segment');
     }
@@ -106,8 +103,8 @@ export const C = component$((props) => {
 `;
     const result = transform(src);
     const segs = result.modules.filter((m) => m.kind === 'segment');
-    const innerTask = segs.find((m) =>
-      m.kind === 'segment' && m.segment.ctxName === 'useVisibleTask$'
+    const innerTask = segs.find(
+      (m) => m.kind === 'segment' && m.segment.ctxName === 'useVisibleTask$'
     );
     if (!innerTask) {
       throw new Error('expected a useVisibleTask$ segment');

@@ -39,8 +39,14 @@ describe('formatSameFileImport', () => {
   });
 
   it('emits an aliased import for _auto_ / default / renamed names', () => {
-    expect(formatSameFileImport('foo', '_auto_foo', './parent')).toBe('import { _auto_foo as foo } from "./parent";');
-    expect(formatSameFileImport('foo', 'default', './parent')).toBe('import { default as foo } from "./parent";');
-    expect(formatSameFileImport('foo', 'renExported', './parent')).toBe('import { renExported as foo } from "./parent";');
+    expect(formatSameFileImport('foo', '_auto_foo', './parent')).toBe(
+      'import { _auto_foo as foo } from "./parent";'
+    );
+    expect(formatSameFileImport('foo', 'default', './parent')).toBe(
+      'import { default as foo } from "./parent";'
+    );
+    expect(formatSameFileImport('foo', 'renExported', './parent')).toBe(
+      'import { renExported as foo } from "./parent";'
+    );
   });
 });

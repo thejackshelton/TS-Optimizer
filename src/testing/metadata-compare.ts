@@ -13,7 +13,7 @@ export interface MetadataCompareResult {
 
 export function compareMetadata(
   expected: SegmentMetadata,
-  actual: SegmentMetadata,
+  actual: SegmentMetadata
 ): MetadataCompareResult {
   const mismatches: MetadataFieldMismatch[] = [];
 

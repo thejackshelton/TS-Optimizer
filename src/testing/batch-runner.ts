@@ -28,11 +28,7 @@ export function getSnapshotFiles(dir: string): string[] {
     .sort();
 }
 
-export function getBatchFiles(
-  files: string[],
-  batchSize: number,
-  batchIndex: number,
-): string[] {
+export function getBatchFiles(files: string[], batchSize: number, batchIndex: number): string[] {
   const start = batchIndex * batchSize;
   return files.slice(start, start + batchSize);
 }
@@ -44,18 +40,12 @@ export function loadLockedSnapshots(lockFile: string): string[] {
 }
 
 export function saveLockedSnapshots(lockFile: string, names: string[]): void {
-  writeFileSync(
-    lockFile,
-    JSON.stringify([...new Set(names)].sort(), null, 2) + '\n',
-  );
+  writeFileSync(lockFile, JSON.stringify([...new Set(names)].sort(), null, 2) + '\n');
 }
 
 export function runBatch(
   config: BatchConfig,
-  testFn?: (
-    snapshot: ParsedSnapshot,
-    filename: string,
-  ) => { passed: boolean; error?: string },
+  testFn?: (snapshot: ParsedSnapshot, filename: string) => { passed: boolean; error?: string }
 ): BatchResult {
   const allFiles = getSnapshotFiles(config.snapshotDir);
   const batchFiles = getBatchFiles(allFiles, config.batchSize, config.batchIndex);
@@ -93,13 +83,8 @@ export function runBatch(
   };
 }
 
-export function lockPassingSnapshots(
-  lockFile: string,
-  batchResult: BatchResult,
-): void {
+export function lockPassingSnapshots(lockFile: string, batchResult: BatchResult): void {
   const existing = loadLockedSnapshots(lockFile);
-  const newlyPassing = batchResult.results
-    .filter((r) => r.passed)
-    .map((r) => r.file);
+  const newlyPassing = batchResult.results.filter((r) => r.passed).map((r) => r.file);
   saveLockedSnapshots(lockFile, [...existing, ...newlyPassing]);
 }

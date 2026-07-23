@@ -9,8 +9,8 @@ import {
   whitespace,
   wordBoundary,
   wordChar,
-} from "magic-regexp";
-import { transformSync as oxcTransformSync, type TransformOptions } from "oxc-transform";
+} from 'magic-regexp';
+import { transformSync as oxcTransformSync, type TransformOptions } from 'oxc-transform';
 import type { SegmentCaptureInfo } from './segment-codegen.js';
 import {
   applySegmentConstReplacement,
@@ -24,10 +24,10 @@ import { parseWithRawTransfer } from '../ast/parse.js';
 import type { AstProgram } from '../../ast-types.js';
 
 /**
- * `parentSourceExt` is the parent input file's extension (`.tsx`/`.ts`/`.jsx`/
- * `.js`), distinct from the segment's *output* `extension`/`sourceExtensions`
- * (often downgraded to `.js`): it drives oxc-transform's parser-input filename
- * so a TS- or JSX-bearing segment body isn't rejected as a syntax error.
+ * `parentSourceExt` is the parent input file's extension (`.tsx`/`.ts`/`.jsx`/ `.js`), distinct
+ * from the segment's _output_ `extension`/`sourceExtensions` (often downgraded to `.js`): it drives
+ * oxc-transform's parser-input filename so a TS- or JSX-bearing segment body isn't rejected as a
+ * syntax error.
  */
 export interface SegmentPostProcessOptions {
   symbolName: string;
@@ -44,65 +44,61 @@ export interface SegmentPostProcessOptions {
 }
 
 const tsTypeAnnotationProbe = createRegExp(
-  exactly(":")
+  exactly(':')
     .and(whitespace.times.any())
-    .and(charIn("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_${[(")),
+    .and(charIn('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_${[('))
 );
 
 const tsAngleAssertionProbe = createRegExp(
-  exactly("<")
+  exactly('<')
     .and(oneOrMore(wordChar))
-    .and(">")
-    .notBefore(whitespace.times.any(), anyOf(")", ",", ";")),
+    .and('>')
+    .notBefore(whitespace.times.any(), anyOf(')', ',', ';'))
 );
 
-const tsGenericTypeListProbe = createRegExp(
-  exactly("<").and(oneOrMore(wordChar)).and(","),
-);
+const tsGenericTypeListProbe = createRegExp(exactly('<').and(oneOrMore(wordChar)).and(','));
 
-const tsAsCastProbe = createRegExp(
-  wordBoundary.and("as").and(oneOrMore(whitespace)).and(wordChar),
-);
+const tsAsCastProbe = createRegExp(wordBoundary.and('as').and(oneOrMore(whitespace)).and(wordChar));
 
 const tsDeclarationProbe = createRegExp(
   wordBoundary
-    .and(anyOf("interface", "type", "enum"))
+    .and(anyOf('interface', 'type', 'enum'))
     .and(oneOrMore(whitespace))
-    .and(wordChar),
+    .and(wordChar)
 );
 
 const tsNonNullPropertyProbe = createRegExp(
-  oneOrMore(wordChar).and(whitespace.times.any()).and(anyOf("!.", "![")),
+  oneOrMore(wordChar).and(whitespace.times.any()).and(anyOf('!.', '!['))
 );
 
 const tsGenericCallProbe = createRegExp(
-  exactly("<")
-    .and(charIn("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  exactly('<')
+    .and(charIn('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
     .and(wordChar.times.any())
     .and(
-      whitespace
-        .times.any()
-        .and(",")
+      whitespace.times
+        .any()
+        .and(',')
         .and(whitespace.times.any())
         .and(oneOrMore(wordChar))
-        .times.any(),
+        .times.any()
     )
     .and(whitespace.times.any())
-    .and(">")
+    .and('>')
     .and(whitespace.times.any())
-    .and("("),
+    .and('(')
 );
 
-const pureAnnotationComment = createRegExp(exactly("/* @__PURE__ */"), [global]);
+const pureAnnotationComment = createRegExp(exactly('/* @__PURE__ */'), [global]);
 
-export const leadingSquareBracket = createRegExp(exactly("[").at.lineStart());
+export const leadingSquareBracket = createRegExp(exactly('[').at.lineStart());
 
-export const trailingSquareBracket = createRegExp(exactly("]").at.lineEnd());
+export const trailingSquareBracket = createRegExp(exactly(']').at.lineEnd());
 
-export const leadingDot = createRegExp(exactly(".").at.lineStart());
+export const leadingDot = createRegExp(exactly('.').at.lineStart());
 
 export const paddingParam = createRegExp(
-  exactly("_").and(digit.times.any()).at.lineStart().at.lineEnd(),
+  exactly('_').and(digit.times.any()).at.lineStart().at.lineEnd()
 );
 
 const wholeWordPatternCache = new Map<string, RegExp>();
@@ -113,16 +109,14 @@ export function getWholeWordPattern(name: string): RegExp {
     return cached;
   }
 
-  const pattern = createRegExp(
-    wordBoundary.and(exactly(name)).and(wordBoundary),
-  );
+  const pattern = createRegExp(wordBoundary.and(exactly(name)).and(wordBoundary));
   wholeWordPatternCache.set(name, pattern);
   return pattern;
 }
 
 function hasCapturePayload(
   captureInfo: SegmentCaptureInfo,
-  includeConstLiterals: boolean,
+  includeConstLiterals: boolean
 ): boolean {
   if (captureInfo.captureNames.length > 0) return true;
   if (captureInfo.autoImports.length > 0) return true;
@@ -132,7 +126,7 @@ function hasCapturePayload(
 
 export function resolveCaptureInfo(
   captureInfo: SegmentCaptureInfo,
-  isInlinedQrl: boolean,
+  isInlinedQrl: boolean
 ): SegmentCaptureInfo | undefined {
   const includeConstLiterals = !isInlinedQrl;
   if (!hasCapturePayload(captureInfo, includeConstLiterals)) {
@@ -146,10 +140,7 @@ export function resolveCaptureInfo(
   return captureInfo;
 }
 
-export function postProcessSegmentCode(
-  code: string,
-  opts: SegmentPostProcessOptions,
-): string {
+export function postProcessSegmentCode(code: string, opts: SegmentPostProcessOptions): string {
   let result = code;
   const filename = opts.canonicalFilename + opts.extension;
 
@@ -165,14 +156,13 @@ export function postProcessSegmentCode(
     // Segments under a foreign `@jsxImportSource` pragma have raw JSX in their
     // body (Qwik's JSX-syntax rewrite was skipped); the TS-syntax probes don't
     // detect plain JSX, so force oxc-transform when the body still contains JSX.
-    const needsJsxStrip =
-      opts.shouldTranspileJsx && /<\/?[A-Za-z]/.test(result);
+    const needsJsxStrip = opts.shouldTranspileJsx && /<\/?[A-Za-z]/.test(result);
     if (hasTsSyntax || needsJsxStrip) {
       const tsStripOptions: TransformOptions = {
         typescript: { onlyRemoveTypeImports: false },
       };
       if (!opts.shouldTranspileJsx) {
-        tsStripOptions.jsx = "preserve";
+        tsStripOptions.jsx = 'preserve';
       }
       // Parser-input filename must reflect the *source* dialect so oxc-transform
       // parses the segment body correctly (see parentSourceExt).
@@ -180,11 +170,11 @@ export function postProcessSegmentCode(
       const tsStripped = oxcTransformSync(
         opts.canonicalFilename + sourceExt,
         result,
-        tsStripOptions,
+        tsStripOptions
       );
       if (tsStripped.code) {
         result = tsStripped.code;
-        result = result.replace(pureAnnotationComment, "/*#__PURE__*/");
+        result = result.replace(pureAnnotationComment, '/*#__PURE__*/');
       }
     }
   }
@@ -213,10 +203,10 @@ export function postProcessSegmentCode(
 
   if (
     opts.isServer !== undefined &&
-    (result.includes("@qwik.dev/core") || result.includes("@builder.io/qwik"))
+    (result.includes('@qwik.dev/core') || result.includes('@builder.io/qwik'))
   ) {
     result = runHelper(() =>
-      applySegmentConstReplacement(result, filename, opts.isServer, lazyParse()),
+      applySegmentConstReplacement(result, filename, opts.isServer, lazyParse())
     );
   }
 
@@ -224,22 +214,18 @@ export function postProcessSegmentCode(
     result = runHelper(() => applySegmentDCE(result));
   }
 
-  const exportIdx = result.indexOf("export const ");
-  const afterExportLine = exportIdx >= 0 ? result.indexOf("\n", exportIdx) : -1;
-  if (afterExportLine >= 0 && result.indexOf("const ", afterExportLine) >= 0) {
-    result = runHelper(() =>
-      applySegmentSideEffectSimplification(result, filename, lazyParse()),
-    );
+  const exportIdx = result.indexOf('export const ');
+  const afterExportLine = exportIdx >= 0 ? result.indexOf('\n', exportIdx) : -1;
+  if (afterExportLine >= 0 && result.indexOf('const ', afterExportLine) >= 0) {
+    result = runHelper(() => applySegmentSideEffectSimplification(result, filename, lazyParse()));
   }
 
-  if (opts.emitMode === "hmr" && opts.devFile && isAnyComponentCtx(opts.ctxName)) {
+  if (opts.emitMode === 'hmr' && opts.devFile && isAnyComponentCtx(opts.ctxName)) {
     result = runHelper(() => injectUseHmr(result, opts.devFile!, lazyParse()));
   }
 
-  if (result.includes("\nimport ")) {
-    result = runHelper(() =>
-      removeUnusedImports(result, filename, undefined, lazyParse()),
-    );
+  if (result.includes('\nimport ')) {
+    result = runHelper(() => removeUnusedImports(result, filename, undefined, lazyParse()));
   }
 
   return result;

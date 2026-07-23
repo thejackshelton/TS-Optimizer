@@ -5,10 +5,7 @@ import type { AstNode, AstProgram } from '../../ast-types.js';
 import type { ExtractionResult } from '../extraction/extract.js';
 import type { ImportInfo } from '../extraction/marker-detection.js';
 import type { ModuleLevelDecl } from '../analysis/variable-migration.js';
-import {
-  buildQrlDeclaration,
-  getQrlImportSource,
-} from './rewrite-calls.js';
+import { buildQrlDeclaration, getQrlImportSource } from './rewrite-calls.js';
 import { isLibModePreservedMarker } from '../qwik/qrl-naming.js';
 import { escapeSymbol } from '../../hashing/naming.js';
 import { buildQrlDevDeclaration, buildDevFilePath } from '../segment/dev-mode.js';
@@ -37,10 +34,7 @@ import { injectUseHmrIntoInlineBody } from '../transform/module-cleanup.js';
 import type { InlineSegmentJsxOptions } from './raw-props.js';
 import type { RewriteContext } from './rewrite-context.js';
 
-function isCustomInlined(
-  ext: ExtractionResult,
-  originalImports: Map<string, ImportInfo>,
-): boolean {
+function isCustomInlined(ext: ExtractionResult, originalImports: Map<string, ImportInfo>): boolean {
   for (const [, info] of originalImports) {
     if (info.importedName === ext.calleeName) return false;
   }
@@ -48,9 +42,20 @@ function isCustomInlined(
 }
 
 export function collectNeededImports(ctx: RewriteContext): void {
-  const { neededImports, alreadyImported, topLevel, extractions,
-    inlineOptions, isDevMode, isInline, inlinedQrlSymbols,
-    noArgQrlCallees, eventHandlerExtraImports, jsxResult, originalImports } = ctx;
+  const {
+    neededImports,
+    alreadyImported,
+    topLevel,
+    extractions,
+    inlineOptions,
+    isDevMode,
+    isInline,
+    inlinedQrlSymbols,
+    noArgQrlCallees,
+    eventHandlerExtraImports,
+    jsxResult,
+    originalImports,
+  } = ctx;
   const hasTopLevelNonSync = topLevel.some((e) => !e.isSync);
   const hasAnyNonSync = extractions.some((e) => !e.isSync);
 
@@ -62,7 +67,13 @@ export function collectNeededImports(ctx: RewriteContext): void {
       }
     }
     const needsCapturesImport = extractions.some(
-      (e) => !e.isSync && e.captureNames.length > 0 && !(inlineOptions && isStrippedExtraction(e, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers)),
+      (e) =>
+        !e.isSync &&
+        e.captureNames.length > 0 &&
+        !(
+          inlineOptions &&
+          isStrippedExtraction(e, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers)
+        )
     );
     if (needsCapturesImport && !alreadyImported.has('_captures')) {
       neededImports.set('_captures', '@qwik.dev/core');
@@ -70,10 +81,14 @@ export function collectNeededImports(ctx: RewriteContext): void {
   } else if (inlineOptions && !inlineOptions.inline) {
     if (hasTopLevelNonSync) {
       const hasNonStripped = topLevel.some(
-        (e) => !e.isSync && !isStrippedExtraction(e, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers),
+        (e) =>
+          !e.isSync &&
+          !isStrippedExtraction(e, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers)
       );
       const hasStripped = topLevel.some(
-        (e) => !e.isSync && isStrippedExtraction(e, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers),
+        (e) =>
+          !e.isSync &&
+          isStrippedExtraction(e, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers)
       );
       if (hasNonStripped) {
         const qrlSymbol = isDevMode ? 'qrlDEV' : 'qrl';
@@ -89,7 +104,7 @@ export function collectNeededImports(ctx: RewriteContext): void {
       const qrlSymbol = isDevMode ? 'qrlDEV' : 'qrl';
       if (!alreadyImported.has(qrlSymbol)) neededImports.set(qrlSymbol, '@qwik.dev/core');
       const hasInlinedQrlLocal = topLevel.some(
-        (e) => e.isInlinedQrl && !ctx.relPath.includes('node_modules'),
+        (e) => e.isInlinedQrl && !ctx.relPath.includes('node_modules')
       );
       if (hasInlinedQrlLocal && !isDevMode && !alreadyImported.has('qrlDEV')) {
         neededImports.set('qrlDEV', '@qwik.dev/core');
@@ -145,9 +160,20 @@ export function collectNeededImports(ctx: RewriteContext): void {
 }
 
 export function buildQrlDeclarations(ctx: RewriteContext): void {
-  const { extractions, inlineOptions, isDevMode, devFilePath, isInline,
-    inlinedQrlSymbols, explicitExtensions, outputExtension, relPath } = ctx;
-  const topLevelNonSync = extractions.filter((e) => !e.isSync && e.parent === null && !inlinedQrlSymbols.has(e.symbolName));
+  const {
+    extractions,
+    inlineOptions,
+    isDevMode,
+    devFilePath,
+    isInline,
+    inlinedQrlSymbols,
+    explicitExtensions,
+    outputExtension,
+    relPath,
+  } = ctx;
+  const topLevelNonSync = extractions.filter(
+    (e) => !e.isSync && e.parent === null && !inlinedQrlSymbols.has(e.symbolName)
+  );
   const allNonSync = extractions.filter((e) => !e.isSync && !inlinedQrlSymbols.has(e.symbolName));
 
   // A moved source-decl carries its `componentQrl(q_<sym>)` wrap into the
@@ -177,14 +203,22 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
   if (isInline) {
     for (const ext of allNonSync) {
       const isRegCtx = matchesRegCtxName(ext, inlineOptions?.regCtxName);
-      const stripped = !isRegCtx && inlineOptions && isStrippedExtraction(ext, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers);
+      const stripped =
+        !isRegCtx &&
+        inlineOptions &&
+        isStrippedExtraction(ext, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers);
 
       if (stripped) {
         const idx = strippedCounter++;
         if (isDevMode && devFilePath) {
-          ctx.qrlDecls.push(buildStrippedNoopQrlDev(ext.symbolName, idx, {
-            file: devFilePath, lo: 0, hi: 0, displayName: ext.displayName,
-          }));
+          ctx.qrlDecls.push(
+            buildStrippedNoopQrlDev(ext.symbolName, idx, {
+              file: devFilePath,
+              lo: 0,
+              hi: 0,
+              displayName: ext.displayName,
+            })
+          );
         } else {
           ctx.qrlDecls.push(buildStrippedNoopQrl(ext.symbolName, idx));
         }
@@ -192,9 +226,14 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
         ctx.qrlVarNames.set(ext.symbolName, `q_qrl_${counter}`);
       } else {
         if (isDevMode && devFilePath) {
-          ctx.qrlDecls.push(buildNoopQrlDevDeclaration(ext.symbolName, {
-            file: devFilePath, lo: ext.argStart, hi: ext.argEnd, displayName: ext.displayName,
-          }));
+          ctx.qrlDecls.push(
+            buildNoopQrlDevDeclaration(ext.symbolName, {
+              file: devFilePath,
+              lo: ext.argStart,
+              hi: ext.argEnd,
+              displayName: ext.displayName,
+            })
+          );
         } else {
           ctx.qrlDecls.push(buildNoopQrlDeclaration(ext.symbolName));
         }
@@ -203,14 +242,23 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
     }
   } else if (inlineOptions && !inlineOptions.inline) {
     for (const ext of topLevelNonSync) {
-      const stripped = isStrippedExtraction(ext, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers);
+      const stripped = isStrippedExtraction(
+        ext,
+        inlineOptions.stripCtxName,
+        inlineOptions.stripEventHandlers
+      );
 
       if (stripped) {
         const idx = strippedCounter++;
         if (isDevMode && devFilePath) {
-          ctx.qrlDecls.push(buildStrippedNoopQrlDev(ext.symbolName, idx, {
-            file: devFilePath, lo: 0, hi: 0, displayName: ext.displayName,
-          }));
+          ctx.qrlDecls.push(
+            buildStrippedNoopQrlDev(ext.symbolName, idx, {
+              file: devFilePath,
+              lo: 0,
+              hi: 0,
+              displayName: ext.displayName,
+            })
+          );
         } else {
           ctx.qrlDecls.push(buildStrippedNoopQrl(ext.symbolName, idx));
         }
@@ -219,12 +267,27 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
       } else {
         if (isDevMode && devFilePath) {
           const devExt = explicitExtensions ? (outputExtension ?? '.js') : undefined;
-          ctx.qrlDecls.push(buildQrlDevDeclaration(
-            ext.symbolName, ext.canonicalFilename, devFilePath,
-            ext.loc[0], ext.loc[1], ext.displayName, devExt,
-          ));
+          ctx.qrlDecls.push(
+            buildQrlDevDeclaration(
+              ext.symbolName,
+              ext.canonicalFilename,
+              devFilePath,
+              ext.loc[0],
+              ext.loc[1],
+              ext.displayName,
+              devExt
+            )
+          );
         } else {
-          ctx.qrlDecls.push(buildQrlDeclaration(ext.symbolName, ext.canonicalFilename, explicitExtensions, ext.extension, outputExtension));
+          ctx.qrlDecls.push(
+            buildQrlDeclaration(
+              ext.symbolName,
+              ext.canonicalFilename,
+              explicitExtensions,
+              ext.extension,
+              outputExtension
+            )
+          );
         }
         ctx.qrlVarNames.set(ext.symbolName, `q_${ext.symbolName}`);
       }
@@ -235,7 +298,7 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
       if (movedMarkerSymbols.has(ext.symbolName) && !(isDevMode && devFilePath)) {
         const fileExt = explicitExtensions ? (outputExtension ?? '.js') : '';
         ctx.qrlDecls.push(
-          `qrl(()=>import("./${ext.canonicalFilename}${fileExt}"), "${ext.symbolName}");`,
+          `qrl(()=>import("./${ext.canonicalFilename}${fileExt}"), "${ext.symbolName}");`
         );
         // Intentionally not registering `q_<sym>` in `qrlVarNames`: the
         // parent no longer declares it, so a stray reference should surface
@@ -243,18 +306,40 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
         continue;
       }
       if (isDevMode && devFilePath) {
-        ctx.qrlDecls.push(buildQrlDevDeclaration(
-          ext.symbolName, ext.canonicalFilename, devFilePath,
-          ext.loc[0], ext.loc[1], ext.displayName, devExt,
-        ));
+        ctx.qrlDecls.push(
+          buildQrlDevDeclaration(
+            ext.symbolName,
+            ext.canonicalFilename,
+            devFilePath,
+            ext.loc[0],
+            ext.loc[1],
+            ext.displayName,
+            devExt
+          )
+        );
       } else if (ext.isInlinedQrl && !relPath.includes('node_modules')) {
         const inlinedDevFile = devFilePath ?? buildDevFilePath(relPath, '', undefined);
-        ctx.qrlDecls.push(buildQrlDevDeclaration(
-          ext.symbolName, ext.canonicalFilename, inlinedDevFile,
-          ext.loc[0], ext.loc[1], ext.displayName, devExt,
-        ));
+        ctx.qrlDecls.push(
+          buildQrlDevDeclaration(
+            ext.symbolName,
+            ext.canonicalFilename,
+            inlinedDevFile,
+            ext.loc[0],
+            ext.loc[1],
+            ext.displayName,
+            devExt
+          )
+        );
       } else {
-        ctx.qrlDecls.push(buildQrlDeclaration(ext.symbolName, ext.canonicalFilename, explicitExtensions, ext.extension, outputExtension));
+        ctx.qrlDecls.push(
+          buildQrlDeclaration(
+            ext.symbolName,
+            ext.canonicalFilename,
+            explicitExtensions,
+            ext.extension,
+            outputExtension
+          )
+        );
       }
       ctx.qrlVarNames.set(ext.symbolName, `q_${ext.symbolName}`);
     }
@@ -266,9 +351,22 @@ export function buildQrlDeclarations(ctx: RewriteContext): void {
 export function buildInlineSCalls(ctx: RewriteContext): void {
   if (!ctx.isInline) return;
 
-  const { extractions, inlineOptions, jsxOptions, isDevMode, relPath,
-    s, program, neededImports, alreadyImported, qrlVarNames, inlinedQrlSymbols, mode, transpileTs,
-    migrationDecisions } = ctx;
+  const {
+    extractions,
+    inlineOptions,
+    jsxOptions,
+    isDevMode,
+    relPath,
+    s,
+    program,
+    neededImports,
+    alreadyImported,
+    qrlVarNames,
+    inlinedQrlSymbols,
+    mode,
+    transpileTs,
+    migrationDecisions,
+  } = ctx;
   const allNonSync = extractions.filter((e) => !e.isSync && !inlinedQrlSymbols.has(e.symbolName));
 
   // A migrated decl is reachable directly — module scope under inline/hoist,
@@ -277,11 +375,15 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
   const migratedNames: ReadonlySet<string> = new Set(
     (migrationDecisions ?? [])
       .filter((d) => d.action === 'reexport' || d.action === 'move')
-      .map((d) => d.varName),
+      .map((d) => d.varName)
   );
 
-  const isHoist = inlineOptions?.entryType === 'hoist' ||
-    (inlineOptions?.entryType === 'inline' && !!transpileTs && !!jsxOptions?.enableJsx && mode !== 'dev');
+  const isHoist =
+    inlineOptions?.entryType === 'hoist' ||
+    (inlineOptions?.entryType === 'inline' &&
+      !!transpileTs &&
+      !!jsxOptions?.enableJsx &&
+      mode !== 'dev');
 
   let inlineSegmentJsxOptions: InlineSegmentJsxOptions | undefined = jsxOptions?.enableJsx
     ? {
@@ -307,7 +409,10 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
 
   for (const ext of allNonSync) {
     const isRegCtx = matchesRegCtxName(ext, inlineOptions?.regCtxName);
-    const isStrippedExt = !isRegCtx && inlineOptions && isStrippedExtraction(ext, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers);
+    const isStrippedExt =
+      !isRegCtx &&
+      inlineOptions &&
+      isStrippedExtraction(ext, inlineOptions.stripCtxName, inlineOptions.stripEventHandlers);
     if (isStrippedExt) continue;
 
     if (ext.parent !== null) {
@@ -334,15 +439,29 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
 
   const processExtraction = (ext: ExtractionResult) => {
     const varName = qrlVarNames.get(ext.symbolName) ?? `q_${ext.symbolName}`;
-    const { transformedBody: rawBody, additionalImports, hoistedDeclarations, keyCounterValue } = transformInlineSegmentBody(
-      ext, extractions, qrlVarNames, inlineSegmentJsxOptions, inlineOptions?.regCtxName, sharedHoister,
-      ctx.closureNodes, ctx.source, ctx.originalImports, ctx.relPath, ctx.jsxKeyCounterValue,
+    const {
+      transformedBody: rawBody,
+      additionalImports,
+      hoistedDeclarations,
+      keyCounterValue,
+    } = transformInlineSegmentBody(
+      ext,
+      extractions,
+      qrlVarNames,
+      inlineSegmentJsxOptions,
+      inlineOptions?.regCtxName,
+      sharedHoister,
+      ctx.closureNodes,
+      ctx.source,
+      ctx.originalImports,
+      ctx.relPath,
+      ctx.jsxKeyCounterValue,
       migratedNames,
       inlineOptions?.stripCtxName,
       inlineOptions?.stripEventHandlers,
       ctx.isServer,
       deriveIsDev(ctx.mode),
-      sharedJsxCallHoister,
+      sharedJsxCallHoister
     );
 
     let sigRewrittenBody = rawBody;
@@ -364,7 +483,10 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
 
     if (isHoist && keyCounterValue !== undefined && inlineSegmentJsxOptions) {
       ctx.jsxKeyCounterValue = keyCounterValue;
-      inlineSegmentJsxOptions = { ...inlineSegmentJsxOptions, keyCounterStart: ctx.jsxKeyCounterValue };
+      inlineSegmentJsxOptions = {
+        ...inlineSegmentJsxOptions,
+        keyCounterStart: ctx.jsxKeyCounterValue,
+      };
     } else if (keyCounterValue !== undefined) {
       // The JSX key counter is shared across every `.s(body)` block; without
       // threading it, the next body's keys would restart at 0.
@@ -435,8 +557,18 @@ export function buildInlineSCalls(ctx: RewriteContext): void {
 }
 
 export function filterUnusedImports(ctx: RewriteContext): void {
-  const { survivingUserImports, survivingImportInfos, s, qrlDecls, sCalls,
-    inlineHoistedDeclarations, isInline, inlineOptions, relPath, isLibMode } = ctx;
+  const {
+    survivingUserImports,
+    survivingImportInfos,
+    s,
+    qrlDecls,
+    sCalls,
+    inlineHoistedDeclarations,
+    isInline,
+    inlineOptions,
+    relPath,
+    isLibMode,
+  } = ctx;
 
   if (survivingUserImports.length === 0 || survivingImportInfos.length === 0) return;
 
@@ -450,7 +582,9 @@ export function filterUnusedImports(ctx: RewriteContext): void {
 
     let defaultUsed = false;
     if (info.defaultPart) {
-      defaultUsed = createRegExp(wordBoundary, exactly(info.defaultPart), wordBoundary).test(fullRefText);
+      defaultUsed = createRegExp(wordBoundary, exactly(info.defaultPart), wordBoundary).test(
+        fullRefText
+      );
     }
 
     const usedNamed: { local: string; imported: string }[] = [];
@@ -466,10 +600,17 @@ export function filterUnusedImports(ctx: RewriteContext): void {
 
     if (!defaultUsed && usedNamed.length === 0 && !info.nsPart) {
       const src = info.source;
-      const hasStripping = !!(inlineOptions?.stripCtxName?.length || inlineOptions?.stripEventHandlers);
+      const hasStripping = !!(
+        inlineOptions?.stripCtxName?.length || inlineOptions?.stripEventHandlers
+      );
       if (isInline && hasStripping && isRelativePathInsideBase(src, relPath)) {
         survivingUserImports[idx] = `import ${info.quote}${src}${info.quote};`;
-        survivingImportInfos[idx] = { ...info, namedParts: [], defaultPart: '', isSideEffect: true };
+        survivingImportInfos[idx] = {
+          ...info,
+          namedParts: [],
+          defaultPart: '',
+          isSideEffect: true,
+        };
         continue;
       }
       survivingUserImports.splice(idx, 1);
@@ -478,20 +619,19 @@ export function filterUnusedImports(ctx: RewriteContext): void {
     }
 
     if (usedNamed.length < info.namedParts.length) {
-      const namedStrs = usedNamed.map(np =>
+      const namedStrs = usedNamed.map((np) =>
         np.imported !== np.local ? `${np.imported} as ${np.local}` : np.local
       );
       let importParts = '';
       const dp = defaultUsed ? info.defaultPart : '';
       if (namedStrs.length > 0) {
-        importParts = dp
-          ? `${dp}, { ${namedStrs.join(', ')} }`
-          : `{ ${namedStrs.join(', ')} }`;
+        importParts = dp ? `${dp}, { ${namedStrs.join(', ')} }` : `{ ${namedStrs.join(', ')} }`;
       } else if (dp) {
         importParts = dp;
       }
       if (importParts) {
-        survivingUserImports[idx] = `import ${importParts} from ${info.quote}${info.source}${info.quote};`;
+        survivingUserImports[idx] =
+          `import ${importParts} from ${info.quote}${info.source}${info.quote};`;
         survivingImportInfos[idx] = { ...info, namedParts: usedNamed, defaultPart: dp };
       } else {
         survivingUserImports.splice(idx, 1);
@@ -502,9 +642,8 @@ export function filterUnusedImports(ctx: RewriteContext): void {
 }
 
 /**
- * Marks an export whose init is QRL-wrapped (`component$`/`componentQrl`) —
- * the sCall placement anchor: self-referencing sCalls must follow it to
- * avoid TDZ at module load.
+ * Marks an export whose init is QRL-wrapped (`component$`/`componentQrl`) — the sCall placement
+ * anchor: self-referencing sCalls must follow it to avoid TDZ at module load.
  */
 function isMarkerLikeCall(init: AstNode | null | undefined): boolean {
   if (!init || init.type !== 'CallExpression' || init.callee?.type !== 'Identifier') return false;
@@ -515,7 +654,8 @@ function isMarkerLikeCall(init: AstNode | null | undefined): boolean {
 function findExportedMarkerNames(program: AstProgram): Set<string> {
   const names = new Set<string>();
   for (const stmt of program.body) {
-    if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration') continue;
+    if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration')
+      continue;
     for (const decl of stmt.declaration.declarations ?? []) {
       if (decl.id?.type !== 'Identifier' || !isMarkerLikeCall(decl.init)) continue;
       names.add(decl.id.name);
@@ -528,7 +668,8 @@ function findLastMarkerExportAnchor(program: AstProgram): { start: number; end: 
   for (let i = program.body.length - 1; i >= 0; i--) {
     const stmt = program.body[i];
     if (stmt.type === 'ExportDefaultDeclaration') return { start: stmt.start, end: stmt.end };
-    if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration') continue;
+    if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration')
+      continue;
     if (isMarkerLikeCall(stmt.declaration.declarations?.[0]?.init)) {
       return { start: stmt.start, end: stmt.end };
     }
@@ -537,9 +678,8 @@ function findLastMarkerExportAnchor(program: AstProgram): { start: number; end: 
 }
 
 /**
- * Names are JS identifiers whose only regex-significant char is `$`; the
- * raw concatenation must preserve existing behavior on `$`-containing
- * names — don't silently "fix" it.
+ * Names are JS identifiers whose only regex-significant char is `$`; the raw concatenation must
+ * preserve existing behavior on `$`-containing names — don't silently "fix" it.
  */
 const wordBoundaryTesterCache = new Map<string, RegExp>();
 
@@ -554,7 +694,7 @@ function wordBoundaryTester(name: string): RegExp {
 
 function findLastReferencedDeclEnd(
   sCalls: readonly string[],
-  decls: readonly ModuleLevelDecl[],
+  decls: readonly ModuleLevelDecl[]
 ): number | null {
   let maxEnd = -1;
   for (const decl of decls) {
@@ -566,15 +706,15 @@ function findLastReferencedDeclEnd(
 }
 
 /**
- * Detects a TDZ-sensitive forward dependency: the latest decl an sCall
- * references that is declared *after* `threshold` (e.g. `q_useStyle.s(STYLES)`
- * where `const STYLES` follows the marker export). `placeSCalls` uses it to
- * position the sCall after that decl instead of before it. Null when none.
+ * Detects a TDZ-sensitive forward dependency: the latest decl an sCall references that is declared
+ * _after_ `threshold` (e.g. `q_useStyle.s(STYLES)` where `const STYLES` follows the marker export).
+ * `placeSCalls` uses it to position the sCall after that decl instead of before it. Null when
+ * none.
  */
 function findForwardReferencedDeclEnd(
   sCall: string,
   decls: readonly ModuleLevelDecl[],
-  threshold: number,
+  threshold: number
 ): number | null {
   let maxEnd = -1;
   for (const decl of decls) {
@@ -587,7 +727,7 @@ function findForwardReferencedDeclEnd(
 
 function partitionSCallsBySelfRef(
   sCalls: readonly string[],
-  exportedNames: ReadonlySet<string>,
+  exportedNames: ReadonlySet<string>
 ): { beforeExport: string[]; afterExport: string[] } {
   const beforeExport: string[] = [];
   const afterExport: string[] = [];
@@ -599,17 +739,16 @@ function partitionSCallsBySelfRef(
 }
 
 /**
- * Places each sCall at one `MagicString` offset. A per-sCall forward
- * dependency (references a decl declared after the marker anchor) is spliced
- * right after that decl to avoid TDZ; the rest group at the marker anchor —
- * self-referencing sCalls after the export, others before — else after the
+ * Places each sCall at one `MagicString` offset. A per-sCall forward dependency (references a decl
+ * declared after the marker anchor) is spliced right after that decl to avoid TDZ; the rest group
+ * at the marker anchor — self-referencing sCalls after the export, others before — else after the
  * last referenced decl, else appended at end of file.
  */
 function placeSCalls(
   s: MagicString,
   program: AstProgram,
   sCalls: readonly string[],
-  moduleLevelDecls: readonly ModuleLevelDecl[] | undefined,
+  moduleLevelDecls: readonly ModuleLevelDecl[] | undefined
 ): void {
   if (sCalls.length === 0) return;
 
@@ -618,9 +757,10 @@ function placeSCalls(
 
   const groupedSCalls: string[] = [];
   for (const sCall of sCalls) {
-    const forwardDeclEnd = markerAnchor && decls.length > 0
-      ? findForwardReferencedDeclEnd(sCall, decls, markerAnchor.end)
-      : null;
+    const forwardDeclEnd =
+      markerAnchor && decls.length > 0
+        ? findForwardReferencedDeclEnd(sCall, decls, markerAnchor.end)
+        : null;
     if (forwardDeclEnd !== null) s.appendRight(forwardDeclEnd, '\n' + sCall);
     else groupedSCalls.push(sCall);
   }
@@ -634,9 +774,7 @@ function placeSCalls(
     return;
   }
 
-  const lastDeclEnd = decls.length > 0
-    ? findLastReferencedDeclEnd(groupedSCalls, decls)
-    : null;
+  const lastDeclEnd = decls.length > 0 ? findLastReferencedDeclEnd(groupedSCalls, decls) : null;
   if (lastDeclEnd !== null) {
     s.appendRight(lastDeclEnd, '\n' + groupedSCalls.join('\n'));
     return;
@@ -646,12 +784,24 @@ function placeSCalls(
 }
 
 export function assembleOutput(ctx: RewriteContext): string {
-  const { s, source, program, neededImports, survivingUserImports, jsxResult,
-    inlineHoistedDeclarations, qrlDecls, sCalls, migrationDecisions,
-    moduleLevelDecls, jsxOptions, transpileTs } = ctx;
+  const {
+    s,
+    source,
+    program,
+    neededImports,
+    survivingUserImports,
+    jsxResult,
+    inlineHoistedDeclarations,
+    qrlDecls,
+    sCalls,
+    migrationDecisions,
+    moduleLevelDecls,
+    jsxOptions,
+    transpileTs,
+  } = ctx;
 
   const importStatements = Array.from(neededImports.entries()).map(
-    ([symbol, src]) => `import { ${symbol} } from "${src}";`,
+    ([symbol, src]) => `import { ${symbol} } from "${src}";`
   );
 
   const preamble: string[] = [];
@@ -685,7 +835,7 @@ export function assembleOutput(ctx: RewriteContext): string {
     // unnecessary and omitted.
     for (const decision of migrationDecisions) {
       if (decision.action === 'reexport') {
-        const decl = moduleLevelDecls?.find(d => d.name === decision.varName);
+        const decl = moduleLevelDecls?.find((d) => d.name === decision.varName);
         if (decl?.isExported) continue;
         s.append(`\nexport { ${decision.varName} as _auto_${decision.varName} };`);
       }
@@ -742,10 +892,10 @@ export function assembleOutput(ctx: RewriteContext): string {
 }
 
 /**
- * Extracts the imports lib mode preserves across TS-strip: the `$`-suffix
- * marker survivors (downstream consumers may import the original forms) and
- * `import { jsx as _jsx } from '@qwik.dev/core/jsx-runtime'`. Returns them
- * as they appear in `source` for the caller to re-prepend.
+ * Extracts the imports lib mode preserves across TS-strip: the `$`-suffix marker survivors
+ * (downstream consumers may import the original forms) and `import { jsx as _jsx } from
+ * '@qwik.dev/core/jsx-runtime'`. Returns them as they appear in `source` for the caller to
+ * re-prepend.
  */
 function extractLibModeReservedImports(source: string): string[] {
   const out: string[] = [];
@@ -758,12 +908,16 @@ function extractLibModeReservedImports(source: string): string[] {
   while ((m = markerRe.exec(source)) !== null) {
     const inner = m[1];
     // Keep only specifiers ending in `$` (length > 1 — excludes the bare `$`).
-    const kept = inner.split(',').map(s => s.trim()).filter(s => s.length > 1 && s.endsWith('$'));
+    const kept = inner
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 1 && s.endsWith('$'));
     if (kept.length === 0) continue;
     out.push(`import { ${kept.join(', ')} } from "@qwik.dev/core";`);
   }
 
-  const jsxRe = /import\s*\{\s*jsx\s+as\s+_jsx\s*\}\s*from\s*(["'])@qwik\.dev\/core\/jsx-runtime\1\s*;/g;
+  const jsxRe =
+    /import\s*\{\s*jsx\s+as\s+_jsx\s*\}\s*from\s*(["'])@qwik\.dev\/core\/jsx-runtime\1\s*;/g;
   const jsxMatch = jsxRe.exec(source);
   if (jsxMatch) {
     out.push(`import { jsx as _jsx } from "@qwik.dev/core/jsx-runtime";`);

@@ -1,8 +1,8 @@
 /**
- * A capture-position `inlinedQrl` (a QRL used inside another QRL's captures
- * array) is not a lazy boundary, so its body is kept inline but still needs a
- * stable top-level binding: `inlinedQrl(() => {…}, "name", […])` becomes
- * `const _inlined_name = () => {…}` + `inlinedQrl(_inlined_name, "name", […])`.
+ * A capture-position `inlinedQrl` (a QRL used inside another QRL's captures array) is not a lazy
+ * boundary, so its body is kept inline but still needs a stable top-level binding: `inlinedQrl(()
+ * => {…}, "name", […])` becomes `const _inlined_name = () => {…}` + `inlinedQrl(_inlined_name,
+ * "name", […])`.
  */
 
 import { walk } from 'oxc-walker';
@@ -55,10 +55,7 @@ function hoistOnePass(code: string): string {
   // Defer non-leaves: once a leaf's body is replaced by its identifier, the
   // enclosing candidate becomes a leaf on the next pass.
   const leaves = candidates.filter(
-    (c) =>
-      !candidates.some(
-        (o) => o !== c && o.callStart >= c.argStart && o.callEnd <= c.argEnd,
-      ),
+    (c) => !candidates.some((o) => o !== c && o.callStart >= c.argStart && o.callEnd <= c.argEnd)
   );
   if (leaves.length === 0) return code;
   leaves.sort((a, b) => a.argStart - b.argStart);
@@ -79,10 +76,7 @@ function asHoistCandidate(node: AstNode): HoistCandidate | null {
   // A function-expression first arg is an un-hoisted body; an identifier is
   // already lifted.
   const fnArg = node.arguments[0];
-  if (
-    !fnArg ||
-    (fnArg.type !== 'ArrowFunctionExpression' && fnArg.type !== 'FunctionExpression')
-  ) {
+  if (!fnArg || (fnArg.type !== 'ArrowFunctionExpression' && fnArg.type !== 'FunctionExpression')) {
     return null;
   }
   const nameArg = node.arguments[1];

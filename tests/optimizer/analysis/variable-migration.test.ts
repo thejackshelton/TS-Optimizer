@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { parseSync } from 'oxc-parser';
 import {
@@ -388,7 +387,10 @@ describe('computeSegmentUsage', () => {
 });
 
 describe('analyzeMigration MIG-06 (moved-decl dependencies)', () => {
-  function declsFor(code: string): { program: ReturnType<typeof parseSync>['program']; decls: ModuleLevelDecl[] } {
+  function declsFor(code: string): {
+    program: ReturnType<typeof parseSync>['program'];
+    decls: ModuleLevelDecl[];
+  } {
     const program = parseSync('test.tsx', code).program;
     const decls = collectModuleLevelDecls(program, code);
     return { program, decls };
@@ -450,10 +452,7 @@ describe('analyzeMigration MIG-06 (moved-decl dependencies)', () => {
   });
 
   it('demotes a dependency moving to a different segment to reexport', () => {
-    const code = [
-      'const shared = () => 1;',
-      'const helperA = () => shared();',
-    ].join('\n');
+    const code = ['const shared = () => 1;', 'const helperA = () => shared();'].join('\n');
     const { program, decls } = declsFor(code);
 
     const segmentUsage = new Map([
@@ -471,10 +470,7 @@ describe('analyzeMigration MIG-06 (moved-decl dependencies)', () => {
   });
 
   it('does not flip dependencies of decls that stay in the parent', () => {
-    const code = [
-      'const SETTINGS = { mode: 1 };',
-      'const stays = () => SETTINGS.mode;',
-    ].join('\n');
+    const code = ['const SETTINGS = { mode: 1 };', 'const stays = () => SETTINGS.mode;'].join('\n');
     const { program, decls } = declsFor(code);
 
     const decisions = analyzeMigration(decls, new Map(), new Set(['SETTINGS', 'stays']), program);
@@ -491,7 +487,11 @@ describe('filterInlineStrategyMigrations', () => {
     { action: 'reexport', varName: 'dualUse', reason: MIG_REASON.REEXPORT_DUAL_USE },
     { action: 'reexport', varName: 'multiSegment', reason: MIG_REASON.REEXPORT_MULTI_SEGMENT },
     { action: 'reexport', varName: 'sideEffect', reason: MIG_REASON.REEXPORT_SIDE_EFFECTS },
-    { action: 'reexport', varName: 'sharedDestructure', reason: MIG_REASON.REEXPORT_SHARED_DESTRUCTURE },
+    {
+      action: 'reexport',
+      varName: 'sharedDestructure',
+      reason: MIG_REASON.REEXPORT_SHARED_DESTRUCTURE,
+    },
     { action: 'reexport', varName: 'movedDep', reason: MIG_REASON.REEXPORT_MOVED_DECL_DEP },
     { action: 'move', varName: 'mover', reason: MIG_REASON.MOVE_SINGLE_SEGMENT },
     { action: 'keep', varName: 'kept', reason: MIG_REASON.KEEP_UNUSED },

@@ -27,12 +27,12 @@ const exportConstAssign = createRegExp(
     .and(oneOrMore(wordChar))
     .and(whitespace.times.any())
     .and('=')
-    .and(whitespace.times.any()),
+    .and(whitespace.times.any())
 );
 
 const exportConstLine = createRegExp(
   exactly('export const ').and(oneOrMore(wordChar)).and(' = ').at.lineStart(),
-  [multiline],
+  [multiline]
 );
 
 const nsImportPattern = createRegExp(
@@ -40,7 +40,7 @@ const nsImportPattern = createRegExp(
     .and(oneOrMore(whitespace))
     .and('as')
     .and(oneOrMore(whitespace))
-    .and(oneOrMore(wordChar).grouped()),
+    .and(oneOrMore(wordChar).grouped())
 );
 
 const CONST_IMPORT_SOURCES: readonly string[] = [
@@ -64,7 +64,7 @@ export function applySegmentConstReplacement(
   code: string,
   filename: string,
   isServer?: boolean,
-  preParsedProgram?: AstProgram,
+  preParsedProgram?: AstProgram
 ): string {
   if (isServer === undefined) return code;
 
@@ -112,7 +112,8 @@ export function applySegmentConstReplacement(
       const replacement = replacements.get(node.name);
       if (replacement === undefined) return;
       if (importRanges.has(`${node.start}:${node.end}`)) return;
-      if (parent?.type === 'MemberExpression' && parent.property === node && !parent.computed) return;
+      if (parent?.type === 'MemberExpression' && parent.property === node && !parent.computed)
+        return;
       if (parent?.type === 'VariableDeclarator' && parent.id === node) return;
       if (parent?.type === 'ImportSpecifier' && parent.imported === node) return;
 
@@ -126,7 +127,7 @@ export function applySegmentConstReplacement(
 export function injectUseHmr(
   segmentCode: string,
   devFile: string,
-  preParsedProgram?: AstProgram,
+  preParsedProgram?: AstProgram
 ): string {
   let program: AstProgram;
   if (preParsedProgram) {
@@ -141,10 +142,14 @@ export function injectUseHmr(
 
   let targetFn: AstFunction | null = null;
   for (const stmt of program.body) {
-    if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration') continue;
+    if (stmt.type !== 'ExportNamedDeclaration' || stmt.declaration?.type !== 'VariableDeclaration')
+      continue;
     const init = stmt.declaration.declarations?.[0]?.init;
     if (!init) continue;
-    if ((init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') && init.body) {
+    if (
+      (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') &&
+      init.body
+    ) {
       targetFn = init;
       break;
     }
@@ -171,7 +176,7 @@ export function injectUseHmr(
 function injectHmrCallIntoFunctionBody(
   code: string,
   fnBody: NonNullable<AstFunction['body']>,
-  devFile: string,
+  devFile: string
 ): string {
   const s = new MagicString(code);
   const indent = inferBlockIndent(code, fnBody.start + 1);
@@ -181,11 +186,7 @@ function injectHmrCallIntoFunctionBody(
     s.appendLeft(fnBody.start + 1, `\n${hmrLine}`);
   } else {
     const expressionText = code.slice(fnBody.start, fnBody.end);
-    s.overwrite(
-      fnBody.start,
-      fnBody.end,
-      `{\n${hmrLine}\n${indent}return ${expressionText};\n}`,
-    );
+    s.overwrite(fnBody.start, fnBody.end, `{\n${hmrLine}\n${indent}return ${expressionText};\n}`);
   }
   return s.toString();
 }
@@ -200,10 +201,7 @@ export function injectUseHmrIntoInlineBody(bodyText: string, devFile: string): s
   const stmt = program.body[0];
   if (!stmt || stmt.type !== 'ExpressionStatement') return bodyText;
   const fn = stmt.expression;
-  if (
-    (fn.type !== 'ArrowFunctionExpression' && fn.type !== 'FunctionExpression') ||
-    !fn.body
-  ) {
+  if ((fn.type !== 'ArrowFunctionExpression' && fn.type !== 'FunctionExpression') || !fn.body) {
     return bodyText;
   }
   return injectHmrCallIntoFunctionBody(bodyText, fn.body, devFile);
@@ -218,7 +216,7 @@ function inferBlockIndent(code: string, start: number): string {
 export function applySegmentSideEffectSimplification(
   code: string,
   filename: string,
-  preParsedProgram?: AstProgram,
+  preParsedProgram?: AstProgram
 ): string {
   const exportMatch = code.match(exportConstLine);
   if (!exportMatch) return code;
@@ -253,8 +251,7 @@ export function applySegmentSideEffectSimplification(
 
   walk(program, {
     enter(node: AstNode, parent: AstParentNode) {
-      if (node.start !== undefined && node.end !== undefined &&
-          (node.end <= exportStart)) return;
+      if (node.start !== undefined && node.end !== undefined && node.end <= exportStart) return;
 
       if (node.type === 'Identifier' && node.name) {
         if (parent?.type === 'VariableDeclarator' && parent.id === node) return;
@@ -327,7 +324,7 @@ export function removeUnusedImports(
   filename: string,
   transpileJsx?: boolean,
   preParsedProgram?: AstProgram,
-  isLibMode?: boolean,
+  isLibMode?: boolean
 ): string {
   const sepIdx = code.indexOf('\n//\n');
   if (sepIdx >= 0) {
@@ -413,11 +410,7 @@ export function removeUnusedImports(
         ) {
           return;
         }
-        if (
-          parent?.type === 'MemberExpression' &&
-          parent.property === node &&
-          !parent.computed
-        ) {
+        if (parent?.type === 'MemberExpression' && parent.property === node && !parent.computed) {
           return;
         }
         referencedNames.add(node.name);
@@ -434,9 +427,10 @@ export function removeUnusedImports(
     // jsx-runtime import even when unused — they're public-surface imports for
     // downstream library consumers.
     if (isLibMode) {
-      const importedName = spec.specNode.type === 'ImportSpecifier'
-        ? (getImportedSpecifierName(spec.specNode) ?? spec.localName)
-        : spec.localName;
+      const importedName =
+        spec.specNode.type === 'ImportSpecifier'
+          ? (getImportedSpecifierName(spec.specNode) ?? spec.localName)
+          : spec.localName;
       if (isLibModePreservedMarker(importedName) && importSource === '@qwik.dev/core') {
         return false;
       }
@@ -445,19 +439,19 @@ export function removeUnusedImports(
       }
     }
 
-    const isQwikImport = QWIK_IMPORT_PREFIXES.some((prefix) =>
-      importSource.startsWith(prefix),
-    );
+    const isQwikImport = QWIK_IMPORT_PREFIXES.some((prefix) => importSource.startsWith(prefix));
     if (isQwikImport && !transpileJsx) {
       const quoteChar = code[spec.node.source.start];
       if (quoteChar === "'") {
         const siblings = importSpecs.filter((s) => s.node === spec.node);
         const allUnreferenced = siblings.every((s) => !referencedNames.has(s.localName));
-        const hasNonDollarSpec = (spec.node.specifiers ?? []).some((s: ImportDeclarationSpecifier) => {
-          if (s.type !== 'ImportSpecifier') return true;
-          const importedName = getImportedSpecifierName(s) ?? s.local.name;
-          return !importedName.endsWith('$');
-        });
+        const hasNonDollarSpec = (spec.node.specifiers ?? []).some(
+          (s: ImportDeclarationSpecifier) => {
+            if (s.type !== 'ImportSpecifier') return true;
+            const importedName = getImportedSpecifierName(s) ?? s.local.name;
+            return !importedName.endsWith('$');
+          }
+        );
         if (allUnreferenced && hasNonDollarSpec) {
           return false;
         }
@@ -470,11 +464,14 @@ export function removeUnusedImports(
   if (unreferencedSpecs.length === 0) return code;
 
   const ms = new MagicString(code);
-  const specsByNode = new Map<ImportDeclaration, Array<{
-    localName: string;
-    node: ImportDeclaration;
-    specNode: ImportDeclarationSpecifier;
-  }>>();
+  const specsByNode = new Map<
+    ImportDeclaration,
+    Array<{
+      localName: string;
+      node: ImportDeclaration;
+      specNode: ImportDeclarationSpecifier;
+    }>
+  >();
 
   for (const spec of unreferencedSpecs) {
     const existing = specsByNode.get(spec.node) ?? [];
@@ -538,7 +535,7 @@ function isBareScript(program: AstProgram): boolean {
       node.type === 'ImportDeclaration' ||
       node.type === 'ExportNamedDeclaration' ||
       node.type === 'ExportDefaultDeclaration' ||
-      node.type === 'ExportAllDeclaration',
+      node.type === 'ExportAllDeclaration'
   );
 }
 
@@ -550,11 +547,9 @@ export function buildPassthroughModule(
   repairedCode: string,
   relPath: RelativePath,
   origPath: string,
-  cachedProgram: AstProgram | undefined,
+  cachedProgram: AstProgram | undefined
 ): TransformModule {
-  const program =
-    cachedProgram ??
-    parseWithRawTransfer(relPath, repairedCode).program;
+  const program = cachedProgram ?? parseWithRawTransfer(relPath, repairedCode).program;
 
   if (isBareScript(program)) {
     return emptyParentModule(relPath, origPath);
@@ -625,7 +620,7 @@ export function buildPassthroughModule(
 }
 
 export function buildParentExtractionMap(
-  extractions: ExtractionResult[],
+  extractions: ExtractionResult[]
 ): Map<string, ExtractionResult> {
   const map = new Map<string, ExtractionResult>();
   for (const ext of extractions) {
@@ -644,9 +639,9 @@ export function buildParentExtractionMap(
 }
 
 /**
- * Collect identifier names from a BinaryExpression subtree (`a + b + c` →
- * `[a, b, c]`). Only real `Identifier` nodes are touched, so identifier-like
- * substrings inside string literals (`'p' + pi`) are not misread as reads.
+ * Collect identifier names from a BinaryExpression subtree (`a + b + c` → `[a, b, c]`). Only real
+ * `Identifier` nodes are touched, so identifier-like substrings inside string literals (`'p' + pi`)
+ * are not misread as reads.
  */
 function extractBinaryOperandIdentifiersFromAst(node: AstNode): string[] {
   const ids: string[] = [];

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  createOptimizer,
-  type OptimizerSystem,
-  type SystemEnvironment,
-} from '../src/index.js';
+import { createOptimizer, type OptimizerSystem, type SystemEnvironment } from '../src/index.js';
 
 describe('createOptimizer', () => {
   it('resolves to an instance with transformModules + sys', async () => {
@@ -67,8 +63,7 @@ describe('createOptimizer', () => {
       env: 'deno' satisfies SystemEnvironment,
       os: 'custom-os',
       dynamicImport: (p) => Promise.resolve({ marker: 'custom', path: p }),
-      strictDynamicImport: (p) =>
-        Promise.resolve({ marker: 'custom', path: p }),
+      strictDynamicImport: (p) => Promise.resolve({ marker: 'custom', path: p }),
       path: {
         resolve: (...parts) => parts.join('/'),
         normalize: (p) => p,

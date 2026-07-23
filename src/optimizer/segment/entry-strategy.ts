@@ -5,7 +5,7 @@ export function resolveEntryField(
   symbolName: string,
   ctxName: string,
   parentComponentSymbol: string | null,
-  manual: Record<string, string> | undefined,
+  manual: Record<string, string> | undefined
 ): string | null {
   if (manual && symbolName in manual) {
     return manual[symbolName];

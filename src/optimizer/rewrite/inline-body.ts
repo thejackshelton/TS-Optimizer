@@ -1,20 +1,18 @@
-/**
- * Inline .s() body transformation for extracted segments.
- */
+/** Inline .s() body transformation for extracted segments. */
 
 import MagicString from 'magic-string';
 import { parseSync } from 'oxc-parser';
 import { walkAstForQp } from '../jsx/qp-walk.js';
 import { formatWCall, wCallSuffix } from '../qwik/w-call.js';
-import {
-  RAW_TRANSFER_PARSER_OPTIONS,
-  type AstFunction,
-} from '../../ast-types.js';
+import { RAW_TRANSFER_PARSER_OPTIONS, type AstFunction } from '../../ast-types.js';
 import type { ExtractionResult, Mutable } from '../extraction/extract.js';
 import type { ImportInfo } from '../extraction/marker-detection.js';
 import { eventHandlerPropName } from '../jsx/event-handlers.js';
 import { transformAllJsx, JsxKeyCounter } from '../jsx/jsx.js';
-import { transformJsxCalls, collectJsxFunctionNamesFromIterable } from '../jsx/jsx-call-transform.js';
+import {
+  transformJsxCalls,
+  collectJsxFunctionNamesFromIterable,
+} from '../jsx/jsx-call-transform.js';
 import { eventHandlerQpParams } from '../jsx/loop-hoisting.js';
 import { computeKeyPrefix } from '../jsx/key-prefix.js';
 import { SignalHoister } from '../jsx/signal-analysis.js';
@@ -46,8 +44,8 @@ import {
 } from './predicates.js';
 
 /**
- * Transform an inline segment body: nested-call rewriting, const inlining,
- * capture unpacking, _rawProps, JSX, and dead-const removal.
+ * Transform an inline segment body: nested-call rewriting, const inlining, capture unpacking,
+ * _rawProps, JSX, and dead-const removal.
  */
 export function transformInlineSegmentBody(
   ext: ExtractionResult,
@@ -62,40 +60,49 @@ export function transformInlineSegmentBody(
   parentRelPath?: string,
   sharedKeyCounterStart?: number,
   /**
-   * Module-level decls that migration reexports or moves. Filtered from
-   * `captureNames` here because under inline/hoist the body references them
-   * from module scope directly — no `_captures[N]` indirection.
+   * Module-level decls that migration reexports or moves. Filtered from `captureNames` here because
+   * under inline/hoist the body references them from module scope directly — no `_captures[N]`
+   * indirection.
    */
   migratedNames?: ReadonlySet<string>,
   /**
-   * Gates suppression of `.w([captures])` on stripped child QRLs in JSX-prop
-   * position: a stripped child's body is `export const X = null` and cannot
-   * consume captures, so emit the bare `q_X` ref instead.
+   * Gates suppression of `.w([captures])` on stripped child QRLs in JSX-prop position: a stripped
+   * child's body is `export const X = null` and cannot consume captures, so emit the bare `q_X` ref
+   * instead.
    */
   stripCtxName?: readonly string[],
   stripEventHandlers?: boolean,
-  /** isServer/isBrowser/isDev folding flags, applied here since this body sits outside the parent MagicString. */
+  /**
+   * IsServer/isBrowser/isDev folding flags, applied here since this body sits outside the parent
+   * MagicString.
+   */
   isServer?: boolean,
   isDev?: boolean,
-  /** Cross-body hoister for `_fnSignal(...)` values from the `_jsxDEV(...)`
-   * rewrite; separate from the JSX hoister (which gets reordered) so emitted
-   * `_hf<n>` refs stay aligned with their declarations. */
-  jsxCallHoister?: SignalHoister,
-): { transformedBody: string; additionalImports: Map<string, string>; hoistedDeclarations: string[]; keyCounterValue?: number } {
+  /**
+   * Cross-body hoister for `_fnSignal(...)` values from the `_jsxDEV(...)` rewrite; separate from
+   * the JSX hoister (which gets reordered) so emitted `_hf<n>` refs stay aligned with their
+   * declarations.
+   */
+  jsxCallHoister?: SignalHoister
+): {
+  transformedBody: string;
+  additionalImports: Map<string, string>;
+  hoistedDeclarations: string[];
+  keyCounterValue?: number;
+} {
   let body: string = ext.bodyText;
   const additionalImports = new Map<string, string>();
   const hoistedDeclarations: string[] = [];
 
-  const nested = allExtractions.filter(e => e.parent === ext.symbolName);
+  const nested = allExtractions.filter((e) => e.parent === ext.symbolName);
 
-  const rawPropsFieldMap: ReadonlyMap<string, string> | undefined =
-    bodyConsolidatesToRawProps(ext.bodyText)
-      ? extractDestructuredFieldInfo(ext.bodyText).fieldMap
-      : undefined;
+  const rawPropsFieldMap: ReadonlyMap<string, string> | undefined = bodyConsolidatesToRawProps(
+    ext.bodyText
+  )
+    ? extractDestructuredFieldInfo(ext.bodyText).fieldMap
+    : undefined;
   const qpValues = (params: string[]): string[] =>
-    rawPropsFieldMap === undefined
-      ? params
-      : consolidateQpCaptureValues(params, rawPropsFieldMap);
+    rawPropsFieldMap === undefined ? params : consolidateQpCaptureValues(params, rawPropsFieldMap);
 
   if (nested.length > 0) {
     const bodyOffset = ext.argStart;
@@ -110,7 +117,10 @@ export function transformInlineSegmentBody(
       if (relCallStart >= 0 && relCallEnd <= body.length) {
         if (child.isSync) {
           additionalImports.set('_qrlSync', '@qwik.dev/core');
-          body = body.slice(0, relCallStart) + buildSyncTransform(child.bodyText) + body.slice(relCallEnd);
+          body =
+            body.slice(0, relCallStart) +
+            buildSyncTransform(child.bodyText) +
+            body.slice(relCallEnd);
         } else if (child.isBare) {
           let replacement = childVarName;
           if (child.captureNames.length > 0) {
@@ -128,7 +138,8 @@ export function transformInlineSegmentBody(
             additionalImports.set('serverQrl', serverQrlSource);
           }
 
-          const hasLoopCrossCaptures = !isRegCtx &&
+          const hasLoopCrossCaptures =
+            !isRegCtx &&
             child.captures &&
             child.captureNames.length > 0 &&
             hasUnderscorePlaceholderParams(child.paramNames);
@@ -161,7 +172,10 @@ export function transformInlineSegmentBody(
           replacement += ')';
           body = body.slice(0, relCallStart) + replacement + body.slice(relCallEnd);
 
-          additionalImports.set(child.qrlCallee, getQrlImportSource(child.qrlCallee, child.importSource));
+          additionalImports.set(
+            child.qrlCallee,
+            getQrlImportSource(child.qrlCallee, child.importSource)
+          );
         } else {
           // inlinedQrl children have empty `qrlCallee` (peer-tool spec args),
           // so emit the bare `q_X.w([captures])` ref without a wrapper call.
@@ -181,16 +195,17 @@ export function transformInlineSegmentBody(
 
   const isRegCtx = matchesRegCtxName(ext, regCtxName);
   if (ext.captureNames.length > 0 && ext.parent !== null) {
-    const parentExt = allExtractions.find(e => e.symbolName === ext.parent);
+    const parentExt = allExtractions.find((e) => e.symbolName === ext.parent);
     if (parentExt) {
       const parentClosure = closureNodes?.get(parentExt.symbolName);
-      const constValues = parentClosure && source !== undefined
-        ? resolveConstLiteralsInClosure(parentClosure, source, ext.captureNames)
-        : resolveConstLiterals(parentExt.bodyText, ext.captureNames);
+      const constValues =
+        parentClosure && source !== undefined
+          ? resolveConstLiteralsInClosure(parentClosure, source, ext.captureNames)
+          : resolveConstLiterals(parentExt.bodyText, ext.captureNames);
       if (constValues.size > 0) {
         body = inlineConstCaptures(body, constValues);
         const wip = ext as Mutable<ExtractionResult>;
-        wip.captureNames = wip.captureNames.filter(n => !constValues.has(n));
+        wip.captureNames = wip.captureNames.filter((n) => !constValues.has(n));
         wip.captures = wip.captureNames.length > 0;
         if (!wip.constLiterals) wip.constLiterals = constValues;
         else {
@@ -209,9 +224,10 @@ export function transformInlineSegmentBody(
   } else if (ext.captureNames.length > 0) {
     // Migrated names are in module scope under inline/hoist, so filter them
     // out — they don't need `_captures[N]` indirection.
-    const effectiveCaptures = migratedNames && migratedNames.size > 0
-      ? ext.captureNames.filter(n => !migratedNames.has(n))
-      : ext.captureNames;
+    const effectiveCaptures =
+      migratedNames && migratedNames.size > 0
+        ? ext.captureNames.filter((n) => !migratedNames.has(n))
+        : ext.captureNames;
     if (effectiveCaptures.length > 0) {
       body = injectCapturesUnpacking(body, effectiveCaptures);
       additionalImports.set('_captures', '@qwik.dev/core');
@@ -230,11 +246,7 @@ export function transformInlineSegmentBody(
 
   if (ext.propsFieldCaptures && ext.propsFieldCaptures.size > 0) {
     // Pass `propsFieldDefaults` so defaulted fields emit `(_rawProps.<key> ?? <default>)`.
-    body = replacePropsFieldReferencesInBody(
-      body,
-      ext.propsFieldCaptures,
-      ext.propsFieldDefaults,
-    );
+    body = replacePropsFieldReferencesInBody(body, ext.propsFieldCaptures, ext.propsFieldDefaults);
   }
 
   body = propagateConstLiteralsInBody(body);
@@ -249,12 +261,19 @@ export function transformInlineSegmentBody(
     if (jsxFunctions.size > 0) {
       let mentionsAny = false;
       for (const name of jsxFunctions) {
-        if (body.includes(name + '(')) { mentionsAny = true; break; }
+        if (body.includes(name + '(')) {
+          mentionsAny = true;
+          break;
+        }
       }
       if (mentionsAny) {
         try {
           const wrappedBody = `(${body})`;
-          const bodyParse = parseSync('__inline_body__.tsx', wrappedBody, RAW_TRANSFER_PARSER_OPTIONS);
+          const bodyParse = parseSync(
+            '__inline_body__.tsx',
+            wrappedBody,
+            RAW_TRANSFER_PARSER_OPTIONS
+          );
           if (bodyParse.program && !bodyParse.errors?.length) {
             const callS = new MagicString(wrappedBody);
             const relPathForPrefix = parentRelPath ?? jsxBodyOptions?.relPath;
@@ -270,13 +289,16 @@ export function transformInlineSegmentBody(
               if (child.ctxKind !== 'eventHandler' && child.ctxKind !== 'jSXProp') continue;
               const params = eventHandlerQpParams(child.paramNames);
               if (params.length > 0) {
-                qpByQrl.set(qrlVarNames.get(child.symbolName) ?? `q_${child.symbolName}`, qpValues(params));
+                qpByQrl.set(
+                  qrlVarNames.get(child.symbolName) ?? `q_${child.symbolName}`,
+                  qpValues(params)
+                );
               }
             }
             const bodyJsxCallHoister = jsxCallHoister ?? new SignalHoister();
             const declsBefore = bodyJsxCallHoister.getDeclarations().length;
             const jsxCallImportedNames = originalImports
-              ? new Set([...originalImports.values()].map(i => i.localName))
+              ? new Set([...originalImports.values()].map((i) => i.localName))
               : new Set<string>();
             transformJsxCalls(wrappedBody, callS, bodyParse.program, {
               jsxFunctions,
@@ -352,8 +374,8 @@ export function transformInlineSegmentBody(
             if (child.ctxKind !== 'eventHandler') continue;
             if (!child.captures || child.captureNames.length === 0) continue;
             const isStripped =
-              (stripCtxName && stripCtxName.some(v => child.ctxName.startsWith(v))) ||
-              (stripEventHandlers === true);
+              (stripCtxName && stripCtxName.some((v) => child.ctxName.startsWith(v))) ||
+              stripEventHandlers === true;
             if (!isStripped) continue;
             const childVarName = qrlVarNames.get(child.symbolName) ?? `q_${child.symbolName}`;
             if (qrlParamMap.has(childVarName)) continue;
@@ -366,7 +388,12 @@ export function transformInlineSegmentBody(
         if (qrlParamMap.size > 0) {
           bodyQpOverrides = new Map();
           bodyQrlsWithCaptures = new Set();
-          walkAstForQp(parseResult.program, (name) => qrlParamMap.get(name), bodyQpOverrides, bodyQrlsWithCaptures);
+          walkAstForQp(
+            parseResult.program,
+            (name) => qrlParamMap.get(name),
+            bodyQpOverrides,
+            bodyQrlsWithCaptures
+          );
           if (bodyQpOverrides.size === 0) {
             bodyQpOverrides = undefined;
             bodyQrlsWithCaptures = undefined;
@@ -375,7 +402,12 @@ export function transformInlineSegmentBody(
       }
 
       const bodyJsxResult = transformAllJsx(
-        { source: wrappedSource, s: bodyS, program: parseResult.program, importedNames: bodyImportedNames },
+        {
+          source: wrappedSource,
+          s: bodyS,
+          program: parseResult.program,
+          importedNames: bodyImportedNames,
+        },
         {
           skipRanges: [],
           devOptions: devOptionsForCall,
@@ -384,7 +416,7 @@ export function transformInlineSegmentBody(
           qrlsWithCaptures: bodyQrlsWithCaptures,
           relPath: jsxBodyOptions.relPath,
           sharedSignalHoister,
-        },
+        }
       );
 
       const transformedWrapped = bodyS.toString();
@@ -411,7 +443,7 @@ export function transformInlineSegmentBody(
     body = foldConstantsInBodyText(body, originalImports, isServer, isDev);
   }
 
-  const hasNestedExts = allExtractions.some(e => e.parent === ext.symbolName);
+  const hasNestedExts = allExtractions.some((e) => e.parent === ext.symbolName);
   if (hasNestedExts) {
     body = removeDeadConstLiterals(body);
   }
@@ -420,5 +452,10 @@ export function transformInlineSegmentBody(
   // RHS in non-JSX positions). Runs after JSX so `_hf<n>_str` stays source-form.
   body = foldBodySimplifiableExpressions(body);
 
-  return { transformedBody: body, additionalImports, hoistedDeclarations, keyCounterValue: finalKeyCounterValue };
+  return {
+    transformedBody: body,
+    additionalImports,
+    hoistedDeclarations,
+    keyCounterValue: finalKeyCounterValue,
+  };
 }

@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import type { JSXAttribute } from '../../../src/ast-types.js';
 import {

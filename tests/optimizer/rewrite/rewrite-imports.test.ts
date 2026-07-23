@@ -7,21 +7,15 @@ describe('rewriteImportSource', () => {
   });
 
   it('@builder.io/qwik/build -> @qwik.dev/core/build', () => {
-    expect(rewriteImportSource('@builder.io/qwik/build')).toBe(
-      '@qwik.dev/core/build'
-    );
+    expect(rewriteImportSource('@builder.io/qwik/build')).toBe('@qwik.dev/core/build');
   });
 
   it('@builder.io/qwik/jsx-runtime -> @qwik.dev/core/jsx-runtime', () => {
-    expect(rewriteImportSource('@builder.io/qwik/jsx-runtime')).toBe(
-      '@qwik.dev/core/jsx-runtime'
-    );
+    expect(rewriteImportSource('@builder.io/qwik/jsx-runtime')).toBe('@qwik.dev/core/jsx-runtime');
   });
 
   it('@builder.io/qwik-city -> @qwik.dev/router', () => {
-    expect(rewriteImportSource('@builder.io/qwik-city')).toBe(
-      '@qwik.dev/router'
-    );
+    expect(rewriteImportSource('@builder.io/qwik-city')).toBe('@qwik.dev/router');
   });
 
   it('@builder.io/qwik-city/more/here -> @qwik.dev/router/more/here', () => {
@@ -31,9 +25,7 @@ describe('rewriteImportSource', () => {
   });
 
   it('@builder.io/qwik-react -> @qwik.dev/react', () => {
-    expect(rewriteImportSource('@builder.io/qwik-react')).toBe(
-      '@qwik.dev/react'
-    );
+    expect(rewriteImportSource('@builder.io/qwik-react')).toBe('@qwik.dev/react');
   });
 
   it('@builder.io/sdk -> @builder.io/sdk (no rewrite)', () => {

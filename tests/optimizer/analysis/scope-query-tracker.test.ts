@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -58,7 +57,7 @@ function checkFixture(source: string, filename: string): FixtureResult {
     if (fromScope !== decl) {
       mismatches.push(
         `${name} @ scope "${scopeKey}": replay=${decl?.type ?? 'null'} ` +
-          `fromScope=${fromScope?.type ?? 'null'}`,
+          `fromScope=${fromScope?.type ?? 'null'}`
       );
     }
   }

@@ -30,7 +30,10 @@ function findFirstCall(program: AstProgram): CallExpression {
         }
       }
     }
-    if (node.type === 'ExportNamedDeclaration' && node.declaration?.type === 'VariableDeclaration') {
+    if (
+      node.type === 'ExportNamedDeclaration' &&
+      node.declaration?.type === 'VariableDeclaration'
+    ) {
       for (const decl of node.declaration.declarations) {
         if (decl.init?.type === 'CallExpression') {
           return decl.init;
@@ -75,10 +78,13 @@ describe('marker-detection', () => {
     });
 
     it('can read imports from parser module metadata', () => {
-      const result = parseSync('test.tsx', `
+      const result = parseSync(
+        'test.tsx',
+        `
         import foo, { component$ as Component } from '@qwik.dev/core';
         import * as ns from './local';
-      `);
+      `
+      );
       const imports = collectImports(result.program, result.module);
 
       expect(imports.get('foo')?.importedName).toBe('default');
@@ -91,10 +97,13 @@ describe('marker-detection', () => {
 
   describe('collectExportNames', () => {
     it('can read export names from parser module metadata', () => {
-      const result = parseSync('test.tsx', `
+      const result = parseSync(
+        'test.tsx',
+        `
         export const useMemo$ = wrap(useMemoQrl);
         export { localThing as localThing$ };
-      `);
+      `
+      );
       const names = collectExportNames(result.program, result.module);
 
       expect(names.has('useMemo$')).toBe(true);

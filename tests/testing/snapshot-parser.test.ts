@@ -60,7 +60,9 @@ describe('parseSnapshot', () => {
     });
 
     it('extracts segment[0] code', () => {
-      expect(result.segments[0].code).toContain('export const renderHeader1_div_onClick_USi8k1jUb40');
+      expect(result.segments[0].code).toContain(
+        'export const renderHeader1_div_onClick_USi8k1jUb40'
+      );
     });
 
     it('extracts segment[0] isEntryPoint', () => {

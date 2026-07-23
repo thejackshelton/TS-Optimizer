@@ -1,13 +1,17 @@
 /**
- * Shared path-string helpers. Operate on normalized string paths for
- * deterministic cross-platform behavior.
+ * Shared path-string helpers. Operate on normalized string paths for deterministic cross-platform
+ * behavior.
  */
-import { basename, dirname, extname, isAbsolute, normalize, normalizeString, relative } from 'pathe';
 import {
-  type FilePath,
-  type RelativePath,
-  mkRelativePath,
-} from './optimizer/types/brands.js';
+  basename,
+  dirname,
+  extname,
+  isAbsolute,
+  normalize,
+  normalizeString,
+  relative,
+} from 'pathe';
+import { type FilePath, type RelativePath, mkRelativePath } from './optimizer/types/brands.js';
 
 // High-level entry points (`computeRelPath`, `computeParentModulePath`,
 // `computeOutputExtension`) take/return branded path types; the low-level string
@@ -43,15 +47,15 @@ export function normalizePath(filePath: string): string {
 }
 
 /**
- * Compute the relative path from srcDir. When the path is outside srcDir, returns
- * a normalized form with any leading `/` stripped, so the result is always usable
- * as a relative path (no leading slash) — matching `RelativePath`'s shape rule.
+ * Compute the relative path from srcDir. When the path is outside srcDir, returns a normalized form
+ * with any leading `/` stripped, so the result is always usable as a relative path (no leading
+ * slash) — matching `RelativePath`'s shape rule.
  *
- * A leading `./` from the input is preserved: the hash function and the JSX
- * dev-info `fileName:` emission both key off the user-provided path shape (e.g.
- * `./node_modules/x` must stay `./node_modules/x`), so stripping it would shift
- * hashes and dev-info paths for `node_modules`-prefixed inputs. Stripping the
- * `./` for absolute-path concatenation happens at the call site.
+ * A leading `./` from the input is preserved: the hash function and the JSX dev-info `fileName:`
+ * emission both key off the user-provided path shape (e.g. `./node_modules/x` must stay
+ * `./node_modules/x`), so stripping it would shift hashes and dev-info paths for
+ * `node_modules`-prefixed inputs. Stripping the `./` for absolute-path concatenation happens at the
+ * call site.
  */
 export function computeRelPath(inputPath: FilePath, srcDir: FilePath): RelativePath {
   const hasLeadingDotSlash = (inputPath as string).startsWith('./');
@@ -92,7 +96,10 @@ function stripLeadingSlash(path: string): string {
   return path.startsWith('/') ? path.slice(1) : path;
 }
 
-export function isRelativePathInsideBase(relativePath: string, importerPath: RelativePath): boolean {
+export function isRelativePathInsideBase(
+  relativePath: string,
+  importerPath: RelativePath
+): boolean {
   if (!relativePath.startsWith('.')) return false;
 
   const importerDir = getDirectory(importerPath);
@@ -103,13 +110,12 @@ export function isRelativePathInsideBase(relativePath: string, importerPath: Rel
 }
 
 /**
- * Compute the parent module path for a segment's import back to the parent.
- * Segments are emitted in the same directory as the parent, so only the basename
- * is used (prefixed with `./`).
+ * Compute the parent module path for a segment's import back to the parent. Segments are emitted in
+ * the same directory as the parent, so only the basename is used (prefixed with `./`).
  */
 export function computeParentModulePath(
   relPath: RelativePath,
-  explicitExtensions?: boolean,
+  explicitExtensions?: boolean
 ): string {
   const basename = getBasename(relPath);
   if (explicitExtensions) {
@@ -119,14 +125,13 @@ export function computeParentModulePath(
 }
 
 /**
- * Output file extension for QRL imports: `.js` when TS is transpiled (fully
- * stripped), `.ts` when only JSX is transpiled (TS remains), else the source
- * extension.
+ * Output file extension for QRL imports: `.js` when TS is transpiled (fully stripped), `.ts` when
+ * only JSX is transpiled (TS remains), else the source extension.
  */
 export function computeOutputExtension(
   sourceExt: string,
   transpileTs?: boolean,
-  transpileJsx?: boolean,
+  transpileJsx?: boolean
 ): string {
   if (transpileTs) return '.js';
   if (transpileJsx) return '.ts';

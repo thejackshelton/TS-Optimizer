@@ -1,6 +1,4 @@
-/**
- * Display-name and symbol-name construction for Qwik segments.
- */
+/** Display-name and symbol-name construction for Qwik segments. */
 
 import { qwikHash } from './siphash.js';
 import { getBasename } from '../paths.js';
@@ -12,9 +10,9 @@ import {
 } from '../optimizer/types/brands.js';
 
 /**
- * Escape a string to contain only alphanumeric characters and underscores:
- * non-alphanumerics become underscores, leading/trailing ones are dropped, and
- * consecutive non-alphanumerics collapse to a single underscore.
+ * Escape a string to contain only alphanumeric characters and underscores: non-alphanumerics become
+ * underscores, leading/trailing ones are dropped, and consecutive non-alphanumerics collapse to a
+ * single underscore.
  */
 export function escapeSymbol(str: string): string {
   let result = '';
@@ -23,9 +21,7 @@ export function escapeSymbol(str: string): string {
 
   for (const ch of str) {
     const isAlnum =
-      (ch >= 'A' && ch <= 'Z') ||
-      (ch >= 'a' && ch <= 'z') ||
-      (ch >= '0' && ch <= '9');
+      (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
     if (isAlnum) {
       if (pendingUnderscore && hasContent) {
         result += '_';
@@ -43,9 +39,8 @@ export function escapeSymbol(str: string): string {
 }
 
 /**
- * Build the display name `{fileStem}_{escapedContext}` from a file stem and
- * context stack. An empty stack yields `{fileStem}_s_`; a result starting with a
- * digit gets a leading underscore.
+ * Build the display name `{fileStem}_{escapedContext}` from a file stem and context stack. An empty
+ * stack yields `{fileStem}_s_`; a result starting with a digit gets a leading underscore.
  */
 export function buildDisplayName(fileStem: string, contextStack: string[]): DisplayName {
   const joined = contextStack.length === 0 ? 's_' : contextStack.join('_');
@@ -64,9 +59,8 @@ export function buildDisplayName(fileStem: string, contextStack: string[]): Disp
 }
 
 /**
- * Build the symbol name `{contextPortion}_{hash}`, where `contextPortion` is the
- * displayName with the `{fileStem}_` prefix removed and `hash` is
- * `qwikHash(scope, relPath, contextPortion)`.
+ * Build the symbol name `{contextPortion}_{hash}`, where `contextPortion` is the displayName with
+ * the `{fileStem}_` prefix removed and `hash` is `qwikHash(scope, relPath, contextPortion)`.
  */
 export function buildSymbolName(
   displayName: DisplayName,

@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
@@ -15,9 +14,7 @@ function transformDefault(source: string, extra: Record<string, unknown> = {}) {
 }
 
 function findComponentBodySegment(result: ReturnType<typeof transformModule>) {
-  return result.modules.find(
-    (m) => m.kind === 'segment' && m.segment.ctxName === 'component$',
-  );
+  return result.modules.find((m) => m.kind === 'segment' && m.segment.ctxName === 'component$');
 }
 
 describe('JSX tag-name rewrite for const {X} = props destructures', () => {

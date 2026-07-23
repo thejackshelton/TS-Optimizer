@@ -1,11 +1,13 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import { collectJsxFunctionNames } from '../../../src/optimizer/jsx/jsx-call-transform.js';
 import type { TransformModule } from '../../../src/optimizer/types/types.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
 
-function findModule(modules: readonly TransformModule[], pathSubstr: string): TransformModule | undefined {
+function findModule(
+  modules: readonly TransformModule[],
+  pathSubstr: string
+): TransformModule | undefined {
   return modules.find((m) => m.path.includes(pathSubstr));
 }
 
@@ -158,7 +160,9 @@ const Foo = componentQrl(inlinedQrl(() => {
     expect(seg?.code).toBeTruthy();
     expect(seg!.code).not.toContain('jsx(Host');
     expect(seg!.code).not.toContain('jsx(Inner');
-    expect(seg!.code).toMatch(/_jsxSorted\(Host,\s*null,\s*null,\s*\/\*#__PURE__\*\/\s*_jsxSorted\(Inner/);
+    expect(seg!.code).toMatch(
+      /_jsxSorted\(Host,\s*null,\s*null,\s*\/\*#__PURE__\*\/\s*_jsxSorted\(Inner/
+    );
   });
 
   it('leaves jsx() calls alone when propsObj is not an ObjectExpression', () => {

@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import {
   mkSymbolName,
@@ -66,7 +65,7 @@ describe('mkHash', () => {
 describe('mkCanonicalFilename', () => {
   it('accepts valid identifier shapes', () => {
     expect(mkCanonicalFilename('test_tsx_renderHeader1_jMxQsjbyDss')).toBe(
-      'test_tsx_renderHeader1_jMxQsjbyDss',
+      'test_tsx_renderHeader1_jMxQsjbyDss'
     );
   });
 
@@ -76,16 +75,16 @@ describe('mkCanonicalFilename', () => {
 
   it('accepts real-world dotted, bracket-route, and digit-leading values', () => {
     expect(mkCanonicalFilename('test.tsx_renderHeader1_jMxQsjbyDss')).toBe(
-      'test.tsx_renderHeader1_jMxQsjbyDss',
+      'test.tsx_renderHeader1_jMxQsjbyDss'
     );
     expect(mkCanonicalFilename('test.spec.tsx_Foo_jMxQsjbyDss')).toBe(
-      'test.spec.tsx_Foo_jMxQsjbyDss',
+      'test.spec.tsx_Foo_jMxQsjbyDss'
     );
     expect(mkCanonicalFilename('[[...slug]].tsx_slug_component_AaBbCcDdEeF')).toBe(
-      '[[...slug]].tsx_slug_component_AaBbCcDdEeF',
+      '[[...slug]].tsx_slug_component_AaBbCcDdEeF'
     );
     expect(mkCanonicalFilename('404.tsx__404_component_AaBbCcDdEeF')).toBe(
-      '404.tsx__404_component_AaBbCcDdEeF',
+      '404.tsx__404_component_AaBbCcDdEeF'
     );
   });
 });
@@ -103,9 +102,7 @@ describe('mkDisplayName', () => {
     expect(mkDisplayName('test.tsx_renderHeader1')).toBe('test.tsx_renderHeader1');
     expect(mkDisplayName('test.spec.tsx_Foo')).toBe('test.spec.tsx_Foo');
     expect(mkDisplayName('foo.mjs_bar')).toBe('foo.mjs_bar');
-    expect(mkDisplayName('[[...slug]].tsx_slug_component')).toBe(
-      '[[...slug]].tsx_slug_component',
-    );
+    expect(mkDisplayName('[[...slug]].tsx_slug_component')).toBe('[[...slug]].tsx_slug_component');
     expect(mkDisplayName('404.tsx__404_component')).toBe('404.tsx__404_component');
   });
 });

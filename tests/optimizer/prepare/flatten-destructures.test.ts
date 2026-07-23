@@ -44,10 +44,7 @@ describe('flattenDestructureUseCalls', () => {
   });
 
   it('does not flatten destructures outside a component$ body', () => {
-    const source = [
-      `const { value } = useStore();`,
-      `export const x = value;`,
-    ].join('\n');
+    const source = [`const { value } = useStore();`, `export const x = value;`].join('\n');
 
     const { source: out, changed } = flatten(source);
     expect(changed).toBe(false);
@@ -65,7 +62,9 @@ describe('flattenDestructureUseCalls', () => {
     ].join('\n');
 
     let result: { source: string; changed: boolean };
-    expect(() => { result = flatten(source); }).not.toThrow();
+    expect(() => {
+      result = flatten(source);
+    }).not.toThrow();
 
     expect(result!.changed).toBe(true);
     expect(result!.source).toContain('const foo = useFoo()');
@@ -86,7 +85,9 @@ describe('flattenDestructureUseCalls', () => {
     ].join('\n');
 
     let result: { source: string; changed: boolean };
-    expect(() => { result = flatten(source); }).not.toThrow();
+    expect(() => {
+      result = flatten(source);
+    }).not.toThrow();
     expect(result!.changed).toBe(true);
     expect(result!.source).toContain('const alpha = useAlpha()');
     expect(result!.source).toContain('const beta = useBeta()');
@@ -140,7 +141,7 @@ describe('flattenDestructureUseCalls', () => {
     expect(out).toContain('store.value');
   });
 
-  it('skips marker-suffixed callees ($-ending) so use*$ extraction isn\'t disturbed', () => {
+  it("skips marker-suffixed callees ($-ending) so use*$ extraction isn't disturbed", () => {
     const source = [
       `import { component$, useTask$ } from '@qwik.dev/core';`,
       `export default component$(() => {`,

@@ -13,7 +13,7 @@ describe('module-symbols', () => {
         class LocalClass {}
         const { alpha, beta: bravo } = source;
         enum LocalEnum { A }
-      `,
+      `
     ).program;
 
     const info = collectSameFileSymbolInfo(program);

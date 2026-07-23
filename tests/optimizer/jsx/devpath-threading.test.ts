@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import type { TransformModule } from '../../../src/optimizer/types/types.js';
@@ -17,13 +16,16 @@ import { component$ } from '@qwik.dev/core';
 export const App = component$(() => <div/>);
 `;
     const result = transformModule({
-      input: [{
-        path: mkFilePath('test.tsx'),
-        code: mkSourceText(input),
-        devPath: '/hello/from/dev/test.tsx',
-      }],
+      input: [
+        {
+          path: mkFilePath('test.tsx'),
+          code: mkSourceText(input),
+          devPath: '/hello/from/dev/test.tsx',
+        },
+      ],
       srcDir: mkFilePath('/src'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       mode: 'dev',
     });
 
@@ -42,7 +44,8 @@ export const App = component$(() => <div/>);
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('/user/qwik/src'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       mode: 'dev',
     });
 
@@ -58,7 +61,8 @@ export const App = component$(() => <div/>);
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('/user/qwik/src'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       mode: 'dev',
     });
 
@@ -75,13 +79,16 @@ import { component$ } from '@qwik.dev/core';
 export const App = component$(() => <div/>);
 `;
     const result = transformModule({
-      input: [{
-        path: mkFilePath('test.tsx'),
-        code: mkSourceText(input),
-        devPath: '/hello/from/dev/test.tsx',
-      }],
+      input: [
+        {
+          path: mkFilePath('test.tsx'),
+          code: mkSourceText(input),
+          devPath: '/hello/from/dev/test.tsx',
+        },
+      ],
       srcDir: mkFilePath('/src'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       mode: 'prod',
     });
 

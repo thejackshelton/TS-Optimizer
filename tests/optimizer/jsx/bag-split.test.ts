@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import type { TransformModule } from '../../../src/optimizer/types/types.js';
@@ -28,7 +27,9 @@ export const C = component$(({some = 1+2, ...rest}) => {
 
     expect(code).toMatch(/\{\s*\.\.\._getConstProps\(rest\),\s*override:\s*true\s*\}/);
     expect(code).toContain('..._getVarProps(rest)');
-    expect(code).not.toMatch(/\{[^}]*\.\.\._getVarProps\([^}]*\.\.\._getConstProps[^}]*\}\s*,\s*\{\s*override/);
+    expect(code).not.toMatch(
+      /\{[^}]*\.\.\._getVarProps\([^}]*\.\.\._getConstProps[^}]*\}\s*,\s*\{\s*override/
+    );
   });
 
   it('keeps merged-in-var when const bag only has event-handler routing', () => {
@@ -104,9 +105,7 @@ export const C = component$((props) => {
       srcDir: mkFilePath('.'),
       entryStrategy: { type: 'segment' },
     });
-    const seg = result.modules.find(
-      (m) => m.kind === 'segment' && /_jsxSplit\(Cmp/.test(m.code),
-    );
+    const seg = result.modules.find((m) => m.kind === 'segment' && /_jsxSplit\(Cmp/.test(m.code));
     if (!seg) throw new Error('Cmp _jsxSplit segment not found');
     const line = seg.code.split('\n').find((l) => l.includes('_jsxSplit(Cmp'));
     if (!line) throw new Error('_jsxSplit(Cmp ...) call not found');

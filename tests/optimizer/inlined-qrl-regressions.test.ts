@@ -3,7 +3,10 @@ import { transformModule } from '../../src/optimizer/transform/index.js';
 import type { TransformModule } from '../../src/optimizer/types/types.js';
 import { mkFilePath, mkSourceText } from '../../src/optimizer/types/brands.js';
 
-function findModule(modules: readonly TransformModule[], pathSubstr: string): TransformModule | undefined {
+function findModule(
+  modules: readonly TransformModule[],
+  pathSubstr: string
+): TransformModule | undefined {
   return modules.find((m) => m.path.includes(pathSubstr));
 }
 
@@ -96,7 +99,9 @@ const Foo = component$(() => {
       srcDir: mkFilePath('.'),
     });
 
-    const outerSeg = result.modules.find((m) => m.kind === 'segment' && m.segment.ctxName === 'component$');
+    const outerSeg = result.modules.find(
+      (m) => m.kind === 'segment' && m.segment.ctxName === 'component$'
+    );
     expect(outerSeg?.code).toBeTruthy();
     expect(outerSeg!.code).toMatch(/import\s*\{\s*qrl\s*\}\s*from\s*"@qwik\.dev\/core"/);
   });

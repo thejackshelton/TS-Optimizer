@@ -1,11 +1,10 @@
-
 import { describe, it, expect } from 'vitest';
 import { parseSync } from 'oxc-parser';
 import { walkAstForQp } from '../../../src/optimizer/jsx/qp-walk.js';
 
 function qpFor(
   source: string,
-  paramsByQrl: Record<string, string[]>,
+  paramsByQrl: Record<string, string[]>
 ): { qpOverrides: Map<number, string[]>; qrlsWithCaptures: Set<string> } {
   const { program } = parseSync('test.tsx', source);
   const map = new Map(Object.entries(paramsByQrl));
@@ -17,27 +16,25 @@ function qpFor(
 
 describe('walkAstForQp', () => {
   it('collects params for an event-handler attr referencing a known QRL', () => {
-    const { qpOverrides, qrlsWithCaptures } = qpFor(
-      `const x = <div onClick$={q_handler}/>;`,
-      { q_handler: ['item'] },
-    );
+    const { qpOverrides, qrlsWithCaptures } = qpFor(`const x = <div onClick$={q_handler}/>;`, {
+      q_handler: ['item'],
+    });
     expect([...qpOverrides.values()]).toEqual([['item']]);
     expect([...qrlsWithCaptures]).toEqual(['q_handler']);
   });
 
   it('recognises already-rewritten q-*: attribute names', () => {
-    const { qpOverrides } = qpFor(
-      `const x = <div q-e:click={q_handler}/>;`,
-      { q_handler: ['item'] },
-    );
+    const { qpOverrides } = qpFor(`const x = <div q-e:click={q_handler}/>;`, {
+      q_handler: ['item'],
+    });
     expect([...qpOverrides.values()]).toEqual([['item']]);
   });
 
   it('dedupes params across multiple handlers on one element', () => {
-    const { qpOverrides } = qpFor(
-      `const x = <div onClick$={q_a} onInput$={q_b}/>;`,
-      { q_a: ['item', 'i'], q_b: ['i', 'list'] },
-    );
+    const { qpOverrides } = qpFor(`const x = <div onClick$={q_a} onInput$={q_b}/>;`, {
+      q_a: ['item', 'i'],
+      q_b: ['i', 'list'],
+    });
     expect([...qpOverrides.values()]).toEqual([['item', 'i', 'list']]);
   });
 
@@ -52,25 +49,21 @@ describe('walkAstForQp', () => {
   it('ignores non-event attributes and unknown QRL names', () => {
     const { qpOverrides, qrlsWithCaptures } = qpFor(
       `const x = <div class={q_handler} onClick$={q_unknown}/>;`,
-      { q_handler: ['item'] },
+      { q_handler: ['item'] }
     );
     expect(qpOverrides.size).toBe(0);
     expect(qrlsWithCaptures.size).toBe(0);
   });
 
   it('ignores non-Identifier handler values', () => {
-    const { qpOverrides } = qpFor(
-      `const x = <div onClick$={() => q_handler()}/>;`,
-      { q_handler: ['item'] },
-    );
+    const { qpOverrides } = qpFor(`const x = <div onClick$={() => q_handler()}/>;`, {
+      q_handler: ['item'],
+    });
     expect(qpOverrides.size).toBe(0);
   });
 
   it('omits elements whose handlers resolve to no params', () => {
-    const { qpOverrides } = qpFor(
-      `const x = <div onClick$={q_a}/>;`,
-      {},
-    );
+    const { qpOverrides } = qpFor(`const x = <div onClick$={q_a}/>;`, {});
     expect(qpOverrides.size).toBe(0);
   });
 

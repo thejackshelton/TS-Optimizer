@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
@@ -22,7 +21,7 @@ export const App = component$(() => {
 `;
     const result = transform(source);
     const seg = result.modules.find(
-      (m) => m.kind === 'segment' && m.segment.ctxName === 'useStyles$',
+      (m) => m.kind === 'segment' && m.segment.ctxName === 'useStyles$'
     );
     if (seg?.kind !== 'segment') throw new Error('expected useStyles$ segment');
 
@@ -42,7 +41,7 @@ export const App = component$(() => {
 `;
     const result = transform(source);
     const seg = result.modules.find(
-      (m) => m.kind === 'segment' && m.segment.ctxName === 'useStyles$',
+      (m) => m.kind === 'segment' && m.segment.ctxName === 'useStyles$'
     );
     if (seg?.kind !== 'segment') throw new Error('expected useStyles$ segment');
 
@@ -59,7 +58,7 @@ export const App = component$(() => {
 `;
     const result = transform(source);
     const seg = result.modules.find(
-      (m) => m.kind === 'segment' && m.segment.ctxName === 'useStyles$',
+      (m) => m.kind === 'segment' && m.segment.ctxName === 'useStyles$'
     );
     if (seg?.kind !== 'segment') throw new Error('expected useStyles$ segment');
 
@@ -76,10 +75,10 @@ export const App = component$(() => {
 `;
     const sourceB = sourceA.replace(`'./style.css'`, `'./../test/style.css'`);
     const segA = transform(sourceA).modules.find(
-      (m) => m.kind === 'segment' && m.segment.ctxName === 'useStyles$',
+      (m) => m.kind === 'segment' && m.segment.ctxName === 'useStyles$'
     );
     const segB = transform(sourceB).modules.find(
-      (m) => m.kind === 'segment' && m.segment.ctxName === 'useStyles$',
+      (m) => m.kind === 'segment' && m.segment.ctxName === 'useStyles$'
     );
     if (segA?.kind !== 'segment' || segB?.kind !== 'segment') {
       throw new Error('expected segments');

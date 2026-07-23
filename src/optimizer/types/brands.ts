@@ -1,7 +1,7 @@
 /**
- * Branded primitive types for the optimizer. Each brand has exactly one smart
- * constructor (`mk<Brand>`); an invalid value is a defect, so the constructor
- * throws rather than returning a recoverable error.
+ * Branded primitive types for the optimizer. Each brand has exactly one smart constructor
+ * (`mk<Brand>`); an invalid value is a defect, so the constructor throws rather than returning a
+ * recoverable error.
  */
 
 export type SymbolName = string & { readonly __brand: 'SymbolName' };
@@ -24,19 +24,17 @@ export type ColumnNumber = number & { readonly __brand: 'ColumnNumber' };
 const IDENTIFIER_SHAPE = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
 
 /**
- * Accepts any non-empty alphanumeric-or-underscore string. Underscores are
- * allowed because the inlinedQrl fallback can use a whole symbol name
- * (e.g. `Foo_component_bbb`) as the hash slot; whitespace, path separators,
- * `.`, and `-` are still rejected, and the distinct brand keeps this apart
- * from `SymbolName`.
+ * Accepts any non-empty alphanumeric-or-underscore string. Underscores are allowed because the
+ * inlinedQrl fallback can use a whole symbol name (e.g. `Foo_component_bbb`) as the hash slot;
+ * whitespace, path separators, `.`, and `-` are still rejected, and the distinct brand keeps this
+ * apart from `SymbolName`.
  */
 const HASH_SHAPE = /^[A-Za-z0-9_]+$/;
 
 /**
- * Context-name shape. Accepts the bare `$` marker, marker callees
- * (`component$`), post-rewrite `Qrl` forms (`componentQrl`), and JSX attribute
- * names whose namespace (`:`) and hyphen (`-`) characters would otherwise be
- * rejected.
+ * Context-name shape. Accepts the bare `$` marker, marker callees (`component$`), post-rewrite
+ * `Qrl` forms (`componentQrl`), and JSX attribute names whose namespace (`:`) and hyphen (`-`)
+ * characters would otherwise be rejected.
  */
 const CTX_NAME_SHAPE = /^(\$|[a-zA-Z_][a-zA-Z0-9_:-]*\$?)$/;
 
@@ -55,10 +53,10 @@ export function mkHash(s: string): Hash {
 }
 
 /**
- * Loose by design: canonical filenames and display names span more than a JS
- * identifier (`[[...slug]].tsx_slug_component`, `404.tsx__404_component`), so
- * non-empty is the only invariant enforceable without rejecting real input.
- * The brand still keeps them distinct from `SymbolName` and `Hash`.
+ * Loose by design: canonical filenames and display names span more than a JS identifier
+ * (`[[...slug]].tsx_slug_component`, `404.tsx__404_component`), so non-empty is the only invariant
+ * enforceable without rejecting real input. The brand still keeps them distinct from `SymbolName`
+ * and `Hash`.
  */
 export function mkCanonicalFilename(s: string): CanonicalFilename {
   if (s.length === 0) {

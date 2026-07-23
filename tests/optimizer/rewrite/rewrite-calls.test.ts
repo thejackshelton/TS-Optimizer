@@ -98,7 +98,9 @@ describe('buildSyncTransform', () => {
   });
 
   it('strips TS annotations from the serialized string of a function expression', () => {
-    const serialized = serializedArg('function(e: Event, t: EventTarget): void { e.preventDefault(); }');
+    const serialized = serializedArg(
+      'function(e: Event, t: EventTarget): void { e.preventDefault(); }'
+    );
     expect(serialized).not.toContain('Event');
     expect(serialized).not.toContain('EventTarget');
     expect(serialized).not.toMatch(/:\s*void/);
@@ -112,10 +114,10 @@ describe('buildSyncTransform', () => {
 
   it('leaves a TS-free body unchanged (no-op guard)', () => {
     expect(serializedArg('(event, target) => { event.preventDefault(); }')).toBe(
-      '(event,target)=>{event.preventDefault();}',
+      '(event,target)=>{event.preventDefault();}'
     );
     expect(serializedArg('(event) => { event.preventDefault(); }')).toBe(
-      'event=>{event.preventDefault();}',
+      'event=>{event.preventDefault();}'
     );
   });
 });

@@ -8,7 +8,7 @@ function transform(source: string) {
     srcDir: mkFilePath('.'),
     mode: 'test',
   });
-  const parent = result.modules.find(m => m.kind === 'parent');
+  const parent = result.modules.find((m) => m.kind === 'parent');
   if (!parent || parent.kind !== 'parent') throw new Error('no parent module emitted');
   return { parent, modules: result.modules };
 }
@@ -68,7 +68,7 @@ export const Foo = component$(() => {
     expect(parent.code).toContain('qrl()');
     const qrlImportLines = parent.code
       .split('\n')
-      .filter(line => /import .*\bqrl\b.* from/.test(line));
+      .filter((line) => /import .*\bqrl\b.* from/.test(line));
     expect(qrlImportLines.length).toBe(1);
   });
 
@@ -105,7 +105,7 @@ export const Foo = component$(() => {
 `;
     const { modules } = transform(source);
     const fooSegment = modules.find(
-      m => m.kind === 'segment' && m.segment.name.startsWith('Foo_component_'),
+      (m) => m.kind === 'segment' && m.segment.name.startsWith('Foo_component_')
     );
     expect(fooSegment).toBeDefined();
     if (fooSegment?.kind !== 'segment') throw new Error('expected segment');

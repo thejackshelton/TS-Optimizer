@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { parseSync } from 'oxc-parser';
 import { applySegmentDCE } from '../../../src/optimizer/transform/dead-code.js';
@@ -32,10 +31,7 @@ describe('applySegmentDCE', () => {
 
     const [open, close] = braceCounts(out);
     expect(open, `unbalanced braces in:\n${out}`).toBe(close);
-    expect(
-      parseSync('s.js', out).errors,
-      `parse errors in:\n${out}`,
-    ).toEqual([]);
+    expect(parseSync('s.js', out).errors, `parse errors in:\n${out}`).toEqual([]);
     expect(out).toContain('live1()');
     expect(out).toContain('live2()');
     expect(out).not.toContain('dead()');

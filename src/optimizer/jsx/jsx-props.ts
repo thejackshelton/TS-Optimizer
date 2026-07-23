@@ -16,16 +16,12 @@ import { startsWithRewrittenEventPrefix } from '../qwik/event-attrs.js';
 import { getJsxAttributeName } from './jsx-attr-name.js';
 
 /**
- * Read a byte range from the transform buffer, falling back to the original
- * `source` when MagicString throws — which happens when the range's start byte
- * lies inside a previously-replaced range (an upstream rewrite overwrote the
- * attribute value before the JSX walker reached the outer element).
+ * Read a byte range from the transform buffer, falling back to the original `source` when
+ * MagicString throws — which happens when the range's start byte lies inside a previously-replaced
+ * range (an upstream rewrite overwrote the attribute value before the JSX walker reached the outer
+ * element).
  */
-function sliceWithFallback(
-  ctx: JsxTransformContext,
-  start: number,
-  end: number,
-): string {
+function sliceWithFallback(ctx: JsxTransformContext, start: number, end: number): string {
   try {
     return sliceTransformed(ctx, start, end);
   } catch {
@@ -34,16 +30,15 @@ function sliceWithFallback(
 }
 
 /**
- * Slot entry — one per JSX attribute in source order. Captures enough for
- * `buildJsxSplitCall` to assemble var/const bags in emit order:
+ * Slot entry — one per JSX attribute in source order. Captures enough for `buildJsxSplitCall` to
+ * assemble var/const bags in emit order:
  *
- *   - attributes appear in source order;
- *   - named props with stable values placed AFTER ALL spreads land in the
- *     const-bag; everything else (stable-but-pre-spread and unstable values)
- *     lands in the var-bag at its source position;
- *   - spreads appear as raw `...expr` in the var-bag when the post-all-spreads
- *     const set is non-empty; otherwise the `_getVarProps`/`_getConstProps`
- *     wrappers are needed so the spread's content is classified at runtime.
+ * - Attributes appear in source order;
+ * - Named props with stable values placed AFTER ALL spreads land in the const-bag; everything else
+ *   (stable-but-pre-spread and unstable values) lands in the var-bag at its source position;
+ * - Spreads appear as raw `...expr` in the var-bag when the post-all-spreads const set is non-empty;
+ *   otherwise the `_getVarProps`/`_getConstProps` wrappers are needed so the spread's content is
+ *   classified at runtime.
  */
 export type SlotEntry =
   | {
@@ -74,10 +69,10 @@ function isConstValueNode(valueNode: AstMaybeNode): boolean {
 }
 
 /**
- * Fold a string-literal JSX attribute value so a value spanning multiple
- * physical lines (or containing tabs) survives re-emission as a single-line
- * JS string literal — raw newlines in an emitted JS string are a syntax error.
- * `quoted` is the raw source slice including its surrounding quotes.
+ * Fold a string-literal JSX attribute value so a value spanning multiple physical lines (or
+ * containing tabs) survives re-emission as a single-line JS string literal — raw newlines in an
+ * emitted JS string are a syntax error. `quoted` is the raw source slice including its surrounding
+ * quotes.
  */
 function foldJsxAttrStringWhitespace(quoted: string): string {
   const quote = quoted[0];
@@ -119,7 +114,7 @@ export function formatPropName(name: string): string {
 export function processProps(
   ctx: JsxTransformContext,
   attributes: JSXAttributeItem[],
-  opts: ProcessPropsOptions,
+  opts: ProcessPropsOptions
 ): {
   varEntries: string[];
   constEntries: string[];
@@ -132,7 +127,15 @@ export function processProps(
   slotOrder: SlotEntry[];
   neededImports: Set<string>;
 } {
-  const { source, importedNames, signalHoister, qrlsWithCaptures, paramNames, bindings, allDeclaredNames } = ctx;
+  const {
+    source,
+    importedNames,
+    signalHoister,
+    qrlsWithCaptures,
+    paramNames,
+    bindings,
+    allDeclaredNames,
+  } = ctx;
   const { tagIsHtml, passiveEvents, inLoop, skipSignalAnalysis } = opts;
   const varEntries: string[] = [];
   const constEntries: string[] = [];
@@ -145,7 +148,18 @@ export function processProps(
   const bindHandlers = new Map<string, string>();
 
   if (!attributes || attributes.length === 0) {
-    return { varEntries, constEntries, beforeSpreadEntries, key, hasVarProps: false, hasVarEventHandler: false, hasSpread, additionalSpreads: [], slotOrder, neededImports };
+    return {
+      varEntries,
+      constEntries,
+      beforeSpreadEntries,
+      key,
+      hasVarProps: false,
+      hasVarEventHandler: false,
+      hasSpread,
+      additionalSpreads: [],
+      slotOrder,
+      neededImports,
+    };
   }
 
   // Dual-write the legacy buckets and `slotOrder` at every push so the many
@@ -155,7 +169,7 @@ export function processProps(
     bucket: string[],
     entry: string,
     classification: 'var' | 'const',
-    sourceStart: number,
+    sourceStart: number
   ): void => {
     bucket.push(entry);
     slotOrder.push({ kind: 'named', entry, classification, sourceStart });
@@ -164,8 +178,8 @@ export function processProps(
     slotOrder.push({ kind: 'spread', expr, sourceStart });
   };
 
-  const hasSpreadAttr = attributes.some(a => a.type === 'JSXSpreadAttribute');
-  const spreadIndex = attributes.findIndex(a => a.type === 'JSXSpreadAttribute');
+  const hasSpreadAttr = attributes.some((a) => a.type === 'JSXSpreadAttribute');
+  const spreadIndex = attributes.findIndex((a) => a.type === 'JSXSpreadAttribute');
   const additionalSpreads: string[] = [];
   let spreadCount = 0;
 
@@ -248,7 +262,12 @@ export function processProps(
     if (isBindProp(propName) && !tagIsHtml) {
       let bindValue = valueText;
       if (valueNode && !skipSignalAnalysis) {
-        const bindSignal = analyzeSignalExpression(valueNode, source, importedNames, allDeclaredNames);
+        const bindSignal = analyzeSignalExpression(
+          valueNode,
+          source,
+          importedNames,
+          allDeclaredNames
+        );
         if (bindSignal.type === 'wrapProp' && bindSignal.isStoreField) {
           bindValue = bindSignal.code;
           neededImports.add('_wrapProp');
@@ -260,7 +279,12 @@ export function processProps(
 
     if (isBindProp(propName) && !hasSpreadAttr) {
       const bindResult = transformBindProp(propName, valueText);
-      pushNamed(constEntries, `"${bindResult.propName}": ${bindResult.propValue}`, 'const', attr.start);
+      pushNamed(
+        constEntries,
+        `"${bindResult.propName}": ${bindResult.propValue}`,
+        'const',
+        attr.start
+      );
       if (bindResult.handler) {
         const existing = bindHandlers.get(bindResult.handler.name);
         if (existing) {
@@ -345,18 +369,28 @@ export function processProps(
     }
 
     if (valueNode && !skipSignalAnalysis) {
-      const signalResult = analyzeSignalExpression(valueNode, source, importedNames, allDeclaredNames);
+      const signalResult = analyzeSignalExpression(
+        valueNode,
+        source,
+        importedNames,
+        allDeclaredNames
+      );
 
       if (signalResult.type === 'wrapProp') {
         const formattedName = formatPropName(propName);
         if (signalResult.isStoreField && tagIsHtml) {
           const objName = signalResult.code.match(/_wrapProp\((\w+)/)?.[1] ?? null;
-          const isConst = isConstBindingName(objName, importedNames, bindings, valueNode?.start ?? 0);
+          const isConst = isConstBindingName(
+            objName,
+            importedNames,
+            bindings,
+            valueNode?.start ?? 0
+          );
           pushNamed(
             isConst ? constEntries : varEntries,
             `${formattedName}: ${signalResult.code}`,
             isConst ? 'const' : 'var',
-            attr.start,
+            attr.start
           );
         } else {
           pushNamed(constEntries, `${formattedName}: ${signalResult.code}`, 'const', attr.start);
@@ -373,14 +407,28 @@ export function processProps(
           (signalResult.isObjectExpr && (propName === 'class' || propName === 'className')) ||
           (isRawWhenNonConst &&
             !fnSignalDepsAllConst(
-              signalResult.deps, importedNames, bindings, valueNode.start, tagIsHtml, isParam,
+              signalResult.deps,
+              importedNames,
+              bindings,
+              valueNode.start,
+              tagIsHtml,
+              isParam
             ));
         if (!excludedFromHoist) {
-          const hfName = signalHoister.hoist(signalResult.hoistedFn, signalResult.hoistedStr, valueNode.start ?? 0);
+          const hfName = signalHoister.hoist(
+            signalResult.hoistedFn,
+            signalResult.hoistedStr,
+            valueNode.start ?? 0
+          );
           const fnSignalCall = `_fnSignal(${hfName}, [${signalResult.deps.join(', ')}], ${hfName}_str)`;
           const formattedName = formatPropName(propName);
           const depsAllConst = fnSignalDepsAllConst(
-            signalResult.deps, importedNames, bindings, valueNode.start, tagIsHtml, isParam,
+            signalResult.deps,
+            importedNames,
+            bindings,
+            valueNode.start,
+            tagIsHtml,
+            isParam
           );
           if (depsAllConst && !inLoop) {
             pushNamed(constEntries, `${formattedName}: ${fnSignalCall}`, 'const', attr.start);
@@ -412,15 +460,16 @@ export function processProps(
     sortVarEntries(varEntries);
   }
 
-  const hasBindEntries = varEntries.some(e => e.startsWith('"bind:'));
-  const eventTarget = (hasSpread && tagIsHtml && !hasBindEntries) ? varEntries : constEntries;
+  const hasBindEntries = varEntries.some((e) => e.startsWith('"bind:'));
+  const eventTarget = hasSpread && tagIsHtml && !hasBindEntries ? varEntries : constEntries;
   for (const [eventName, handlerCode] of bindHandlers) {
     const quotedEventName = `"${eventName}"`;
     const existingIdx = constEntries.findIndex((e) => e.startsWith(`${quotedEventName}: `));
     if (existingIdx >= 0) {
       const existingEntry = constEntries[existingIdx];
       const existingValue = existingEntry.slice(quotedEventName.length + 2);
-      constEntries[existingIdx] = `${quotedEventName}: ${mergeEventHandlers(existingValue, handlerCode)}`;
+      constEntries[existingIdx] =
+        `${quotedEventName}: ${mergeEventHandlers(existingValue, handlerCode)}`;
     } else {
       eventTarget.push(`${quotedEventName}: ${handlerCode}`);
     }

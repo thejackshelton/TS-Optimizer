@@ -13,7 +13,8 @@ import type { AstNode, AstParentNode } from '../../../src/ast-types.js';
 function parseExpr(src: string): AstNode {
   const wrapped = `const __e__ = ${src};`;
   const parsed = parseSync('__expr__.ts', wrapped);
-  const decl = (parsed.program?.body?.[0] as { declarations?: Array<{ init?: AstNode }> })?.declarations?.[0];
+  const decl = (parsed.program?.body?.[0] as { declarations?: Array<{ init?: AstNode }> })
+    ?.declarations?.[0];
   if (!decl?.init) throw new Error('parse failed');
   return decl.init;
 }

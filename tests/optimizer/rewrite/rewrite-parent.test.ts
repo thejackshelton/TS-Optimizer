@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { rewriteParentModule } from '../../../src/optimizer/rewrite/index.js';
-import { extractSegments, type ExtractionResult } from '../../../src/optimizer/extraction/extract.js';
+import {
+  extractSegments,
+  type ExtractionResult,
+} from '../../../src/optimizer/extraction/extract.js';
 import { collectImports } from '../../../src/optimizer/extraction/marker-detection.js';
 import { parseSync } from 'oxc-parser';
 import { mkRelativePath } from '../../../src/optimizer/types/brands.js';
@@ -9,7 +12,12 @@ function rewrite(source: string, relPath = 'test.tsx'): string {
   const extractions = extractSegments(source, relPath);
   const { program } = parseSync(relPath, source);
   const imports = collectImports(program);
-  const result = rewriteParentModule(source, mkRelativePath(relPath), extractions as ExtractionResult[], imports);
+  const result = rewriteParentModule(
+    source,
+    mkRelativePath(relPath),
+    extractions as ExtractionResult[],
+    imports
+  );
   return result.code;
 }
 
@@ -47,7 +55,7 @@ export const handler = /*#__PURE__*/ $(() => console.log("hi"));`;
 
     expect(
       /\/\*\s*#?@?__PURE__\s*\*\/\s*q_/.test(code),
-      `Stranded PURE annotation before a q_ reference:\n${code}`,
+      `Stranded PURE annotation before a q_ reference:\n${code}`
     ).toBe(false);
     expect(code).toContain('export const handler = q_');
   });
@@ -62,9 +70,7 @@ const handler = $(() => {
 });`;
     const code = rewrite(source);
 
-    const qrlDecls = code
-      .split('\n')
-      .filter((line) => line.startsWith('const q_'));
+    const qrlDecls = code.split('\n').filter((line) => line.startsWith('const q_'));
     expect(qrlDecls.length).toBe(1);
     expect(code).not.toMatch(/const q_handler/);
     expect(code).toMatch(/\/\*#__PURE__\*\/ qrl\(\(\)=>import\(.*handler/);
@@ -89,14 +95,10 @@ export const App = component$(() => {
 });`;
     const code = rewrite(source);
 
-    const importLines = code
-      .split('\n')
-      .filter((line) => line.startsWith('import {'));
+    const importLines = code.split('\n').filter((line) => line.startsWith('import {'));
 
     const qrlImport = importLines.find((l) => l.includes('{ qrl }'));
-    const componentQrlImport = importLines.find((l) =>
-      l.includes('{ componentQrl }'),
-    );
+    const componentQrlImport = importLines.find((l) => l.includes('{ componentQrl }'));
     expect(qrlImport).toBeDefined();
     expect(componentQrlImport).toBeDefined();
     expect(qrlImport).not.toBe(componentQrlImport);
@@ -139,9 +141,7 @@ const fn = sync$(() => {
 
     expect(code).toContain('_qrlSync(');
     expect(code).toContain('import { _qrlSync } from "@qwik.dev/core";');
-    const qrlDecls = code
-      .split('\n')
-      .filter((line) => line.startsWith('const q_'));
+    const qrlDecls = code.split('\n').filter((line) => line.startsWith('const q_'));
     expect(qrlDecls.length).toBe(0);
   });
 
@@ -156,7 +156,12 @@ export const App = component$(() => {
     const extractions = extractSegments(source, 'test.tsx');
     const { program } = parseSync('test.tsx', source);
     const imports = collectImports(program);
-    const result = rewriteParentModule(source, mkRelativePath('test.tsx'), extractions as ExtractionResult[], imports);
+    const result = rewriteParentModule(
+      source,
+      mkRelativePath('test.tsx'),
+      extractions as ExtractionResult[],
+      imports
+    );
 
     expect(result.extractions.length).toBeGreaterThanOrEqual(2);
     const nested = result.extractions.find((e) => e.parent != null);
@@ -178,10 +183,7 @@ const val = useMemo$(() => {
     expect(code).toContain('useMemoQrl(q_');
     const importLines = code
       .split('\n')
-      .filter(
-        (line) =>
-          line.startsWith('import {') && line.includes('useMemoQrl'),
-      );
+      .filter((line) => line.startsWith('import {') && line.includes('useMemoQrl'));
     expect(importLines.length).toBe(0);
   });
 
@@ -194,10 +196,7 @@ export const App = component$(() => {
 
     const componentQrlImports = code
       .split('\n')
-      .filter(
-        (line) =>
-          line.startsWith('import {') && line.includes('componentQrl'),
-      );
+      .filter((line) => line.startsWith('import {') && line.includes('componentQrl'));
     expect(componentQrlImports.length).toBeLessThanOrEqual(1);
   });
 

@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -70,12 +69,10 @@ function diffAgainstLegacy(source: string, filename: string): string[] {
     const ours = fused.get(fn) ?? [];
     const computedKeyNames = collectComputedKeyNames(fn);
     const legacySet = new Set(legacy);
-    const filtered = ours.filter(
-      (n) => legacySet.has(n) || !computedKeyNames.has(n),
-    );
+    const filtered = ours.filter((n) => legacySet.has(n) || !computedKeyNames.has(n));
     if (JSON.stringify(filtered) !== JSON.stringify(legacy)) {
       mismatches.push(
-        `${key} @ ${fn.start}: fused=${JSON.stringify(ours)} legacy=${JSON.stringify(legacy)}`,
+        `${key} @ ${fn.start}: fused=${JSON.stringify(ours)} legacy=${JSON.stringify(legacy)}`
       );
     }
   }

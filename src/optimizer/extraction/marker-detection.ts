@@ -19,7 +19,7 @@ export interface CustomInlinedInfo {
 }
 
 function getExportedSpecifierName(
-  specifier: ModuleExportName | null | undefined,
+  specifier: ModuleExportName | null | undefined
 ): string | undefined {
   if (specifier?.type === 'Identifier') {
     return specifier.name;
@@ -36,7 +36,7 @@ function getImportSpecifierName(specifier: ModuleExportName): string | undefined
 
 export function collectImports(
   program: AstProgram,
-  moduleInfo?: AstEcmaScriptModule,
+  moduleInfo?: AstEcmaScriptModule
 ): Map<string, ImportInfo> {
   const imports = new Map<string, ImportInfo>();
 
@@ -108,7 +108,7 @@ export function collectImports(
 
 export function collectExportNames(
   program: AstProgram,
-  moduleInfo?: AstEcmaScriptModule,
+  moduleInfo?: AstEcmaScriptModule
 ): Set<string> {
   const exports = new Set<string>();
 
@@ -152,9 +152,7 @@ export function collectExportNames(
   return exports;
 }
 
-export function collectCustomInlined(
-  program: AstProgram,
-): Map<string, CustomInlinedInfo> {
+export function collectCustomInlined(program: AstProgram): Map<string, CustomInlinedInfo> {
   const custom = new Map<string, CustomInlinedInfo>();
 
   for (const node of program.body) {
@@ -186,9 +184,8 @@ export function getCalleeName(callExpr: CallExpression): string | null {
 }
 
 /**
- * A marker call: the callee's original imported name ends in `$` (renamed
- * imports match on the imported name, not the local one), or it's a `$`-named
- * customInlined entry.
+ * A marker call: the callee's original imported name ends in `$` (renamed imports match on the
+ * imported name, not the local one), or it's a `$`-named customInlined entry.
  */
 export function isMarkerCall(
   callExpr: CallExpression,
@@ -205,7 +202,7 @@ export function isMarkerCall(
   return false;
 }
 
-/** sync$ is a marker but does NOT extract a segment. */
+/** Sync$ is a marker but does NOT extract a segment. */
 export function isSyncMarker(calleeName: string): boolean {
   return calleeName === 'sync$';
 }
@@ -213,7 +210,7 @@ export function isSyncMarker(calleeName: string): boolean {
 export function getExtractionKind(
   _calleeName: string,
   isJsxEventAttr: boolean,
-  isJsxNonEventAttr: boolean = false,
+  isJsxNonEventAttr: boolean = false
 ): 'function' | 'eventHandler' | 'jSXProp' {
   if (isJsxEventAttr) return 'eventHandler';
   if (isJsxNonEventAttr) return 'jSXProp';
@@ -225,29 +222,20 @@ export function getExtractionName(
   isJsxEventAttr: boolean,
   jsxAttrName?: string
 ): string {
-  return (isJsxEventAttr && jsxAttrName) ? jsxAttrName : calleeName;
+  return isJsxEventAttr && jsxAttrName ? jsxAttrName : calleeName;
 }
 
 /**
- * Sound textual prefilter: may `source` contain an extraction trigger? Every
- * trigger leaves a verbatim token — a `$`-final identifier/attribute/key (a
- * token-final `$` is only ever followed by `{` in template-literal `${`, so
- * that shape is excluded), an `inlinedQrl` callee, or a unicode-escaped `$`.
- * Over-inclusion is safe (the walk decides for real); a false negative would
+ * Sound textual prefilter: may `source` contain an extraction trigger? Every trigger leaves a
+ * verbatim token — a `$`-final identifier/attribute/key (a token-final `$` is only ever followed by
+ * `{` in template-literal `${`, so that shape is excluded), an `inlinedQrl` callee, or a
+ * unicode-escaped `$`. Over-inclusion is safe (the walk decides for real); a false negative would
  * silently drop a segment, so the check must never miss.
  */
 export function sourceMayContainMarkers(source: string): boolean {
-  for (
-    let idx = source.indexOf('$');
-    idx !== -1;
-    idx = source.indexOf('$', idx + 1)
-  ) {
+  for (let idx = source.indexOf('$'); idx !== -1; idx = source.indexOf('$', idx + 1)) {
     // charCodeAt past end is NaN (!== '{'), so a trailing `$` over-includes safely.
     if (source.charCodeAt(idx + 1) !== 0x7b /* '{' */) return true;
   }
-  return (
-    source.includes('inlinedQrl') ||
-    source.includes('\\u0024') ||
-    source.includes('\\u{24}')
-  );
+  return source.includes('inlinedQrl') || source.includes('\\u0024') || source.includes('\\u{24}');
 }

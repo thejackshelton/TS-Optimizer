@@ -1,6 +1,11 @@
 import { createRegExp, exactly, anyOf, global } from 'magic-regexp';
 import type { AstMaybeNode, AstNode, AstParentNode } from '../../ast-types.js';
-import { forEachAstChild, isAstNode, someAstDescendant, memberStaticPropName } from '../ast/guards.js';
+import {
+  forEachAstChild,
+  isAstNode,
+  someAstDescendant,
+  memberStaticPropName,
+} from '../ast/guards.js';
 import {
   applyReplacements,
   formatSimplifiedLiteral,
@@ -15,15 +20,18 @@ import {
 import { quoteAsStringLiteral } from '../edit/string-literal.js';
 import { addBindingNamesFromPatternToSet } from '../ast/binding-pattern.js';
 
-const trailingComma = createRegExp(
-  exactly(',').and(anyOf('}', ']', ')').grouped()),
-  [global],
-);
+const trailingComma = createRegExp(exactly(',').and(anyOf('}', ']', ')').grouped()), [global]);
 
 export type SignalExprResult =
   | { type: 'none' }
   | { type: 'wrapProp'; code: string; isStoreField?: boolean }
-  | { type: 'fnSignal'; deps: string[]; hoistedFn: string; hoistedStr: string; isObjectExpr?: boolean };
+  | {
+      type: 'fnSignal';
+      deps: string[];
+      hoistedFn: string;
+      hoistedStr: string;
+      isObjectExpr?: boolean;
+    };
 
 type IdentifierNode = Extract<AstNode, { type: 'Identifier' }>;
 type MemberExpressionNode = Extract<AstNode, { type: 'MemberExpression' }>;
@@ -49,15 +57,30 @@ function peelExpressionWrappers(node: AstMaybeNode): AstNode | null {
 }
 
 const GLOBAL_NAMES = new Set([
-  'window', 'document', 'globalThis', 'navigator', 'location', 'history',
-  'screen', 'localStorage', 'sessionStorage', 'console', 'Math', 'JSON',
-  'Date', 'Array', 'Object', 'String', 'Number', 'Boolean', 'undefined',
-  'NaN', 'Infinity',
+  'window',
+  'document',
+  'globalThis',
+  'navigator',
+  'location',
+  'history',
+  'screen',
+  'localStorage',
+  'sessionStorage',
+  'console',
+  'Math',
+  'JSON',
+  'Date',
+  'Array',
+  'Object',
+  'String',
+  'Number',
+  'Boolean',
+  'undefined',
+  'NaN',
+  'Infinity',
 ]);
 
-function isSignalValueAccess(
-  node: AstMaybeNode,
-): node is MemberExpressionNode {
+function isSignalValueAccess(node: AstMaybeNode): node is MemberExpressionNode {
   return (
     node != null &&
     node.type === 'MemberExpression' &&
@@ -70,7 +93,7 @@ function isSignalValueAccess(
 function isStoreFieldAccess(
   node: AstMaybeNode,
   importedNames: Set<string>,
-  localNames?: Set<string>,
+  localNames?: Set<string>
 ): node is MemberExpressionNode {
   if (node == null || node.type !== 'MemberExpression') return false;
   if (node.object?.type !== 'Identifier') return false;
@@ -113,9 +136,9 @@ function containsImportedReference(node: AstMaybeNode, importedNames: Set<string
 }
 
 /**
- * True when the expression contains a call outside an optional chain. Such a
- * call blocks hoisting: a serialized, reactively re-run `_fnSignal` body cannot
- * carry an arbitrary call, whereas an optional-chain getter (`a?.b()`) can.
+ * True when the expression contains a call outside an optional chain. Such a call blocks hoisting:
+ * a serialized, reactively re-run `_fnSignal` body cannot carry an arbitrary call, whereas an
+ * optional-chain getter (`a?.b()`) can.
  */
 function containsNonOptionalCall(node: AstMaybeNode): boolean {
   return hasCallOutsideChainSpine(node, false);
@@ -164,7 +187,7 @@ function getMemberChainDepth(node: AstNode): number {
 function isDeepStoreAccess(
   node: AstNode,
   importedNames: Set<string>,
-  localNames?: Set<string>,
+  localNames?: Set<string>
 ): node is MemberExpressionNode {
   if (node.type !== 'MemberExpression') return false;
   if (getMemberChainDepth(node) < 2) return false;
@@ -178,11 +201,11 @@ function isDeepStoreAccess(
 }
 
 /**
- * Single-walk collector returning both `roots` (reactive roots, first-appearance
- * order) and `allDeps` (roots plus bare locally-bound identifiers, sorted). The
- * non-computed `MemberExpression.property` and `Property.key` positions are
- * excluded from both outputs — safe because signal/store detection happens at
- * the MemberExpression level, not the property Identifier.
+ * Single-walk collector returning both `roots` (reactive roots, first-appearance order) and
+ * `allDeps` (roots plus bare locally-bound identifiers, sorted). The non-computed
+ * `MemberExpression.property` and `Property.key` positions are excluded from both outputs — safe
+ * because signal/store detection happens at the MemberExpression level, not the property
+ * Identifier.
  */
 interface SignalDepsResult {
   roots: string[];
@@ -192,7 +215,7 @@ interface SignalDepsResult {
 function collectSignalDeps(
   node: AstNode,
   importedNames: Set<string>,
-  localNames?: Set<string>,
+  localNames?: Set<string>
 ): SignalDepsResult {
   const roots: string[] = [];
   const bareIdents: string[] = [];
@@ -311,11 +334,7 @@ function collectSignalDeps(
   function descend(n: AstNode): void {
     forEachAstChild(n, (child, key, parent) => {
       if (key === 'key' && parent.type === 'Property') return;
-      if (
-        key === 'property' &&
-        parent.type === 'MemberExpression' &&
-        !parent.computed
-      ) {
+      if (key === 'property' && parent.type === 'MemberExpression' && !parent.computed) {
         return;
       }
       walk(child);
@@ -332,20 +351,19 @@ function collectSignalDeps(
 function collectReactiveRoots(
   node: AstNode,
   importedNames: Set<string>,
-  localNames?: Set<string>,
+  localNames?: Set<string>
 ): string[] {
   return collectSignalDeps(node, importedNames, localNames).roots;
 }
 
 /**
- * Generate a hoisted function body, replacing reactive root names with `pN`
- * params. Returns both the full function (original spacing) and a
- * minimal-whitespace serialized string form.
+ * Generate a hoisted function body, replacing reactive root names with `pN` params. Returns both
+ * the full function (original spacing) and a minimal-whitespace serialized string form.
  */
 function generateFnSignal(
   exprNode: AstNode,
   source: string,
-  roots: string[],
+  roots: string[]
 ): { hoistedFn: string; hoistedStr: string } {
   const rootToParam = new Map<string, string>();
   for (let i = 0; i < roots.length; i++) {
@@ -360,28 +378,23 @@ function generateFnSignal(
   // simplifications target Binary/Unary/Logical/Conditional with primitive
   // operands, so no node type overlaps.
   const rootCollector = rootReplacementsCollector(rootToParam);
-  const replacements = collectRangeReplacements(
-    exprNode, exprStart, exprText,
-    [rootCollector],
-  );
-  const simplifications = collectRangeReplacements(
-    exprNode, exprStart, exprText,
-    [lambdaBodySimplificationsCollector()],
-  );
+  const replacements = collectRangeReplacements(exprNode, exprStart, exprText, [rootCollector]);
+  const simplifications = collectRangeReplacements(exprNode, exprStart, exprText, [
+    lambdaBodySimplificationsCollector(),
+  ]);
 
   const strFnBody = applyReplacements(exprText, replacements);
 
-  const lambdaFnBody = simplifications.length > 0
-    ? applyReplacements(exprText, [...replacements, ...simplifications])
-    : strFnBody;
+  const lambdaFnBody =
+    simplifications.length > 0
+      ? applyReplacements(exprText, [...replacements, ...simplifications])
+      : strFnBody;
 
   const params = roots.map((_, i) => `p${i}`).join(',');
 
   // Object expressions need wrapping parens so the arrow returns an object, not a block
   const needsParens = exprNode.type === 'ObjectExpression';
-  const hoistedFn = needsParens
-    ? `(${params})=>(${lambdaFnBody})`
-    : `(${params})=>${lambdaFnBody}`;
+  const hoistedFn = needsParens ? `(${params})=>(${lambdaFnBody})` : `(${params})=>${lambdaFnBody}`;
 
   let strBody = stripTrailingCommas(normalizeStringQuotes(removeWhitespace(strFnBody)));
   strBody = stripOuterParens(strBody);
@@ -395,7 +408,7 @@ function generateFnSignal(
 function collectComputedKeyRewrites(
   chainNode: AstNode,
   rootToParam: ReadonlyMap<string, string>,
-  exprStart: number,
+  exprStart: number
 ): Array<{ start: number; end: number; replacement: string }> {
   const reps: Array<{ start: number; end: number; replacement: string }> = [];
   function rewriteKey(node: AstMaybeNode, parentKey?: string, parentNode?: AstNode): void {
@@ -405,7 +418,8 @@ function collectComputedKeyRewrites(
         parentKey === 'property' &&
         parentNode?.type === 'MemberExpression' &&
         !parentNode.computed
-      ) return;
+      )
+        return;
       const param = rootToParam.get(node.name);
       if (param != null) {
         reps.push({ start: node.start - exprStart, end: node.end - exprStart, replacement: param });
@@ -423,7 +437,7 @@ function collectComputedKeyRewrites(
 }
 
 function rootReplacementsCollector(
-  rootToParam: ReadonlyMap<string, string>,
+  rootToParam: ReadonlyMap<string, string>
 ): RangeReplacementCollector {
   return (n, ctx) => {
     if (isSignalValueAccess(n) || isDeepStoreAccess(n, new Set())) {
@@ -476,11 +490,13 @@ function rootReplacementsCollector(
       isReplaceableIdentifierPosition(ctx.parentKey, ctx.parentNode)
     ) {
       return {
-        replacements: [{
-          start: n.start - ctx.exprStart,
-          end: n.end - ctx.exprStart,
-          replacement: rootToParam.get(n.name)!,
-        }],
+        replacements: [
+          {
+            start: n.start - ctx.exprStart,
+            end: n.end - ctx.exprStart,
+            replacement: rootToParam.get(n.name)!,
+          },
+        ],
         skipSubtree: true,
       };
     }
@@ -497,11 +513,10 @@ function findRootIdentifier(node: AstMaybeNode): IdentifierNode | null {
 }
 
 /**
- * Remove whitespace around operators for the minimal string form, preserving
- * whitespace inside string literals and inserting a space only where adjacent
- * tokens would merge (e.g. `in`, `instanceof`). Intentionally a character-level
- * tokenizer, not AST-based — it runs on tiny already-extracted fragments where
- * re-parsing would be more complex.
+ * Remove whitespace around operators for the minimal string form, preserving whitespace inside
+ * string literals and inserting a space only where adjacent tokens would merge (e.g. `in`,
+ * `instanceof`). Intentionally a character-level tokenizer, not AST-based — it runs on tiny
+ * already-extracted fragments where re-parsing would be more complex.
  */
 function removeWhitespace(text: string): string {
   const tokens: string[] = [];
@@ -519,10 +534,19 @@ function removeWhitespace(text: string): string {
       let tok = ch;
       i++;
       while (i < text.length && text[i] !== ch) {
-        if (text[i] === '\\') { tok += text[i]; i++; }
-        if (i < text.length) { tok += text[i]; i++; }
+        if (text[i] === '\\') {
+          tok += text[i];
+          i++;
+        }
+        if (i < text.length) {
+          tok += text[i];
+          i++;
+        }
       }
-      if (i < text.length) { tok += text[i]; i++; }
+      if (i < text.length) {
+        tok += text[i];
+        i++;
+      }
       tokens.push(tok);
       continue;
     }
@@ -534,7 +558,10 @@ function removeWhitespace(text: string): string {
         tok += text[i];
         i++;
       }
-      if (i < text.length) { tok += text[i]; i++; }
+      if (i < text.length) {
+        tok += text[i];
+        i++;
+      }
       tokens.push(tok);
       continue;
     }
@@ -588,8 +615,9 @@ function skipStringLiteral(text: string, i: number): number {
   if (ch === '`') {
     i++;
     while (i < text.length && text[i] !== '`') {
-      if (text[i] === '\\') { i++; }
-      else if (text[i] === '$' && i + 1 < text.length && text[i + 1] === '{') {
+      if (text[i] === '\\') {
+        i++;
+      } else if (text[i] === '$' && i + 1 < text.length && text[i + 1] === '{') {
         i += 2;
         let depth = 1;
         while (i < text.length && depth > 0) {
@@ -607,9 +635,9 @@ function skipStringLiteral(text: string, i: number): number {
 }
 
 /**
- * Find the matching close-paren for an open paren at position 0, skipping
- * string/template literals; returns -1 if not found. Intentionally text-based —
- * runs on tiny fragments where re-parsing isn't worth it.
+ * Find the matching close-paren for an open paren at position 0, skipping string/template literals;
+ * returns -1 if not found. Intentionally text-based — runs on tiny fragments where re-parsing isn't
+ * worth it.
  */
 function findMatchingParen(text: string): number {
   let depth = 0;
@@ -628,8 +656,8 @@ function findMatchingParen(text: string): number {
 }
 
 /**
- * Strip balanced outer parentheses that wrap the entire expression (unnecessary
- * parens are omitted by AST re-serialization).
+ * Strip balanced outer parentheses that wrap the entire expression (unnecessary parens are omitted
+ * by AST re-serialization).
  */
 function stripOuterParens(text: string): string {
   while (text.length >= 2 && text[0] === '(') {
@@ -643,10 +671,7 @@ function stripOuterParens(text: string): string {
   return text;
 }
 
-/**
- * Strip redundant parentheses around a ternary condition:
- * `(cond)?cons:alt` -> `cond?cons:alt`.
- */
+/** Strip redundant parentheses around a ternary condition: `(cond)?cons:alt` -> `cond?cons:alt`. */
 function stripTernaryConditionParens(text: string): string {
   if (text.length < 4 || text[0] !== '(') return text;
 
@@ -660,9 +685,9 @@ function stripTernaryConditionParens(text: string): string {
 }
 
 /**
- * Normalize single-quoted string literals to double quotes (the serialized
- * double-quote convention). Intentionally character-level — runs on tiny
- * fragments where re-parsing isn't worth it.
+ * Normalize single-quoted string literals to double quotes (the serialized double-quote
+ * convention). Intentionally character-level — runs on tiny fragments where re-parsing isn't worth
+ * it.
  */
 function normalizeStringQuotes(text: string): string {
   let result = '';
@@ -716,7 +741,7 @@ export function analyzeSignalExpression(
   exprNode: AstMaybeNode,
   source: string,
   importedNames: Set<string>,
-  localNames?: Set<string>,
+  localNames?: Set<string>
 ): SignalExprResult {
   const peeled = peelExpressionWrappers(exprNode);
   if (peeled == null) return { type: 'none' };
@@ -785,7 +810,7 @@ function tryBuildFnSignal(
   exprNode: AstNode,
   source: string,
   importedNames: Set<string>,
-  localNames?: Set<string>,
+  localNames?: Set<string>
 ): SignalExprResult {
   const { roots, allDeps } = collectSignalDeps(exprNode, importedNames, localNames);
   if (roots.length === 0) return { type: 'none' };
@@ -803,7 +828,7 @@ function analyzeCallExpression(
   exprNode: Extract<AstNode, { type: 'CallExpression' }>,
   source: string,
   importedNames: Set<string>,
-  localNames?: Set<string>,
+  localNames?: Set<string>
 ): SignalExprResult {
   const calleeName = getCalleeIdentifierName(exprNode.callee);
   if (calleeName === 'mutable') return { type: 'none' };
@@ -816,13 +841,14 @@ function analyzeMemberExpression(
   exprNode: Extract<AstNode, { type: 'MemberExpression' }>,
   source: string,
   importedNames: Set<string>,
-  localNames?: Set<string>,
+  localNames?: Set<string>
 ): SignalExprResult {
   const unwrapped = peelExpressionWrappers(exprNode.object);
   const objIdent = unwrapped?.type === 'Identifier' ? unwrapped.name : null;
 
   // Only apply signal treatment to identifiers resolvable in scope.
-  const isKnownIdent = objIdent === null ||
+  const isKnownIdent =
+    objIdent === null ||
     importedNames.has(objIdent) ||
     GLOBAL_NAMES.has(objIdent) ||
     (localNames?.has(objIdent) ?? true);
@@ -905,9 +931,9 @@ export class SignalHoister {
   }
 
   /**
-   * Build a map renumbering `_hf` variables to source-position order. The walk
-   * is bottom-up (leave callback), so emitted `_hf` numbers must be remapped to
-   * top-down source order. Returns null if already in order.
+   * Build a map renumbering `_hf` variables to source-position order. The walk is bottom-up (leave
+   * callback), so emitted `_hf` numbers must be remapped to top-down source order. Returns null if
+   * already in order.
    */
   buildRenameMap(): Map<string, string> | null {
     if (this.hoistedFunctions.length <= 1) return null;

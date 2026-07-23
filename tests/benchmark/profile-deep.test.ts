@@ -82,7 +82,7 @@ describe('profiling harness', () => {
     console.log(
       `PROFILE ${workload.label}: iterations=${ITERATIONS} ` +
         `total=${total.toFixed(0)}ms min=${min.toFixed(1)}ms ` +
-        `avg=${(total / ITERATIONS).toFixed(1)}ms`,
+        `avg=${(total / ITERATIONS).toFixed(1)}ms`
     );
     expect(perIteration.length).toBe(ITERATIONS);
   }, 300_000);

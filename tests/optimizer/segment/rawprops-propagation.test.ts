@@ -83,7 +83,7 @@ export const AtomStatus = component$(({ctx, atom}) => {
     });
 
     const eventHandlerSeg = result.modules.find(
-      (m) => m.kind === 'segment' && m.path.includes('span_q_e_click'),
+      (m) => m.kind === 'segment' && m.path.includes('span_q_e_click')
     );
     expect(eventHandlerSeg?.code).toBeTruthy();
     expect(eventHandlerSeg!.code).toMatch(/\(_,\s*_1,\s*atom,\s*ctx\)\s*=>/);
@@ -117,9 +117,12 @@ export const Panel = component$(({ showAll }: any) => {
       expect(withQp, 'expected a module emitting a q:p prop').toBeTruthy();
       const code = withQp!.code;
 
-      expect(code, 'q:p value reaches the field via _rawProps').toContain('"q:p": _rawProps.showAll');
-      expect(code, 'bare destructured name must not leak into the parent scope')
-        .not.toMatch(/"q:p":\s*showAll\b/);
+      expect(code, 'q:p value reaches the field via _rawProps').toContain(
+        '"q:p": _rawProps.showAll'
+      );
+      expect(code, 'bare destructured name must not leak into the parent scope').not.toMatch(
+        /"q:p":\s*showAll\b/
+      );
     });
   }
 });

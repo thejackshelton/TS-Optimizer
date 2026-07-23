@@ -134,9 +134,7 @@ export const C = component$(({count, some = 1+2}) => {
     const code = findParent(result).code;
     expect(code).toMatch(/\(_rawProps\)\s*=>/);
     expect(code).toMatch(/_rawProps[.,)"]\s*(?:["'])?count/);
-    expect(code).toMatch(
-      /(?:_rawProps\.some\s*\?\?\s*(?:1\s*\+\s*2|3))|(?:p0\.some\?\?1\+2)/,
-    );
+    expect(code).toMatch(/(?:_rawProps\.some\s*\?\?\s*(?:1\s*\+\s*2|3))|(?:p0\.some\?\?1\+2)/);
   });
 });
 
@@ -217,11 +215,9 @@ export const C = component$(({count, stuff = hola()}) => {
 describe('bug 3: gate counts only top-level returns, not nested ones', () => {
   function findSegment(
     result: { modules: readonly TransformModule[] },
-    needle: string,
+    needle: string
   ): TransformModule {
-    const seg = result.modules.find(
-      (m) => m.kind === 'segment' && m.path.includes(needle),
-    );
+    const seg = result.modules.find((m) => m.kind === 'segment' && m.path.includes(needle));
     if (!seg) throw new Error(`segment ${needle} not found`);
     return seg;
   }

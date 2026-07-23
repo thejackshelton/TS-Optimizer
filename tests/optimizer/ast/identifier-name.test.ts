@@ -17,8 +17,6 @@ describe('identifier-name', () => {
 
   it('builds dot or bracket accessors as needed', () => {
     expect(buildPropertyAccessor('_rawProps', 'count')).toBe('_rawProps.count');
-    expect(buildPropertyAccessor('_rawProps', 'bind:value')).toBe(
-      '_rawProps["bind:value"]',
-    );
+    expect(buildPropertyAccessor('_rawProps', 'bind:value')).toBe('_rawProps["bind:value"]');
   });
 });

@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import MagicString from 'magic-string';
 import { parseSync } from 'oxc-parser';
-import { replaceConstants, foldConstantsInBodyText } from '../../../src/optimizer/rewrite/const-replacement.js';
+import {
+  replaceConstants,
+  foldConstantsInBodyText,
+} from '../../../src/optimizer/rewrite/const-replacement.js';
 import { collectImports } from '../../../src/optimizer/extraction/marker-detection.js';
 import { transformModule } from '../../../src/index.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
@@ -164,7 +167,12 @@ if (isServer) { bar(); }
 describe('foldConstantsInBodyText', () => {
   it('folds isBrowser to false in a standalone body when isServer=true', () => {
     const importMap = importMapOf(`import { isBrowser } from '@qwik.dev/core';`);
-    const out = foldConstantsInBodyText(`() => { if (isBrowser) { load(); } return 1; }`, importMap, true, undefined);
+    const out = foldConstantsInBodyText(
+      `() => { if (isBrowser) { load(); } return 1; }`,
+      importMap,
+      true,
+      undefined
+    );
     expect(out).toContain('if (false)');
     expect(/\bisBrowser\b/.test(out)).toBe(false);
   });

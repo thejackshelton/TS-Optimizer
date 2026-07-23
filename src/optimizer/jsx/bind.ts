@@ -57,10 +57,7 @@ export function transformBindProp(
   };
 }
 
-export function mergeEventHandlers(
-  existingHandler: string | null,
-  newHandler: string
-): string {
+export function mergeEventHandlers(existingHandler: string | null, newHandler: string): string {
   if (existingHandler === null) {
     return newHandler;
   }

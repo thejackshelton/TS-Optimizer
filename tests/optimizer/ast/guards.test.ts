@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { forEachAstChild, someAstChild } from '../../../src/optimizer/ast/guards.js';
 import type { AstCompatNode, AstNode } from '../../../src/ast-types.js';
@@ -22,7 +21,10 @@ describe('someAstChild', () => {
     const child = mkNode('Bar');
     const node = mkNode('Foo', { body: child });
     let calls = 0;
-    const result = someAstChild(node, () => { calls++; return true; });
+    const result = someAstChild(node, () => {
+      calls++;
+      return true;
+    });
     expect(result).toBe(true);
     expect(calls).toBe(1);
   });
@@ -57,7 +59,10 @@ describe('someAstChild', () => {
   it('returns false when no child matches', () => {
     const node = mkNode('Foo', { a: mkNode('A'), b: mkNode('B') });
     let calls = 0;
-    const result = someAstChild(node, () => { calls++; return false; });
+    const result = someAstChild(node, () => {
+      calls++;
+      return false;
+    });
     expect(result).toBe(false);
     expect(calls).toBe(2);
   });
@@ -94,7 +99,9 @@ describe('forEachAstChild', () => {
     const b = mkNode('B');
     const node = mkNode('Foo', { left: a, right: b });
     const seen: string[] = [];
-    forEachAstChild(node, (child) => { seen.push(child.type); });
+    forEachAstChild(node, (child) => {
+      seen.push(child.type);
+    });
     expect(seen.sort()).toEqual(['A', 'B']);
   });
 
@@ -102,14 +109,18 @@ describe('forEachAstChild', () => {
     const items = [mkNode('A'), mkNode('B'), mkNode('C')];
     const node = mkNode('Foo', { items });
     const seen: string[] = [];
-    forEachAstChild(node, (child) => { seen.push(child.type); });
+    forEachAstChild(node, (child) => {
+      seen.push(child.type);
+    });
     expect(seen).toEqual(['A', 'B', 'C']);
   });
 
   it('skips non-object values', () => {
     const node = mkNode('Foo', { count: 5, name: 'x', flag: true });
     const seen: string[] = [];
-    forEachAstChild(node, (child) => { seen.push(child.type); });
+    forEachAstChild(node, (child) => {
+      seen.push(child.type);
+    });
     expect(seen).toEqual([]);
   });
 });

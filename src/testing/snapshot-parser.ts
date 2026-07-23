@@ -1,9 +1,18 @@
 /**
- * Parser for `.snap` fixture files: YAML frontmatter, optional INPUT section,
- * segment blocks with metadata, parent module blocks, and diagnostics.
+ * Parser for `.snap` fixture files: YAML frontmatter, optional INPUT section, segment blocks with
+ * metadata, parent module blocks, and diagnostics.
  */
 
-import { createRegExp, exactly, oneOrMore, char, whitespace, linefeed, multiline as m, global as g } from 'magic-regexp';
+import {
+  createRegExp,
+  exactly,
+  oneOrMore,
+  char,
+  whitespace,
+  linefeed,
+  multiline as m,
+  global as g,
+} from 'magic-regexp';
 
 export interface SegmentMetadata {
   origin: string;
@@ -154,16 +163,19 @@ function extractInput(body: string): { input: string | null; rest: string } {
   // Strip only the marker's own trailing newline; later whitespace affects qrlDEV byte offsets.
   if (afterInput.startsWith('\n')) afterInput = afterInput.slice(1);
 
-  const delimMatch = afterInput.match(createRegExp(
-    exactly('=').times.atLeast(3)
-      .and(whitespace.times.any())
-      .and(oneOrMore(char))
-      .and(whitespace.times.any())
-      .and(exactly('=='))
-      .at.lineStart()
-      .at.lineEnd(),
-    [m],
-  ));
+  const delimMatch = afterInput.match(
+    createRegExp(
+      exactly('=')
+        .times.atLeast(3)
+        .and(whitespace.times.any())
+        .and(oneOrMore(char))
+        .and(whitespace.times.any())
+        .and(exactly('=='))
+        .at.lineStart()
+        .at.lineEnd(),
+      [m]
+    )
+  );
   if (!delimMatch || delimMatch.index === undefined) {
     // trimEnd() preserves leading newlines — they affect the qrlDEV lo/hi byte
     // offsets, computed from the original input including leading whitespace.
@@ -177,18 +189,19 @@ function extractInput(body: string): { input: string | null; rest: string } {
 }
 
 /**
- * Section delimiter pattern: lines like
- *   ============================= filename.tsx (ENTRY POINT)==
- *   ============================= filename.tsx ==
+ * Section delimiter pattern: lines like ============================= filename.tsx (ENTRY POINT)==
+ * ============================= filename.tsx ==
  */
 const SECTION_DELIM_RE = createRegExp(
-  exactly('=').times.atLeast(3).groupedAs('eq')
+  exactly('=')
+    .times.atLeast(3)
+    .groupedAs('eq')
     .and(whitespace.times.any())
     .and(oneOrMore(char).groupedAs('name'))
     .and(whitespace.times.any())
     .and(exactly('==').groupedAs('end'))
     .at.lineStart()
-    .at.lineEnd(),
+    .at.lineEnd()
 );
 
 function parseSections(body: string): {
@@ -265,14 +278,16 @@ function extractCodeAndSourceMap(sectionBody: string): {
   code: string;
   sourceMap: string | null;
 } {
-  const someMatch = sectionBody.match(createRegExp(
-    exactly('Some("')
-      .and(char.times.any().groupedAs('val'))
-      .and(exactly('")'))
-      .at.lineStart()
-      .at.lineEnd(),
-    [m],
-  ));
+  const someMatch = sectionBody.match(
+    createRegExp(
+      exactly('Some("')
+        .and(char.times.any().groupedAs('val'))
+        .and(exactly('")'))
+        .at.lineStart()
+        .at.lineEnd(),
+      [m]
+    )
+  );
 
   let sourceMap: string | null = null;
   let code: string;

@@ -9,6 +9,6 @@ const QWIK_PACKAGE_PREFIXES = [
 
 export function isQwikPackageSource(source: string): boolean {
   return QWIK_PACKAGE_PREFIXES.some(
-    (prefix) => source === prefix || source.startsWith(prefix + '/'),
+    (prefix) => source === prefix || source.startsWith(prefix + '/')
   );
 }

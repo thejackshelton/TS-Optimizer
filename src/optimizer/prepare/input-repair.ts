@@ -1,23 +1,22 @@
 /**
- * Input preprocessing for parse-error recovery. oxc-parser returns an empty
- * AST for certain syntax errors; this module applies targeted repairs to make
- * such inputs parseable while preserving semantics. Repairs run ONLY when the
- * initial parse yields an empty program body with errors — well-formed inputs
- * pass through unchanged.
+ * Input preprocessing for parse-error recovery. oxc-parser returns an empty AST for certain syntax
+ * errors; this module applies targeted repairs to make such inputs parseable while preserving
+ * semantics. Repairs run ONLY when the initial parse yields an empty program body with errors —
+ * well-formed inputs pass through unchanged.
  */
 
 import type { AstEcmaScriptModule, AstProgram } from '../../ast-types.js';
 import { parseWithRawTransfer } from '../ast/parse.js';
 
 /**
- * Attempt to repair source oxc-parser cannot parse; returns the original
- * source unchanged if it already parses or no repair strategy succeeds.
+ * Attempt to repair source oxc-parser cannot parse; returns the original source unchanged if it
+ * already parses or no repair strategy succeeds.
  */
 export function repairInput(
   source: string,
   filename: string,
   preParsedProgram?: AstProgram,
-  preParsedModule?: AstEcmaScriptModule,
+  preParsedModule?: AstEcmaScriptModule
 ): { source: string; program?: AstProgram; module?: AstEcmaScriptModule } {
   // A pre-parsed Program (e.g. from a bundler that already parsed this source)
   // is trusted as-is, skipping the internal parse.
@@ -45,8 +44,8 @@ export function repairInput(
 }
 
 /**
- * Remove a single unmatched closing paren (only when `)` count exceeds `(` by
- * exactly one), trying each `)` from end to start.
+ * Remove a single unmatched closing paren (only when `)` count exceeds `(` by exactly one), trying
+ * each `)` from end to start.
  */
 function tryRemoveUnmatchedParens(source: string, filename: string): string | null {
   let openCount = 0;
@@ -80,8 +79,8 @@ function tryRemoveUnmatchedParens(source: string, filename: string): string | nu
 }
 
 /**
- * Wrap JSX text containing a raw `>` (which oxc-parser rejects) into an
- * expression container `{"text"}`.
+ * Wrap JSX text containing a raw `>` (which oxc-parser rejects) into an expression container
+ * `{"text"}`.
  */
 function tryWrapJsxTextArrows(source: string, filename: string): string | null {
   const regions = findJsxTextRegionsWithGt(source);
@@ -105,8 +104,8 @@ function tryWrapJsxTextArrows(source: string, filename: string): string | null {
 const BRACKET_ONLY_LINE = /^[)\]};,]+$/;
 
 /**
- * Find JSX text regions containing `>`, plus trailing bracket-only companion
- * lines (e.g. `));`) that must be wrapped alongside them.
+ * Find JSX text regions containing `>`, plus trailing bracket-only companion lines (e.g. `));`)
+ * that must be wrapped alongside them.
  */
 function findJsxTextRegionsWithGt(source: string): Array<{ start: number; end: number }> {
   const regions: Array<{ start: number; end: number }> = [];

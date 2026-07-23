@@ -57,9 +57,9 @@ describe('buildDisplayName', () => {
 
 describe('buildSymbolName', () => {
   it('produces correct symbol name for renderHeader1_div_onClick', () => {
-    expect(buildSymbolName(mkDisplayName('test.tsx_renderHeader1_div_onClick'), undefined, 'test.tsx')).toBe(
-      'renderHeader1_div_onClick_USi8k1jUb40'
-    );
+    expect(
+      buildSymbolName(mkDisplayName('test.tsx_renderHeader1_div_onClick'), undefined, 'test.tsx')
+    ).toBe('renderHeader1_div_onClick_USi8k1jUb40');
   });
 
   it('produces correct symbol name for renderHeader1', () => {
@@ -69,9 +69,9 @@ describe('buildSymbolName', () => {
   });
 
   it('produces correct symbol name for renderHeader2_component', () => {
-    expect(buildSymbolName(mkDisplayName('test.tsx_renderHeader2_component'), undefined, 'test.tsx')).toBe(
-      'renderHeader2_component_Ay6ibkfFYsw'
-    );
+    expect(
+      buildSymbolName(mkDisplayName('test.tsx_renderHeader2_component'), undefined, 'test.tsx')
+    ).toBe('renderHeader2_component_Ay6ibkfFYsw');
   });
 
   it('matches all symbol names across the 210 snapshot corpus', () => {

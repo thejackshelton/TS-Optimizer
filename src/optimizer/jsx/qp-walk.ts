@@ -1,8 +1,7 @@
 /**
- * Shared q:p collection walk for both emit paths (segment codegen and
- * inline/hoist). The walk shape is identical; only param resolution differs,
- * so it's injected as `resolveParams`. Matched QRL names feed
- * `qrlsWithCaptures`, which drives downstream var/const prop classification.
+ * Shared q:p collection walk for both emit paths (segment codegen and inline/hoist). The walk shape
+ * is identical; only param resolution differs, so it's injected as `resolveParams`. Matched QRL
+ * names feed `qrlsWithCaptures`, which drives downstream var/const prop classification.
  */
 
 import { forEachAstChild } from '../ast/guards.js';
@@ -13,7 +12,7 @@ import type { AstMaybeNode, JSXAttributeItem } from '../../ast-types.js';
 export function collectQpParamsFromElement(
   attrs: readonly JSXAttributeItem[],
   resolveParams: (qrlName: string) => readonly string[] | undefined,
-  qrlsWithCaptures?: Set<string>,
+  qrlsWithCaptures?: Set<string>
 ): string[] {
   const elementParams: string[] = [];
   const seen = new Set<string>();
@@ -46,7 +45,7 @@ export function walkAstForQp(
   node: AstMaybeNode,
   resolveParams: (qrlName: string) => readonly string[] | undefined,
   qpOverrides: Map<number, string[]>,
-  qrlsWithCaptures?: Set<string>,
+  qrlsWithCaptures?: Set<string>
 ): void {
   if (!node || typeof node !== 'object') return;
 
@@ -54,12 +53,14 @@ export function walkAstForQp(
     const elementParams = collectQpParamsFromElement(
       node.openingElement.attributes,
       resolveParams,
-      qrlsWithCaptures,
+      qrlsWithCaptures
     );
     if (elementParams.length > 0) {
       qpOverrides.set(node.start, elementParams);
     }
   }
 
-  forEachAstChild(node, (child) => walkAstForQp(child, resolveParams, qpOverrides, qrlsWithCaptures));
+  forEachAstChild(node, (child) =>
+    walkAstForQp(child, resolveParams, qpOverrides, qrlsWithCaptures)
+  );
 }

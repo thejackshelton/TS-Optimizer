@@ -1,7 +1,4 @@
-export function computeLineColFromOffset(
-  source: string,
-  offset: number,
-): [number, number] {
+export function computeLineColFromOffset(source: string, offset: number): [number, number] {
   let line = 1;
   let col = 1;
   for (let i = 0; i < offset && i < source.length; i++) {

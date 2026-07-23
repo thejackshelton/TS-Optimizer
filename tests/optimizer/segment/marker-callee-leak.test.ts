@@ -5,11 +5,9 @@ import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js
 
 function findSegmentByCtx(
   result: { modules: readonly TransformModule[] },
-  ctxName: string,
+  ctxName: string
 ): TransformModule {
-  const m = result.modules.find(
-    (mod) => mod.kind === 'segment' && mod.segment.ctxName === ctxName,
-  );
+  const m = result.modules.find((mod) => mod.kind === 'segment' && mod.segment.ctxName === ctxName);
   if (!m) throw new Error(`segment with ctxName=${ctxName} not found`);
   return m;
 }
@@ -29,7 +27,8 @@ export const App = component$(() => {
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       stripCtxName: ['server'],
       entryStrategy: { type: 'segment' },
     });
@@ -52,7 +51,8 @@ export const App = component$(() => {
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       stripCtxName: ['server'],
       entryStrategy: { type: 'segment' },
     });
@@ -73,12 +73,13 @@ export const App = component$(() => {
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       entryStrategy: { type: 'segment' },
     });
 
     const useTaskSegments = result.modules.filter(
-      (m) => m.kind === 'segment' && m.segment.ctxName === 'useTask$',
+      (m) => m.kind === 'segment' && m.segment.ctxName === 'useTask$'
     );
     expect(useTaskSegments.length).toBeGreaterThan(0);
     for (const seg of useTaskSegments) {
@@ -100,7 +101,8 @@ export const App = component$(() => {
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       entryStrategy: { type: 'segment' },
     });
 

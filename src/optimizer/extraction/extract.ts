@@ -1,4 +1,3 @@
-
 import { walk } from 'oxc-walker';
 import type {
   AstEcmaScriptModule,
@@ -25,7 +24,11 @@ import {
   type CustomInlinedInfo,
   type ImportInfo,
 } from './marker-detection.js';
-import { isEventProp, transformEventPropName, collectPassiveDirectives } from '../jsx/event-handlers.js';
+import {
+  isEventProp,
+  transformEventPropName,
+  collectPassiveDirectives,
+} from '../jsx/event-handlers.js';
 import { collectJsxFunctionNamesFromIterable } from '../jsx/jsx-call-transform.js';
 import { getBasename, getDirectory, getExtension, getFileStem } from '../../paths.js';
 import { detectForeignJsxRuntime } from '../jsx/jsx-import-source.js';
@@ -51,10 +54,9 @@ import {
 } from '../types/brands.js';
 
 /**
- * Fields shared across all three phases of the extraction pipeline.
- * Once set at extraction time (post-disambig + post-prod-rename +
- * post-transpile-downgrade), these are immutable for the rest of the
- * pipeline. Phase transitions use object spread to carry these forward.
+ * Fields shared across all three phases of the extraction pipeline. Once set at extraction time
+ * (post-disambig + post-prod-rename + post-transpile-downgrade), these are immutable for the rest
+ * of the pipeline. Phase transitions use object spread to carry these forward.
  */
 export interface ExtractionBase {
   readonly symbolName: SymbolName;
@@ -103,10 +105,9 @@ export interface ExtractionBase {
 }
 
 /**
- * Phase-spanning fields, mutable for the pipeline's in-place transition pattern
- * (capture analysis, parent rewrite, event-capture promotion all mutate in
- * place). Truly-immutable fields stay readonly on `ExtractionBase`. Consumers
- * narrow on `phase`.
+ * Phase-spanning fields, mutable for the pipeline's in-place transition pattern (capture analysis,
+ * parent rewrite, event-capture promotion all mutate in place). Truly-immutable fields stay
+ * readonly on `ExtractionBase`. Consumers narrow on `phase`.
  */
 interface ExtractionPhaseFields {
   captureNames: string[];
@@ -115,20 +116,18 @@ interface ExtractionPhaseFields {
   parent: SymbolName | null;
   propsFieldCaptures?: Map<string, string>;
   /**
-   * Parallel to `propsFieldCaptures` — for each captured prop field with a
-   * destructure-time default (`some = 1+2`), the default expression as source
-   * text. Nested segment bodies emit `(_rawProps.<key> ?? <default>)` so the
-   * runtime applies the default the way the parent body would. Keyed by
-   * local-binding name.
+   * Parallel to `propsFieldCaptures` — for each captured prop field with a destructure-time default
+   * (`some = 1+2`), the default expression as source text. Nested segment bodies emit
+   * `(_rawProps.<key> ?? <default>)` so the runtime applies the default the way the parent body
+   * would. Keyed by local-binding name.
    */
   propsFieldDefaults?: Map<string, string>;
   constLiterals?: Map<string, string>;
 }
 
 /**
- * Phase 1 output. `captureNames`/`paramNames` are empty unless pre-populated by
- * the inlinedQrl explicit-captures array. `parent` is `null` until parent
- * rewrite resolves nesting.
+ * Phase 1 output. `captureNames`/`paramNames` are empty unless pre-populated by the inlinedQrl
+ * explicit-captures array. `parent` is `null` until parent rewrite resolves nesting.
  */
 export interface ExtractedSegment extends ExtractionBase, ExtractionPhaseFields {
   readonly phase: 'extracted';
@@ -140,25 +139,23 @@ export interface CapturedSegment extends ExtractionBase, ExtractionPhaseFields {
 }
 
 /**
- * Phase 5 output. `parent` is resolved; `propsFieldCaptures` and `constLiterals`
- * are finalised. Downstream consumers take this variant.
+ * Phase 5 output. `parent` is resolved; `propsFieldCaptures` and `constLiterals` are finalised.
+ * Downstream consumers take this variant.
  */
 export interface ConsolidatedSegment extends ExtractionBase, ExtractionPhaseFields {
   readonly phase: 'consolidated';
 }
 
 /**
- * Discriminated union over the three pipeline phases; consumers narrow on
- * `phase`. `phase` is internal to the optimizer — it does not propagate to the
- * NAPI `SegmentAnalysis` output.
+ * Discriminated union over the three pipeline phases; consumers narrow on `phase`. `phase` is
+ * internal to the optimizer — it does not propagate to the NAPI `SegmentAnalysis` output.
  */
 export type ExtractionResult = ExtractedSegment | CapturedSegment | ConsolidatedSegment;
 
 /**
- * Strip `readonly` from every property of `T`. Phase-transition code casts an
- * input array to the next phase's mutable builder, mutates in place, and returns
- * it typed as the readonly next-phase variant; external consumers see the
- * readonly union and narrow via `phase`.
+ * Strip `readonly` from every property of `T`. Phase-transition code casts an input array to the
+ * next phase's mutable builder, mutates in place, and returns it typed as the readonly next-phase
+ * variant; external consumers see the readonly union and narrow via `phase`.
  */
 export type Mutable<T> = { -readonly [P in keyof T]: T[P] };
 
@@ -182,10 +179,9 @@ function extensionFromSegmentJsx(hasJsx: boolean, sourceExt: string): string {
 }
 
 /**
- * `ContextStack` restricted to push/peek/read — `.pop()` is intentionally
- * absent so the enter handler can't corrupt the context-stack/pushedNodes
- * pairing (popping is exit-only). Same instance the exit handler sees as the
- * full type.
+ * `ContextStack` restricted to push/peek/read — `.pop()` is intentionally absent so the enter
+ * handler can't corrupt the context-stack/pushedNodes pairing (popping is exit-only). Same instance
+ * the exit handler sees as the full type.
  */
 type ContextStackForEnter = Pick<
   ContextStack,
@@ -193,9 +189,9 @@ type ContextStackForEnter = Pick<
 >;
 
 /**
- * Enter-phase context for the extraction walker. `activeSegmentBodies` is
- * readonly at the array level so enter can read the top frame and mutate its
- * fields but can't pop — popping is exit-only.
+ * Enter-phase context for the extraction walker. `activeSegmentBodies` is readonly at the array
+ * level so enter can read the top frame and mutate its fields but can't pop — popping is
+ * exit-only.
  */
 interface ExtractWalkEnterContext {
   readonly source: string;
@@ -203,19 +199,16 @@ interface ExtractWalkEnterContext {
   readonly scope: string | undefined;
   readonly transpileJsx: boolean | undefined;
   /**
-   * Fired once per discovered extraction at the creation node's enter, before
-   * the walker descends into the closure body. The fused gather walk uses it to
-   * register the closure node for its projections, keyed by extraction object
-   * identity (symbolName isn't final until `disambiguateExtractions` runs).
+   * Fired once per discovered extraction at the creation node's enter, before the walker descends
+   * into the closure body. The fused gather walk uses it to register the closure node for its
+   * projections, keyed by extraction object identity (symbolName isn't final until
+   * `disambiguateExtractions` runs).
    */
-  readonly onExtraction?: (
-    extraction: ExtractedSegment,
-    closureNode: AstFunction | null,
-  ) => void;
+  readonly onExtraction?: (extraction: ExtractedSegment, closureNode: AstFunction | null) => void;
   /**
-   * The user's explicit `transpileJsx` value (defaults false). Distinct from the
-   * derived `transpileJsx` above, which defaults TRUE for `.tsx`/`.jsx`. The
-   * ctxKind classifier needs the strict semantic.
+   * The user's explicit `transpileJsx` value (defaults false). Distinct from the derived
+   * `transpileJsx` above, which defaults TRUE for `.tsx`/`.jsx`. The ctxKind classifier needs the
+   * strict semantic.
    */
   readonly explicitTranspileJsx: boolean;
   readonly sourceExt: string;
@@ -226,16 +219,16 @@ interface ExtractWalkEnterContext {
   readonly customInlined: Map<string, CustomInlinedInfo>;
   readonly hasNonQwikJsxImportSource: boolean;
   /**
-   * Local names that resolve to a Qwik JSX-runtime function (`jsx` / `jsxs` /
-   * `jsxDEV` from `@qwik.dev/core`, or anything from `@qwik.dev/core/jsx-runtime`
-   * / `.../jsx-dev-runtime`). Used to push naming context for peer-tool
-   * `jsx('tag', { onProp$: ... })` calls the same way JSX syntax does.
+   * Local names that resolve to a Qwik JSX-runtime function (`jsx` / `jsxs` / `jsxDEV` from
+   * `@qwik.dev/core`, or anything from `@qwik.dev/core/jsx-runtime` / `.../jsx-dev-runtime`). Used
+   * to push naming context for peer-tool `jsx('tag', { onProp$: ... })` calls the same way JSX
+   * syntax does.
    */
   readonly jsxFunctions: ReadonlySet<string>;
   /**
-   * Tagged ObjectExpressions that are the props-bag (second arg) of a recognised
-   * JSX-runtime call. Tag value is the tag-kind from the first arg —
-   * string-literal → `'html'`, identifier → `'component'`.
+   * Tagged ObjectExpressions that are the props-bag (second arg) of a recognised JSX-runtime call.
+   * Tag value is the tag-kind from the first arg — string-literal → `'html'`, identifier →
+   * `'component'`.
    */
   readonly jsxPropObjects: Map<AstNode, 'html' | 'component'>;
   readonly naming: ContextStackForEnter;
@@ -248,9 +241,9 @@ interface ExtractWalkEnterContext {
 }
 
 /**
- * Exit-phase context: extends the enter context with the two exit-only
- * act-helpers and widens `naming` back to the full `ContextStack` so they can
- * `.pop()`. Calling either helper from the enter handler is a compile error.
+ * Exit-phase context: extends the enter context with the two exit-only act-helpers and widens
+ * `naming` back to the full `ContextStack` so they can `.pop()`. Calling either helper from the
+ * enter handler is a compile error.
  */
 interface ExtractWalkExitContext extends Omit<ExtractWalkEnterContext, 'naming'> {
   readonly naming: ContextStack;
@@ -258,50 +251,48 @@ interface ExtractWalkExitContext extends Omit<ExtractWalkEnterContext, 'naming'>
   readonly popContextStackForNode: (node: AstNode) => void;
 }
 
-/** Open segment bodies during the program walk — used to fold JSX detection into this walk without extra subtree walks. */
+/**
+ * Open segment bodies during the program walk — used to fold JSX detection into this walk without
+ * extra subtree walks.
+ */
 type ActiveSegmentBody = {
   leaveNode: AstNode;
   root: AstNode;
   /**
-   * The WIP segment under construction, mutated during the walker's `leave`
-   * handler (extension flip, segmentImports). Exposed as the readonly
-   * `ExtractedSegment` once the walker completes.
+   * The WIP segment under construction, mutated during the walker's `leave` handler (extension
+   * flip, segmentImports). Exposed as the readonly `ExtractedSegment` once the walker completes.
    */
   result: ExtractedSegmentBuilder;
   hasJsx: boolean;
   /**
-   * When set, the outer walk accumulates referenced Identifier names here as it
-   * descends. On `leave`, `segmentImports` is computed from this set instead of
-   * re-walking the body — avoids an O(extractionCount × programSize) cost.
+   * When set, the outer walk accumulates referenced Identifier names here as it descends. On
+   * `leave`, `segmentImports` is computed from this set instead of re-walking the body — avoids an
+   * O(extractionCount × programSize) cost.
    */
   bodyIds?: Set<string>;
 };
 
 /** Resolve aliased import back to its original name (e.g., `c$` -> `component$`). */
-function resolveCanonicalCalleeName(
-  calleeName: string,
-  imports: Map<string, ImportInfo>,
-): string {
+function resolveCanonicalCalleeName(calleeName: string, imports: Map<string, ImportInfo>): string {
   const importInfo = imports.get(calleeName);
   return importInfo ? importInfo.importedName : calleeName;
 }
 
 /**
- * When a marker call's single argument is an `Identifier` resolving to an import
- * binding, segments derive their displayName + hash from the import path rather
- * than the surrounding context stack — so `useStyles$(css3)` with
- * `import css3 from './style.css'` produces `style_css` / a hash of
- * `./style.css#default`, stable across files importing the same asset. Returns
- * null for non-Identifier args or Identifiers that don't resolve to an import;
- * callers fall back to stack-based naming.
+ * When a marker call's single argument is an `Identifier` resolving to an import binding, segments
+ * derive their displayName + hash from the import path rather than the surrounding context stack —
+ * so `useStyles$(css3)` with `import css3 from './style.css'` produces `style_css` / a hash of
+ * `./style.css#default`, stable across files importing the same asset. Returns null for
+ * non-Identifier args or Identifiers that don't resolve to an import; callers fall back to
+ * stack-based naming.
  *
- * Scope is narrow: single-Identifier only; the namespace-member form
- * (`useStyles$(ns.foo)`) is unsupported — extend when a fixture needs it.
+ * Scope is narrow: single-Identifier only; the namespace-member form (`useStyles$(ns.foo)`) is
+ * unsupported — extend when a fixture needs it.
  */
 function getImportArgNaming(
   arg: AstNode,
   imports: Map<string, ImportInfo>,
-  relPath: string,
+  relPath: string
 ): { importContextPortion: string; hashSeed: string } | null {
   if (arg.type !== 'Identifier') return null;
   const importInfo = imports.get(arg.name);
@@ -315,9 +306,10 @@ function getImportArgNaming(
   const slashIdx = resolvedSource.lastIndexOf('/');
   const pathTail = slashIdx >= 0 ? resolvedSource.slice(slashIdx + 1) : resolvedSource;
   const baseName = escapeSymbol(pathTail);
-  const importContextPortion = importInfo.importedName === 'default'
-    ? baseName
-    : `${baseName}_${escapeSymbol(importInfo.importedName)}`;
+  const importContextPortion =
+    importInfo.importedName === 'default'
+      ? baseName
+      : `${baseName}_${escapeSymbol(importInfo.importedName)}`;
 
   const hashSeed = `${resolvedSource}#${importInfo.importedName}`;
 
@@ -325,8 +317,8 @@ function getImportArgNaming(
 }
 
 /**
- * Absolute / bare specifiers pass through; relative paths resolve against the
- * directory of `relPath`.
+ * Absolute / bare specifiers pass through; relative paths resolve against the directory of
+ * `relPath`.
  */
 function resolveImportHashPath(importPath: string, relPath: string): string {
   const normalized = importPath.replace(/\\/g, '/');
@@ -347,14 +339,14 @@ function resolveImportHashPath(importPath: string, relPath: string): string {
 }
 
 /**
- * Bare $() segments inherit the wrapper call name as naming context,
- * e.g., component($(() => {})) -> "..._component".
+ * Bare $() segments inherit the wrapper call name as naming context, e.g., component($(() => {}))
+ * -> "..._component".
  */
 function getDirectWrapperContextName(
   node: AstNode,
   parent: AstParentNode,
   imports: Map<string, ImportInfo>,
-  customInlined: Map<string, CustomInlinedInfo>,
+  customInlined: Map<string, CustomInlinedInfo>
 ): string | null {
   if (parent?.type !== 'CallExpression') return null;
   if (!parent.arguments.some((arg) => arg === node)) {
@@ -381,14 +373,11 @@ function collectIdentifiers(node: AstNode): Set<string> {
 }
 
 /**
- * File-level imports referenced by the given identifier set. Hot path feeds the
- * Set accumulated during the outer walk (no extra walk); cold path falls back to
- * `collectSegmentImports`, which re-walks the body.
+ * File-level imports referenced by the given identifier set. Hot path feeds the Set accumulated
+ * during the outer walk (no extra walk); cold path falls back to `collectSegmentImports`, which
+ * re-walks the body.
  */
-function filterImportsByIds(
-  ids: Set<string>,
-  imports: Map<string, ImportInfo>,
-): ImportInfo[] {
+function filterImportsByIds(ids: Set<string>, imports: Map<string, ImportInfo>): ImportInfo[] {
   const result: ImportInfo[] = [];
   for (const [localName, info] of imports) {
     if (ids.has(localName)) result.push(info);
@@ -413,8 +402,8 @@ function isComponentTag(tagNode: JSXElementName | null | undefined): boolean {
 const onEventAttrName = /^(?:document:|window:)?on[A-Z-]/;
 
 /**
- * The hash is the suffix after the last underscore of a stack-composed symbol
- * name (`renderHeader1_jMxQsjbyDss`); a name with no underscore is used whole.
+ * The hash is the suffix after the last underscore of a stack-composed symbol name
+ * (`renderHeader1_jMxQsjbyDss`); a name with no underscore is used whole.
  */
 function hashFromSymbolName(symbolName: SymbolName): Hash {
   const lastUnder = symbolName.lastIndexOf('_');
@@ -422,16 +411,16 @@ function hashFromSymbolName(symbolName: SymbolName): Hash {
 }
 
 /**
- * Two-rule ctxKind classification shared by the JSX-attribute and
- * pre-transformed JSX object-prop paths. `explicitTranspileJsx` true → element-
- * kind rule (Component → jSXProp); false → name-prefix rule (`on*$` →
- * eventHandler regardless of element kind). The marker-call-inside-JSX-attribute
- * path has its own name-prefix rule and deliberately doesn't share this helper.
+ * Two-rule ctxKind classification shared by the JSX-attribute and pre-transformed JSX object-prop
+ * paths. `explicitTranspileJsx` true → element- kind rule (Component → jSXProp); false →
+ * name-prefix rule (`on*$` → eventHandler regardless of element kind). The
+ * marker-call-inside-JSX-attribute path has its own name-prefix rule and deliberately doesn't share
+ * this helper.
  */
 function classifyJsxHandlerCtxKind(
   propName: string,
   isComponentEvent: boolean,
-  explicitTranspileJsx: boolean,
+  explicitTranspileJsx: boolean
 ): 'eventHandler' | 'jSXProp' {
   if (explicitTranspileJsx) {
     return isComponentEvent ? 'jSXProp' : 'eventHandler';
@@ -441,10 +430,10 @@ function classifyJsxHandlerCtxKind(
 }
 
 /**
- * Per-path inputs for {@link buildExtractedSegment}. Required fields are those
- * that diverge between the four extraction paths; optional fields are per-path
- * overrides of a shared default. Derivations and empty collections live in the
- * factory, so adding an `ExtractionBase` field is a one-site change.
+ * Per-path inputs for {@link buildExtractedSegment}. Required fields are those that diverge between
+ * the four extraction paths; optional fields are per-path overrides of a shared default.
+ * Derivations and empty collections live in the factory, so adding an `ExtractionBase` field is a
+ * one-site change.
  */
 interface ExtractedSegmentSpec {
   readonly symbolName: SymbolName;
@@ -530,32 +519,28 @@ export interface ExtractionCollectorOptions {
   /** See the `closureNodesOut` parameter of {@link extractSegments}. */
   readonly closureNodesOut?: Map<string, AstFunction>;
   /** See {@link ExtractWalkEnterContext.onExtraction}. */
-  readonly onExtraction?: (
-    extraction: ExtractedSegment,
-    closureNode: AstFunction | null,
-  ) => void;
+  readonly onExtraction?: (extraction: ExtractedSegment, closureNode: AstFunction | null) => void;
 }
 
 /**
- * The Phase-1 extraction walk as a composable collector: per-node enter/leave
- * handlers plus a post-walk `finish`. Two hosts drive it — `extractSegments`
- * (standalone, retained as the differential oracle) and `gatherModuleFacts` (the
- * canonical gather walk, sharing its single traversal). The enter/exit protocol
- * is enforced by the split context views: host walks cannot cross the phases.
+ * The Phase-1 extraction walk as a composable collector: per-node enter/leave handlers plus a
+ * post-walk `finish`. Two hosts drive it — `extractSegments` (standalone, retained as the
+ * differential oracle) and `gatherModuleFacts` (the canonical gather walk, sharing its single
+ * traversal). The enter/exit protocol is enforced by the split context views: host walks cannot
+ * cross the phases.
  */
 export interface ExtractionCollector {
   enter(node: AstNode, parent: AstNode | null): void;
   leave(node: AstNode): void;
   /**
-   * Post-walk act: disambiguate colliding display names, populate
-   * `closureNodesOut`, and expose the WIP builders as readonly `ExtractedSegment`.
-   * Call exactly once, after the host walk completes.
+   * Post-walk act: disambiguate colliding display names, populate `closureNodesOut`, and expose the
+   * WIP builders as readonly `ExtractedSegment`. Call exactly once, after the host walk completes.
    */
   finish(): readonly ExtractedSegment[];
 }
 
 export function createExtractionCollector(
-  options: ExtractionCollectorOptions,
+  options: ExtractionCollectorOptions
 ): ExtractionCollector {
   const { source, relPath, scope, transpileJsx, program } = options;
   const explicitTranspileJsx = options.explicitTranspileJsx;
@@ -565,9 +550,8 @@ export function createExtractionCollector(
   const customInlined = collectCustomInlined(program);
 
   const relDir = getDirectory(relPath);
-  const fileStem = getFileStem(relPath) === 'index' && relDir
-    ? getBasename(relDir)
-    : getBasename(relPath);
+  const fileStem =
+    getFileStem(relPath) === 'index' && relDir ? getBasename(relDir) : getBasename(relPath);
   const sourceExt = getExtension(relPath) || '.js';
   const defaultExtension = extensionFromSegmentJsx(false, sourceExt);
   const fileName = getBasename(relPath);
@@ -579,10 +563,9 @@ export function createExtractionCollector(
   const results: ExtractedSegmentBuilder[] = [];
   const activeSegmentBodies: ActiveSegmentBody[] = [];
   /**
-   * Pairings of (extraction → its closure AST node) collected during the walk.
-   * Populated into `closureNodesOut` after `disambiguateExtractions` mutates
-   * `symbolName` in place — extraction object identity stays stable through
-   * the rename, so the pairing remains correct.
+   * Pairings of (extraction → its closure AST node) collected during the walk. Populated into
+   * `closureNodesOut` after `disambiguateExtractions` mutates `symbolName` in place — extraction
+   * object identity stays stable through the rename, so the pairing remains correct.
    */
   const pendingClosures: Array<{ extraction: ExtractionResult; node: AstFunction }> = [];
 
@@ -599,9 +582,7 @@ export function createExtractionCollector(
   // `jsx() → _jsxSorted` rewrite. Empty when the file imports no
   // jsx-runtime names (e.g. pure JSX-syntax sources); the walker
   // short-circuits cheaply.
-  const jsxFunctions: ReadonlySet<string> = collectJsxFunctionNamesFromIterable(
-    imports.values(),
-  );
+  const jsxFunctions: ReadonlySet<string> = collectJsxFunctionNamesFromIterable(imports.values());
   const jsxPropObjects = new Map<AstNode, 'html' | 'component'>();
 
   // Split walk state into Enter and Exit context views so the type system
@@ -632,7 +613,9 @@ export function createExtractionCollector(
     pushedNodes,
     parentMap,
     results,
-    pushActiveSegmentBody: (frame) => { activeSegmentBodies.push(frame); },
+    pushActiveSegmentBody: (frame) => {
+      activeSegmentBodies.push(frame);
+    },
   };
 
   const exitCtx: ExtractWalkExitContext = {
@@ -703,9 +686,8 @@ export function createExtractionCollector(
         // props bag (see the JSX-runtime CallExpression arm below), apply the
         // same naming rules JSX syntax uses for `<tag onProp$=...>` —
         // `q_e_<event>` for HTML tags, `<key without $>` for components.
-        const jsxKind = parent?.type === 'ObjectExpression'
-          ? ctx.jsxPropObjects.get(parent)
-          : undefined;
+        const jsxKind =
+          parent?.type === 'ObjectExpression' ? ctx.jsxPropObjects.get(parent) : undefined;
         const rawKey = node.key.name;
         // Skip the `children` key when naming a JSX props bag, so a handler
         // nested under `{ children: _jsxDEV("button", …) }` is named
@@ -722,9 +704,7 @@ export function createExtractionCollector(
               // `transformEventPropName` falls back to raw-name push for
               // non-event props.
               const transformed = transformEventPropName(rawKey, new Set());
-              pushedKey = transformed
-                ? transformed.replace(/[-:]/g, '_')
-                : rawKey;
+              pushedKey = transformed ? transformed.replace(/[-:]/g, '_') : rawKey;
             }
           } else {
             pushedKey = rawKey;
@@ -793,7 +773,7 @@ export function createExtractionCollector(
           opening.name?.type === 'JSXIdentifier'
             ? opening.name.name
             : opening.name?.type === 'JSXMemberExpression'
-              ? opening.name.property?.name ?? ''
+              ? (opening.name.property?.name ?? '')
               : '';
         if (tagName) {
           ctx.naming.push(tagName);
@@ -811,7 +791,8 @@ export function createExtractionCollector(
       if (node.type === 'JSXAttribute') {
         const rawAttrName = getJsxAttributeName(node);
         if (rawAttrName.endsWith('$') && isEventProp(rawAttrName)) {
-          const isComponentElement = parent?.type === 'JSXOpeningElement' && isComponentTag(parent.name);
+          const isComponentElement =
+            parent?.type === 'JSXOpeningElement' && isComponentTag(parent.name);
           if (isComponentElement) {
             ctx.naming.push(rawAttrName.slice(0, -1));
           } else {
@@ -858,9 +839,8 @@ export function createExtractionCollector(
         const arg1 = node.arguments[1];
         const arg2 = node.arguments[2];
 
-        const nameValue = arg1?.type === 'Literal' && typeof arg1.value === 'string'
-            ? arg1.value
-            : null;
+        const nameValue =
+          arg1?.type === 'Literal' && typeof arg1.value === 'string' ? arg1.value : null;
 
         const isNullBody = arg0?.type === 'Literal' && arg0.value === null;
 
@@ -921,10 +901,7 @@ export function createExtractionCollector(
           // Function arg0 defers segmentImports collection to the outer walk;
           // non-function arg0 (rare cold path) falls back to the inline sub-walk.
           let inlinedSegmentImports: ImportInfo[] = [];
-          if (
-            arg0.type !== 'ArrowFunctionExpression' &&
-            arg0.type !== 'FunctionExpression'
-          ) {
+          if (arg0.type !== 'ArrowFunctionExpression' && arg0.type !== 'FunctionExpression') {
             inlinedSegmentImports = collectSegmentImports(arg0, ctx.imports);
           }
 
@@ -952,10 +929,7 @@ export function createExtractionCollector(
             inlinedQrlNameArg: nameValue,
           });
           ctx.results.push(extraction);
-          if (
-            arg0.type === 'ArrowFunctionExpression' ||
-            arg0.type === 'FunctionExpression'
-          ) {
+          if (arg0.type === 'ArrowFunctionExpression' || arg0.type === 'FunctionExpression') {
             // Same JSX-detection as other extractions: JSX in arg0's body flips
             // the extension in the leave handler. Defensive — current peer tools
             // pre-transform JSX, but the gate must be ready for those that don't.
@@ -986,9 +960,10 @@ export function createExtractionCollector(
 
         const canonicalCallee = resolveCanonicalCalleeName(calleeName, imports);
 
-        const wrapperContext = canonicalCallee === '$'
-          ? getDirectWrapperContextName(node, parent, imports, customInlined)
-          : null;
+        const wrapperContext =
+          canonicalCallee === '$'
+            ? getDirectWrapperContextName(node, parent, imports, customInlined)
+            : null;
         if (wrapperContext) {
           ctx.naming.push(wrapperContext);
           pushCount++;
@@ -1028,8 +1003,9 @@ export function createExtractionCollector(
               // rule (`on*$`) when not. This optimizer always sees raw JSX, so
               // the gate is explicit here.
               const jsxOpeningElement = parentMap.get(jsxAttrParent);
-              const isComponentElement = jsxOpeningElement?.type === 'JSXOpeningElement'
-                && isComponentTag(jsxOpeningElement.name);
+              const isComponentElement =
+                jsxOpeningElement?.type === 'JSXOpeningElement' &&
+                isComponentTag(jsxOpeningElement.name);
 
               if (ctx.explicitTranspileJsx) {
                 // Element-kind rule: HTML → eventHandler; Component → jSXProp.
@@ -1058,15 +1034,20 @@ export function createExtractionCollector(
 
         const ctxKind = getExtractionKind(canonicalCallee, isEventAttr, isJsxNonEventAttr);
         const isJsxAttrContext = isEventAttr || isJsxNonEventAttr;
-        const ctxName = mkCtxName(getExtractionName(canonicalCallee, isJsxAttrContext, isJsxAttrContext ? attrCtx : undefined));
+        const ctxName = mkCtxName(
+          getExtractionName(
+            canonicalCallee,
+            isJsxAttrContext,
+            isJsxAttrContext ? attrCtx : undefined
+          )
+        );
 
         // When the marker's first arg is a single Identifier resolving to an
         // import binding, derive displayName + hash from the import path so the
         // segment name stays stable across files importing the same asset. Falls
         // back to stack-based naming when the helper returns null.
-        const importNaming = !isJsxAttrContext && !isBare
-          ? getImportArgNaming(arg, imports, relPath)
-          : null;
+        const importNaming =
+          !isJsxAttrContext && !isBare ? getImportArgNaming(arg, imports, relPath) : null;
 
         let displayName: DisplayName;
         let symbolName: SymbolName;
@@ -1104,11 +1085,14 @@ export function createExtractionCollector(
           extension: defaultExtension,
         });
         ctx.results.push(extraction);
-        ctx.pushActiveSegmentBody({ leaveNode: node, root: arg, result: extraction, hasJsx: false, bodyIds: new Set<string>() });
-        if (
-          arg.type === 'ArrowFunctionExpression' ||
-          arg.type === 'FunctionExpression'
-        ) {
+        ctx.pushActiveSegmentBody({
+          leaveNode: node,
+          root: arg,
+          result: extraction,
+          hasJsx: false,
+          bodyIds: new Set<string>(),
+        });
+        if (arg.type === 'ArrowFunctionExpression' || arg.type === 'FunctionExpression') {
           ctx.pendingClosures.push({ extraction, node: arg });
           ctx.onExtraction?.(extraction, arg);
         } else {
@@ -1140,18 +1124,16 @@ export function createExtractionCollector(
 
         if (expr.type === 'CallExpression' && isMarkerCall(expr, imports, customInlined)) {
           // Handled by marker call detection above
-        } else if (
-          expr.type === 'ArrowFunctionExpression' ||
-          expr.type === 'FunctionExpression'
-        ) {
+        } else if (expr.type === 'ArrowFunctionExpression' || expr.type === 'FunctionExpression') {
           const bodyText = source.slice(expr.start, expr.end);
 
-          const isComponentEvent = parent?.type === 'JSXOpeningElement' && isComponentTag(parent.name);
+          const isComponentEvent =
+            parent?.type === 'JSXOpeningElement' && isComponentTag(parent.name);
 
           const ctxKind = classifyJsxHandlerCtxKind(
             attrName,
             isComponentEvent,
-            explicitTranspileJsx === true,
+            explicitTranspileJsx === true
           );
           const ctxName = mkCtxName(attrName);
 
@@ -1178,7 +1160,13 @@ export function createExtractionCollector(
             isComponentEvent,
           });
           ctx.results.push(extraction);
-          ctx.pushActiveSegmentBody({ leaveNode: node, root: expr, result: extraction, hasJsx: false, bodyIds: new Set<string>() });
+          ctx.pushActiveSegmentBody({
+            leaveNode: node,
+            root: expr,
+            result: extraction,
+            hasJsx: false,
+            bodyIds: new Set<string>(),
+          });
           // Safe cast: the enclosing if already gated `expr.type` to a function expression.
           ctx.pendingClosures.push({ extraction, node: expr as AstFunction });
           ctx.onExtraction?.(extraction, expr as AstFunction);
@@ -1224,7 +1212,7 @@ export function createExtractionCollector(
           const ctxKind = classifyJsxHandlerCtxKind(
             propKey,
             isComponentEvent,
-            explicitTranspileJsx === true,
+            explicitTranspileJsx === true
           );
           const ctxName = mkCtxName(propKey);
 
@@ -1257,7 +1245,13 @@ export function createExtractionCollector(
             isJsxObjectProp: true,
           });
           ctx.results.push(extraction);
-          ctx.pushActiveSegmentBody({ leaveNode: node, root: value, result: extraction, hasJsx: false, bodyIds: new Set<string>() });
+          ctx.pushActiveSegmentBody({
+            leaveNode: node,
+            root: value,
+            result: extraction,
+            hasJsx: false,
+            bodyIds: new Set<string>(),
+          });
           ctx.pendingClosures.push({ extraction, node: value as AstFunction });
           ctx.onExtraction?.(extraction, value as AstFunction);
         }
@@ -1302,18 +1296,17 @@ export function extractSegments(
   /** When `preParsedProgram` is set, optional module metadata from the same parse. */
   preParsedModule?: AstEcmaScriptModule,
   /**
-   * Optional out-map. When provided, populated with each extraction's closure
-   * AST node keyed by the post-disambiguation `symbolName`, so callers skip a
-   * per-extraction body re-parse.
+   * Optional out-map. When provided, populated with each extraction's closure AST node keyed by the
+   * post-disambiguation `symbolName`, so callers skip a per-extraction body re-parse.
    */
   closureNodesOut?: Map<string, AstFunction>,
   /**
-   * The user's explicit `transpileJsx` value (defaults false). Distinct from the
-   * derived `transpileJsx` above, which defaults TRUE for `.tsx`/`.jsx` when the
-   * user omits the flag. The ctxKind classifier needs the strict semantic to
-   * select between the name-prefix (default) and element-kind (active) rules.
+   * The user's explicit `transpileJsx` value (defaults false). Distinct from the derived
+   * `transpileJsx` above, which defaults TRUE for `.tsx`/`.jsx` when the user omits the flag. The
+   * ctxKind classifier needs the strict semantic to select between the name-prefix (default) and
+   * element-kind (active) rules.
    */
-  explicitTranspileJsx?: boolean,
+  explicitTranspileJsx?: boolean
 ): readonly ExtractedSegment[] {
   const parseResult: AstParseResult | null = preParsedProgram
     ? null
@@ -1344,14 +1337,14 @@ export function extractSegments(
 }
 
 /**
- * Append `_1`, `_2`, … suffixes to extractions that share a display name,
- * recomputing hashes accordingly.
+ * Append `_1`, `_2`, … suffixes to extractions that share a display name, recomputing hashes
+ * accordingly.
  */
 function disambiguateExtractions(
   extractions: ExtractedSegmentBuilder[],
   fileStem: string,
   relPath: string,
-  scope?: string,
+  scope?: string
 ): void {
   // Mutates identity fields on entries that collide on the displayName context
   // portion; the builder mutability is internal — the boundary exposes

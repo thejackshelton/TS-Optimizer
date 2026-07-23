@@ -1,11 +1,9 @@
 /**
- * Flatten `const <ObjectPattern> = useFoo()` destructures inside `component$`
- * bodies as a pre-extraction code-size optimization. `const { store5 } =
- * useForm2()` becomes `const form2 = useForm2()` and every `store5` reference
- * rewrites to `form2.store5` (the new binding drops the `use` prefix and
- * lowercases the first char). Only object-pattern destructures of a
- * `use`-prefixed identifier callee are handled; array and member-init forms
- * are left alone.
+ * Flatten `const <ObjectPattern> = useFoo()` destructures inside `component$` bodies as a
+ * pre-extraction code-size optimization. `const { store5 } = useForm2()` becomes `const form2 =
+ * useForm2()` and every `store5` reference rewrites to `form2.store5` (the new binding drops the
+ * `use` prefix and lowercases the first char). Only object-pattern destructures of a `use`-prefixed
+ * identifier callee are handled; array and member-init forms are left alone.
  */
 
 import MagicString from 'magic-string';
@@ -18,7 +16,7 @@ type Substitution = { from: string; to: string };
 export function flattenDestructureUseCalls(
   source: string,
   relPath: string,
-  program: AstProgram,
+  program: AstProgram
 ): { source: string; changed: boolean } {
   // Sound prefilter: the walk only fires on a callee literally named
   // `component$`, and that token appears verbatim at its source position, so
@@ -63,7 +61,7 @@ export function flattenDestructureUseCalls(
         if (node.start < decl.scopeStart || node.end > decl.scopeEnd) continue;
         const subs = subsByScope.get(decl.scopeStart);
         if (!subs) continue;
-        const hit = subs.find(sub => sub.from === node.name);
+        const hit = subs.find((sub) => sub.from === node.name);
         if (!hit) continue;
         let replacement = hit.to;
         if (isShorthandPropertyValue(node, parent)) {
@@ -80,9 +78,8 @@ export function flattenDestructureUseCalls(
 }
 
 /**
- * True when an Identifier sits in a declaring position (introducing a binding,
- * an object-literal key, a label) rather than a reference — only references to
- * flattened names get rewritten.
+ * True when an Identifier sits in a declaring position (introducing a binding, an object-literal
+ * key, a label) rather than a reference — only references to flattened names get rewritten.
  */
 function isDeclaringIdentifierPosition(node: AstNode, parent: AstParentNode): boolean {
   if (!parent) return false;
@@ -130,16 +127,15 @@ interface FlattenableDecl {
 }
 
 /**
- * For each flattenable `const { ... } = use*()` at the top level of a
- * `component$(arrow)` body with a BlockStatement, record a FlattenableDecl,
- * overwrite its pattern, and register the substitution map under the body's
- * span. Other call shapes are ignored.
+ * For each flattenable `const { ... } = use*()` at the top level of a `component$(arrow)` body with
+ * a BlockStatement, record a FlattenableDecl, overwrite its pattern, and register the substitution
+ * map under the body's span. Other call shapes are ignored.
  */
 function collectAndApplyDeclsForComponentCall(
   callNode: CallExpression,
   edits: () => MagicString,
   decls: FlattenableDecl[],
-  subsByScope: Map<number, Substitution[]>,
+  subsByScope: Map<number, Substitution[]>
 ): void {
   const arrow = callNode.arguments?.[0];
   if (!arrow || arrow.type !== 'ArrowFunctionExpression') return;
@@ -166,7 +162,8 @@ function collectAndApplyDeclsForComponentCall(
       if (prop.type !== 'Property') continue;
       if (prop.computed) continue;
       const key = prop.key;
-      const keyName = key.type === 'Identifier' ? key.name : (key.type === 'Literal' ? String(key.value) : null);
+      const keyName =
+        key.type === 'Identifier' ? key.name : key.type === 'Literal' ? String(key.value) : null;
       if (keyName === null) continue;
       const val = prop.value;
       if (val.type !== 'Identifier') continue;
@@ -186,7 +183,7 @@ function collectAndApplyDeclsForComponentCall(
     };
     decls.push(decl);
     edits().overwrite(decl.idStart, decl.idEnd, decl.newBinding);
-    const subs: Substitution[] = decl.fields.map(field => ({
+    const subs: Substitution[] = decl.fields.map((field) => ({
       from: field.localName,
       to: `${decl.newBinding}.${field.keyName}`,
     }));
@@ -199,8 +196,13 @@ function collectAndApplyDeclsForComponentCall(
 export function flattenAndReparse(
   source: string,
   relPath: string,
-  program: AstProgram,
-): { source: string; program: AstProgram; module: ReturnType<typeof parseWithRawTransfer>['module'] | null; changed: boolean } {
+  program: AstProgram
+): {
+  source: string;
+  program: AstProgram;
+  module: ReturnType<typeof parseWithRawTransfer>['module'] | null;
+  changed: boolean;
+} {
   const result = flattenDestructureUseCalls(source, relPath, program);
   if (!result.changed) {
     return { source, program, module: null, changed: false };

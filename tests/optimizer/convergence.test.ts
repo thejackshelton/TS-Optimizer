@@ -33,9 +33,7 @@ function formatSnapshot(input: string, result: TransformOutput): string {
 }
 
 function getTestName(snapFilename: string): string {
-  return snapFilename
-    .replace('qwik_core__test__', '')
-    .replace('.snap', '');
+  return snapFilename.replace('qwik_core__test__', '').replace('.snap', '');
 }
 
 describe('convergence: all 209 snapshots', () => {
@@ -98,7 +96,7 @@ describe('convergence: all 209 snapshots', () => {
         if (!expectedSeg.metadata) continue;
 
         const actualSeg = result.modules.find(
-          (m) => m.kind === 'segment' && m.segment.name === expectedSeg.metadata!.name,
+          (m) => m.kind === 'segment' && m.segment.name === expectedSeg.metadata!.name
         );
 
         if (!actualSeg) {
@@ -157,7 +155,9 @@ describe('convergence: all 209 snapshots', () => {
     console.log(`Full fail:        ${results.fullFail}`);
     console.log(`No input:         ${results.noInput}`);
     console.log(`Error/throw:      ${results.error}`);
-    console.log(`Pass rate:        ${results.total > 0 ? ((results.fullPass / results.total) * 100).toFixed(1) : 0}%`);
+    console.log(
+      `Pass rate:        ${results.total > 0 ? ((results.fullPass / results.total) * 100).toFixed(1) : 0}%`
+    );
     console.log('===========================\n');
 
     expect(results.total).toBeGreaterThan(0);

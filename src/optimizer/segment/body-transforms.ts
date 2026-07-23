@@ -1,8 +1,16 @@
-import { createRegExp, exactly, oneOrMore, maybe, anyOf, wordChar, wordBoundary, whitespace, global } from 'magic-regexp';
+import {
+  createRegExp,
+  exactly,
+  oneOrMore,
+  maybe,
+  anyOf,
+  wordChar,
+  wordBoundary,
+  whitespace,
+  global,
+} from 'magic-regexp';
 import { walk } from 'oxc-walker';
-import type {
-  AstNode,
-} from '../../ast-types.js';
+import type { AstNode } from '../../ast-types.js';
 import {
   createFunctionTransformSession,
   insertFunctionBodyPrologue,
@@ -14,16 +22,19 @@ import { formatWCall } from '../qwik/w-call.js';
 import { applyRawPropsTransform, consolidateRawPropsInWCalls } from '../rewrite/index.js';
 import type { ExtractionResult } from '../extraction/extract.js';
 import type { NestedCallSiteInfo } from './segment-codegen.js';
-import {
-  pureAwareOverwriteStart,
-  scanMatchingParenForward,
-} from '../edit/text-scanning.js';
+import { pureAwareOverwriteStart, scanMatchingParenForward } from '../edit/text-scanning.js';
 
 const qwikDisableDirective = createRegExp(
-  exactly('/*').and(whitespace.times.any()).and('@qwik-disable-next-line')
-    .and(oneOrMore(whitespace)).and(oneOrMore(wordChar))
-    .and(whitespace.times.any()).and('*/').and(whitespace.times.any()).and(maybe(exactly('\n'))),
-  [global],
+  exactly('/*')
+    .and(whitespace.times.any())
+    .and('@qwik-disable-next-line')
+    .and(oneOrMore(whitespace))
+    .and(oneOrMore(wordChar))
+    .and(whitespace.times.any())
+    .and('*/')
+    .and(whitespace.times.any())
+    .and(maybe(exactly('\n'))),
+  [global]
 );
 
 function getNestedCallSiteStart(site: NestedCallSiteInfo): number {
@@ -34,17 +45,27 @@ function getNestedCallSiteStart(site: NestedCallSiteInfo): number {
 }
 
 /**
- * Text-based because it runs after nested call site rewriting has invalidated
- * the original AST positions.
+ * Text-based because it runs after nested call site rewriting has invalidated the original AST
+ * positions.
  */
-function findEnclosingArrowBodyForCapture(text: string, pos: number, capturedVarName: string): number {
+function findEnclosingArrowBodyForCapture(
+  text: string,
+  pos: number,
+  capturedVarName: string
+): number {
   let i = pos - 1;
   while (i >= 1) {
-    if (text[i] !== '(' && text[i] !== '{') { i--; continue; }
+    if (text[i] !== '(' && text[i] !== '{') {
+      i--;
+      continue;
+    }
 
     let j = i - 1;
     while (j >= 0 && /\s/.test(text[j])) j--;
-    if (!(j >= 1 && text[j] === '>' && text[j - 1] === '=')) { i--; continue; }
+    if (!(j >= 1 && text[j] === '>' && text[j - 1] === '=')) {
+      i--;
+      continue;
+    }
 
     let paramEnd = j - 2;
     while (paramEnd >= 0 && /\s/.test(text[paramEnd])) paramEnd--;
@@ -66,12 +87,18 @@ function findEnclosingArrowBodyForCapture(text: string, pos: number, capturedVar
       paramText = text.slice(pStart, paramEnd + 1);
     }
 
-    const params = paramText.split(',').map(p => p.trim());
+    const params = paramText.split(',').map((p) => p.trim());
     if (params.includes(capturedVarName)) return i + 1;
 
     const bodyStart = i + 1;
     const bodySlice = text.slice(bodyStart, pos);
-    const localDeclPattern = createRegExp(wordBoundary, anyOf('const', 'let', 'var'), oneOrMore(whitespace), exactly(capturedVarName), wordBoundary);
+    const localDeclPattern = createRegExp(
+      wordBoundary,
+      anyOf('const', 'let', 'var'),
+      oneOrMore(whitespace),
+      exactly(capturedVarName),
+      wordBoundary
+    );
     if (localDeclPattern.test(bodySlice)) return bodyStart;
 
     i--;
@@ -80,7 +107,14 @@ function findEnclosingArrowBodyForCapture(text: string, pos: number, capturedVar
 }
 
 function findVarDeclarationEnd(text: string, startPos: number, varName: string): number {
-  const pattern = createRegExp(wordBoundary, anyOf('const', 'let', 'var'), oneOrMore(whitespace), exactly(varName), whitespace.times.any(), exactly('='));
+  const pattern = createRegExp(
+    wordBoundary,
+    anyOf('const', 'let', 'var'),
+    oneOrMore(whitespace),
+    exactly(varName),
+    whitespace.times.any(),
+    exactly('=')
+  );
   const searchText = text.slice(startPos);
   const match = pattern.exec(searchText);
   if (!match) return -1;
@@ -95,29 +129,31 @@ function findVarDeclarationEnd(text: string, startPos: number, varName: string):
 }
 
 /**
- * Position threshold: below it a capture resolved in the segment's outermost
- * arrow body (hoisted to component scope); above it, deeper in a nested loop
- * callback (hoisted at the local declaration site). Empirical.
+ * Position threshold: below it a capture resolved in the segment's outermost arrow body (hoisted to
+ * component scope); above it, deeper in a nested loop callback (hoisted at the local declaration
+ * site). Empirical.
  */
 const OUTERMOST_BODY_THRESHOLD = 20;
 
 /**
- * Returns the body unchanged when the range is out of bounds — a defensive
- * guard against stale positions from upstream rewriting.
+ * Returns the body unchanged when the range is out of bounds — a defensive guard against stale
+ * positions from upstream rewriting.
  */
-function spliceWithinBody(bodyText: string, start: number, end: number, replacement: string): string {
+function spliceWithinBody(
+  bodyText: string,
+  start: number,
+  end: number,
+  replacement: string
+): string {
   if (start < 0 || end > bodyText.length) return bodyText;
   return bodyText.slice(0, start) + replacement + bodyText.slice(end);
 }
 
-/**
- * MUST run before any other text modifications because it uses original
- * source positions.
- */
+/** MUST run before any other text modifications because it uses original source positions. */
 export function rewriteNestedCallSitesInline(
   bodyText: string,
   nestedCallSites: NestedCallSiteInfo[],
-  bodyOffset: number,
+  bodyOffset: number
 ): string {
   const sorted = [...nestedCallSites].sort((a, b) => {
     return getNestedCallSiteStart(b) - getNestedCallSiteStart(a);
@@ -127,7 +163,12 @@ export function rewriteNestedCallSitesInline(
   const hoistDeclarations: Array<{ position: number; declaration: string }> = [];
 
   for (const site of sorted) {
-    if (site.isJsxAttr && site.attrStart !== undefined && site.attrEnd !== undefined && site.transformedPropName) {
+    if (
+      site.isJsxAttr &&
+      site.attrStart !== undefined &&
+      site.attrEnd !== undefined &&
+      site.transformedPropName
+    ) {
       // A JSX-attr child that captures but isn't on the loop-cross hoist path
       // (`hoistedSymbolName` unset) still needs `.w([captures])` wrapping at
       // the parent's prop call site.
@@ -141,9 +182,18 @@ export function rewriteNestedCallSitesInline(
       }
       const relStart = site.attrStart - bodyOffset;
       const relEnd = site.attrEnd - bodyOffset;
-      bodyText = spliceWithinBody(bodyText, relStart, relEnd, `${site.transformedPropName}={${propValueRef}}`);
+      bodyText = spliceWithinBody(
+        bodyText,
+        relStart,
+        relEnd,
+        `${site.transformedPropName}={${propValueRef}}`
+      );
 
-      if (site.hoistedSymbolName && site.hoistedCaptureNames && site.hoistedCaptureNames.length > 0) {
+      if (
+        site.hoistedSymbolName &&
+        site.hoistedCaptureNames &&
+        site.hoistedCaptureNames.length > 0
+      ) {
         const capturedVar = site.hoistedCaptureNames[0];
         const enclosingPos = findEnclosingArrowBodyForCapture(bodyText, relStart, capturedVar);
         const isLoopCallback = enclosingPos >= 0 && enclosingPos > OUTERMOST_BODY_THRESHOLD;
@@ -157,7 +207,10 @@ export function rewriteNestedCallSitesInline(
             const varDeclPos = findVarDeclarationEnd(bodyText, enclosingPos, capVar);
             if (varDeclPos > latestDeclPos) latestDeclPos = varDeclPos;
           }
-          hoistDeclarations.push({ position: latestDeclPos >= 0 ? latestDeclPos : enclosingPos, declaration: decl });
+          hoistDeclarations.push({
+            position: latestDeclPos >= 0 ? latestDeclPos : enclosingPos,
+            declaration: decl,
+          });
         } else {
           if (!componentScopeWDecls) componentScopeWDecls = [];
           const wCall = formatWCall(site.qrlVarName, site.hoistedCaptureNames, '        ', '    ');
@@ -200,14 +253,14 @@ export function rewriteNestedCallSitesInline(
 
 function injectHoistDeclarations(
   bodyText: string,
-  hoistDeclarations: Array<{ position: number; declaration: string }>,
+  hoistDeclarations: Array<{ position: number; declaration: string }>
 ): string {
   if (hoistDeclarations.length === 0) return bodyText;
 
   // Group .w() declarations in the same scope together at the max position.
   if (hoistDeclarations.length > 1) {
-    const maxPos = Math.max(...hoistDeclarations.map(h => h.position));
-    const minPos = Math.min(...hoistDeclarations.map(h => h.position));
+    const maxPos = Math.max(...hoistDeclarations.map((h) => h.position));
+    const minPos = Math.min(...hoistDeclarations.map((h) => h.position));
     if (maxPos - minPos < 500) {
       for (const h of hoistDeclarations) h.position = maxPos;
     }
@@ -230,9 +283,7 @@ function injectHoistDeclarations(
       const blockBody = `{\n        ${hoist.declaration}\n        return ${exprContent};\n    }`;
       bodyText = bodyText.slice(0, pos - 1) + blockBody + bodyText.slice(closeIdx + 1);
     } else if (charBefore === '{') {
-      bodyText = bodyText.slice(0, pos) +
-        '\n        ' + hoist.declaration +
-        bodyText.slice(pos);
+      bodyText = bodyText.slice(0, pos) + '\n        ' + hoist.declaration + bodyText.slice(pos);
     } else {
       let indent = '\t';
       const nextNewline = bodyText.indexOf('\n', pos);
@@ -241,19 +292,16 @@ function injectHoistDeclarations(
         const indentMatch = nextLine.match(/^(\s+)/);
         if (indentMatch) indent = indentMatch[1];
       }
-      bodyText = bodyText.slice(0, pos) +
-        indent + hoist.declaration + '\n' +
-        bodyText.slice(pos);
+      bodyText = bodyText.slice(0, pos) + indent + hoist.declaration + '\n' + bodyText.slice(pos);
     }
   }
   return bodyText;
 }
 
 /**
- * A component body may contain nested function declarations (each with their
- * own `return`), and `componentScopeWDecls` must be injected before the
- * COMPONENT's return, not the first nested function's — so this returns the
- * LAST depth-1 `return`, or -1 when none is found.
+ * A component body may contain nested function declarations (each with their own `return`), and
+ * `componentScopeWDecls` must be injected before the COMPONENT's return, not the first nested
+ * function's — so this returns the LAST depth-1 `return`, or -1 when none is found.
  */
 function findComponentReturnPosition(bodyText: string): number {
   let i = 0;
@@ -294,10 +342,20 @@ function injectComponentScopeWDecls(bodyText: string, decls: string[] | undefine
   return bodyText.slice(0, returnIdx) + declBlock + bodyText.slice(returnIdx);
 }
 
-export function inlineEnumReferences(bodyText: string, enumValueMap: Map<string, Map<string, string>>): string {
+export function inlineEnumReferences(
+  bodyText: string,
+  enumValueMap: Map<string, Map<string, string>>
+): string {
   for (const [enumName, members] of enumValueMap) {
     for (const [memberName, value] of members) {
-      const pattern = createRegExp(wordBoundary, exactly(enumName), exactly('.'), exactly(memberName), wordBoundary, [global]);
+      const pattern = createRegExp(
+        wordBoundary,
+        exactly(enumName),
+        exactly('.'),
+        exactly(memberName),
+        wordBoundary,
+        [global]
+      );
       bodyText = bodyText.replace(pattern, value);
     }
   }
@@ -305,15 +363,17 @@ export function inlineEnumReferences(bodyText: string, enumValueMap: Map<string,
 }
 
 /**
- * When a component body declares `const X = call(q_yyy.w([X]))`, the capture
- * array references `X` inside its own initializer — TDZ. Rewrites to:
+ * When a component body declares `const X = call(q_yyy.w([X]))`, the capture array references `X`
+ * inside its own initializer — TDZ. Rewrites to:
  *
- *     const _ref = {};
- *     _ref.X = call(q_yyy.w([_ref.X]));
- *     const { X } = _ref;
+ * ```
+ * const _ref = {};
+ * _ref.X = call(q_yyy.w([_ref.X]));
+ * const { X } = _ref;
+ * ```
  *
- * Detection is conservative: only `q_xxx.w([...])` arrays are inspected for
- * Identifier elements matching the enclosing const declarator name.
+ * Detection is conservative: only `q_xxx.w([...])` arrays are inspected for Identifier elements
+ * matching the enclosing const declarator name.
  */
 export function applySelfRefIndirection(bodyText: string): string {
   if (!bodyText.includes('.w([')) return bodyText;
@@ -325,7 +385,12 @@ export function applySelfRefIndirection(bodyText: string): string {
 
   let foundAny = false;
   for (const stmt of block.body ?? []) {
-    if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const' || stmt.declarations?.length !== 1) continue;
+    if (
+      stmt.type !== 'VariableDeclaration' ||
+      stmt.kind !== 'const' ||
+      stmt.declarations?.length !== 1
+    )
+      continue;
     const d = stmt.declarations[0];
     if (d?.id?.type !== 'Identifier' || !d.init) continue;
     const { name } = d.id;
@@ -365,15 +430,13 @@ export function applyRawPropsToSegmentBody(bodyText: string, parts: string[]): s
   if (result === bodyText) return bodyText;
 
   bodyText = consolidateRawPropsInWCalls(result);
-  if (bodyText.includes('_restProps(') && !parts.some(p => p.includes('_restProps'))) {
+  if (bodyText.includes('_restProps(') && !parts.some((p) => p.includes('_restProps'))) {
     insertImportBeforeSeparator(parts, `import { _restProps } from "@qwik.dev/core";`);
   }
   return bodyText;
 }
 
-/**
- * Must run AFTER nested call site rewriting, which uses original positions.
- */
+/** Must run AFTER nested call site rewriting, which uses original positions. */
 export function stripDiagnosticsAndDirectives(bodyText: string): string {
   bodyText = bodyText.replace(qwikDisableDirective, '');
 
@@ -402,7 +465,10 @@ export function transformSyncCalls(bodyText: string, parts: string[]): string {
   let i = 0;
   while (i < bodyText.length) {
     const syncIdx = bodyText.indexOf('sync$(', i);
-    if (syncIdx === -1) { result += bodyText.slice(i); break; }
+    if (syncIdx === -1) {
+      result += bodyText.slice(i);
+      break;
+    }
 
     if (syncIdx > 0 && /[\w$]/.test(bodyText[syncIdx - 1])) {
       result += bodyText.slice(i, syncIdx + 6);
@@ -419,14 +485,22 @@ export function transformSyncCalls(bodyText: string, parts: string[]): string {
 
   bodyText = result;
   const syncSepIdx = parts.indexOf('//');
-  if (syncSepIdx >= 0 && !parts.some(p => p.includes('_qrlSync'))) {
+  if (syncSepIdx >= 0 && !parts.some((p) => p.includes('_qrlSync'))) {
     parts.splice(syncSepIdx, 0, `import { _qrlSync } from "@qwik.dev/core";`);
   }
   return bodyText;
 }
 
 export function ensureCoreImports(bodyText: string, parts: string[]): void {
-  const coreSymbols = ['_jsxSorted', '_jsxSplit', '_fnSignal', '_wrapProp', '_restProps', '_getVarProps', '_getConstProps'];
+  const coreSymbols = [
+    '_jsxSorted',
+    '_jsxSplit',
+    '_fnSignal',
+    '_wrapProp',
+    '_restProps',
+    '_getVarProps',
+    '_getConstProps',
+  ];
 
   for (const sym of coreSymbols) {
     if (bodyText.includes(sym) && !partsHaveImport(parts, sym)) {
@@ -434,7 +508,10 @@ export function ensureCoreImports(bodyText: string, parts: string[]): void {
     }
   }
   if (bodyText.includes('_Fragment') && !partsHaveImport(parts, '_Fragment')) {
-    insertImportBeforeSeparator(parts, `import { Fragment as _Fragment } from "@qwik.dev/core/jsx-runtime";`);
+    insertImportBeforeSeparator(
+      parts,
+      `import { Fragment as _Fragment } from "@qwik.dev/core/jsx-runtime";`
+    );
   }
 }
 
@@ -473,7 +550,11 @@ export function removeDeadConstLiterals(bodyText: string): string {
       (initNode.value === null || typeof initNode.value !== 'object');
     if (!isLiteral) continue;
 
-    candidates.push({ name: d.id.name, stmtStart: stmt.start - offset, stmtEnd: stmt.end - offset });
+    candidates.push({
+      name: d.id.name,
+      stmtStart: stmt.start - offset,
+      stmtEnd: stmt.end - offset,
+    });
   }
 
   if (candidates.length === 0) return bodyText;
@@ -492,7 +573,11 @@ export function removeDeadConstLiterals(bodyText: string): string {
   let result = bodyText;
   for (const c of toRemove) {
     let end = c.stmtEnd;
-    while (end < result.length && (result[end] === '\n' || result[end] === '\r' || result[end] === ';')) end++;
+    while (
+      end < result.length &&
+      (result[end] === '\n' || result[end] === '\r' || result[end] === ';')
+    )
+      end++;
     let start = c.stmtStart;
     while (start > 0 && (result[start - 1] === '\t' || result[start - 1] === ' ')) start--;
     result = result.slice(0, start) + result.slice(end);
@@ -531,9 +616,13 @@ export function insertImportBeforeSeparator(parts: string[], importStmt: string)
 }
 
 export function partsHaveImport(parts: string[], symbol: string): boolean {
-  return parts.some(p =>
-    p.includes(`{ ${symbol} }`) || p.includes(`{ ${symbol},`) ||
-    p.includes(`, ${symbol} }`) || p.includes(`, ${symbol},`) ||
-    p.includes(`as ${symbol}`) || p.includes(`* as ${symbol}`),
+  return parts.some(
+    (p) =>
+      p.includes(`{ ${symbol} }`) ||
+      p.includes(`{ ${symbol},`) ||
+      p.includes(`, ${symbol} }`) ||
+      p.includes(`, ${symbol},`) ||
+      p.includes(`as ${symbol}`) ||
+      p.includes(`* as ${symbol}`)
   );
 }
