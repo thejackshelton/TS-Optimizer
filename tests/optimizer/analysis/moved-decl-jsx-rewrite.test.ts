@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import type { TransformModule } from '../../../src/optimizer/types/types.js';
@@ -6,11 +5,9 @@ import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js
 
 function findSegmentByCtx(
   result: { modules: readonly TransformModule[] },
-  ctxName: string,
+  ctxName: string
 ): TransformModule {
-  const m = result.modules.find(
-    (mod) => mod.kind === 'segment' && mod.segment.ctxName === ctxName,
-  );
+  const m = result.modules.find((mod) => mod.kind === 'segment' && mod.segment.ctxName === ctxName);
   if (!m) throw new Error(`segment with ctxName=${ctxName} not found`);
   return m;
 }
@@ -34,11 +31,14 @@ export default component$(() => {
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
     });
 
     const seg = findSegmentByCtx(result, 'component$');
-    expect(seg.code).toMatch(/_jsxSplit\("div", \{ \.\.\._getVarProps\(props\) \}, _getConstProps\(props\)/);
+    expect(seg.code).toMatch(
+      /_jsxSplit\("div", \{ \.\.\._getVarProps\(props\) \}, _getConstProps\(props\)/
+    );
     expect(seg.code).not.toMatch(/_jsx\("div", \{ \.\.\.props \}\)/);
     expect(seg.code).not.toMatch(/from ["']react\/jsx-runtime["']/);
   });
@@ -52,7 +52,8 @@ export default component$(() => <Hola/>);
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
     });
 
     const seg = findSegmentByCtx(result, 'component$');
@@ -70,7 +71,8 @@ export default component$(() => <Greet name="World"/>);
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
     });
 
     const seg = findSegmentByCtx(result, 'component$');
@@ -86,7 +88,8 @@ export default component$(() => <div>hello</div>);
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
     });
 
     const seg = findSegmentByCtx(result, 'component$');

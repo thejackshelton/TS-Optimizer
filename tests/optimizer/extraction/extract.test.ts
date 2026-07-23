@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { extractSegments, type ExtractionResult } from '../../../src/optimizer/extraction/extract.js';
+import {
+  extractSegments,
+  type ExtractionResult,
+} from '../../../src/optimizer/extraction/extract.js';
 import { generateSegmentCode } from '../../../src/optimizer/segment/segment-codegen.js';
 import {
   mkBodyText,
@@ -88,8 +91,7 @@ export const Root = component$(() => {
 });
 `;
     const results = extractSegments(source, 'test.tsx');
-    const bareResults = results
-      .filter((r) => r.ctxName === '$');
+    const bareResults = results.filter((r) => r.ctxName === '$');
     const bareDisplayNames = bareResults.map((r) => r.displayName);
 
     expect(bareDisplayNames).toContain('test.tsx_Root_component_useStyles');
@@ -362,7 +364,7 @@ export const App = component$(() => {
 });
 `;
     const results = extractSegments(source, 'test.tsx');
-    const taskExtractions = results.filter(r => r.calleeName === 'useTask$');
+    const taskExtractions = results.filter((r) => r.calleeName === 'useTask$');
     expect(taskExtractions).toHaveLength(3);
 
     expect(taskExtractions[0].displayName).toBe('test.tsx_App_component_useTask');
@@ -392,7 +394,7 @@ export const App = component$(() => {
 });
 `;
     const results = extractSegments(source, 'test.tsx');
-    const taskExtractions = results.filter(r => r.calleeName === 'useTask$');
+    const taskExtractions = results.filter((r) => r.calleeName === 'useTask$');
     expect(taskExtractions).toHaveLength(2);
 
     expect(taskExtractions[0].hash).not.toBe(taskExtractions[1].hash);
@@ -408,7 +410,7 @@ export const App = component$(() => {
 });
 `;
     const results = extractSegments(source, 'test.tsx');
-    const taskExtractions = results.filter(r => r.calleeName === 'useTask$');
+    const taskExtractions = results.filter((r) => r.calleeName === 'useTask$');
     expect(taskExtractions).toHaveLength(2);
 
     const second = taskExtractions[1];

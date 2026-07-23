@@ -25,7 +25,11 @@ function duplicateImportBindings(code: string): string[] {
     const braces = line.match(/\{([^}]*)\}/);
     if (!braces) continue;
     for (const raw of braces[1].split(',')) {
-      const name = raw.replace(/\btype\b/, '').trim().split(/\s+as\s+/)[0].trim();
+      const name = raw
+        .replace(/\btype\b/, '')
+        .trim()
+        .split(/\s+as\s+/)[0]
+        .trim();
       if (!name) continue;
       if (seen.has(name)) dups.push(name);
       else seen.add(name);

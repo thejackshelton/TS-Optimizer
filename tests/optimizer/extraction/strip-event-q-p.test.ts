@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
@@ -36,7 +35,7 @@ export const App = component$(() => {
 });
 `);
       const handler = result.modules.find(
-        (m) => m.kind === 'segment' && m.segment.ctxName === 'shouldRemove$',
+        (m) => m.kind === 'segment' && m.segment.ctxName === 'shouldRemove$'
       );
       if (handler?.kind !== 'segment') throw new Error('shouldRemove$ segment missing');
       expect(handler.segment.ctxKind).toBe('eventHandler');
@@ -51,7 +50,7 @@ export const App = component$(() => {
 });
 `);
       const handler = result.modules.find(
-        (m) => m.kind === 'segment' && m.segment.ctxName === 'onClick$',
+        (m) => m.kind === 'segment' && m.segment.ctxName === 'onClick$'
       );
       if (handler?.kind !== 'segment') throw new Error('Card onClick$ segment missing');
       expect(handler.segment.ctxKind).toBe('jSXProp');
@@ -75,7 +74,7 @@ export const App = component$(() => {
         mode: 'test',
       });
       const handler = result.modules.find(
-        (m) => m.kind === 'segment' && m.segment.ctxName === 'onClick$',
+        (m) => m.kind === 'segment' && m.segment.ctxName === 'onClick$'
       );
       if (handler?.kind !== 'segment') throw new Error('Card onClick$ segment missing');
       expect(handler.segment.ctxKind).toBe('eventHandler');
@@ -94,7 +93,7 @@ export const App = component$(() => {
 `);
       const parent = result.modules[0];
       expect(parent.code).toMatch(
-        /_jsxSorted\(\s*Card\s*,\s*null\s*,\s*\{\s*render\$:\s*q_[A-Za-z_0-9]+\.w\(\[\s*state\s*\]\)/,
+        /_jsxSorted\(\s*Card\s*,\s*null\s*,\s*\{\s*render\$:\s*q_[A-Za-z_0-9]+\.w\(\[\s*state\s*\]\)/
       );
     });
   });
@@ -116,7 +115,7 @@ export const App = component$(() => {
   );
 });
 `,
-        { stripEventHandlers: true },
+        { stripEventHandlers: true }
       );
       const parent = result.modules[0];
       expect(parent.code).toMatch(/_jsxSorted\("div",\s*\{\s*"q:p":\s*state\s*\}/);
@@ -139,11 +138,11 @@ export const App = component$(() => {
   );
 });
 `,
-        { stripEventHandlers: true },
+        { stripEventHandlers: true }
       );
       const parent = result.modules[0];
       expect(parent.code).toMatch(
-        /_jsxSorted\("div",\s*\{\s*"q:ps":\s*\[\s*alpha\s*,\s*beta\s*\]\s*\}/,
+        /_jsxSorted\("div",\s*\{\s*"q:ps":\s*\[\s*alpha\s*,\s*beta\s*\]\s*\}/
       );
     });
 
@@ -168,7 +167,7 @@ export const App = component$(() => {
   return <Card onClick$={() => state.n}/>;
 });
 `,
-        { stripEventHandlers: true },
+        { stripEventHandlers: true }
       );
       const parent = result.modules[0];
       expect(parent.code).not.toMatch(/"q:ps?":/);

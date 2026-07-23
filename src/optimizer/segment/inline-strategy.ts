@@ -1,15 +1,12 @@
 /**
- * Inline/hoist entry strategies keep segment bodies in the parent module —
- * QRL declarations use `_noopQrl()` and bodies attach via `.s()` calls rather
- * than landing in separate files. Stripped segments use sentinel counter
- * naming to avoid colliding with real symbol names.
+ * Inline/hoist entry strategies keep segment bodies in the parent module — QRL declarations use
+ * `_noopQrl()` and bodies attach via `.s()` calls rather than landing in separate files. Stripped
+ * segments use sentinel counter naming to avoid colliding with real symbol names.
  */
 
 import { formatDevMeta, type NoopQrlDevMeta } from './dev-mode.js';
 
-/**
- * The `0xFFFF0000 + index * 2` range cannot conflict with real QRL names.
- */
+/** The `0xFFFF0000 + index * 2` range cannot conflict with real QRL names. */
 export function getSentinelCounter(index: number): number {
   return 0xffff0000 + index * 2;
 }
@@ -37,7 +34,7 @@ export function buildStrippedNoopQrl(symbolName: string, strippedIndex: number):
 export function buildStrippedNoopQrlDev(
   symbolName: string,
   strippedIndex: number,
-  devMeta: NoopQrlDevMeta,
+  devMeta: NoopQrlDevMeta
 ): string {
   return buildNoopQrlDev(`q_qrl_${getSentinelCounter(strippedIndex)}`, symbolName, devMeta);
 }

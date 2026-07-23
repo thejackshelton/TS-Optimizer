@@ -19,11 +19,7 @@ import type { PassiveConflict } from '../analysis/module-gather-walk.js';
 import { getJsxAttributeName } from '../jsx/jsx-attr-name.js';
 import { plainQrlName } from '../qwik/qrl-naming.js';
 import { computeLineColFromOffset } from './source-loc.js';
-import {
-  mkByteOffset,
-  mkColumnNumber,
-  mkLineNumber,
-} from '../types/brands.js';
+import { mkByteOffset, mkColumnNumber, mkLineNumber } from '../types/brands.js';
 
 type SourceRange = { start: number; end: number };
 
@@ -49,7 +45,7 @@ export function detectC02Diagnostics(
   program: AstProgram,
   source: string,
   file: string,
-  diagnostics: Diagnostic[],
+  diagnostics: Diagnostic[]
 ): void {
   for (const extraction of extractions) {
     const closureNode = closureNodes.get(extraction.symbolName);
@@ -59,9 +55,7 @@ export function detectC02Diagnostics(
     if (!undeclaredIds || undeclaredIds.length === 0) continue;
 
     const enclosingExt = enclosingExtMap.get(extraction.symbolName) ?? null;
-    const enclosingClosure = enclosingExt
-      ? closureNodes.get(enclosingExt.symbolName)
-      : undefined;
+    const enclosingClosure = enclosingExt ? closureNodes.get(enclosingExt.symbolName) : undefined;
 
     // C02 fires only for fn/class refs inside an enclosing extraction's closure —
     // module-level refs are handled by variable-migration and would false-positive.
@@ -95,7 +89,7 @@ export function detectC02Diagnostics(
         continue;
       }
       diagnostics.push(
-        emitC02(refName, file, declType === 'class', buildHighlight(source, site.start, site.end)),
+        emitC02(refName, file, declType === 'class', buildHighlight(source, site.start, site.end))
       );
     }
   }
@@ -115,7 +109,7 @@ export function detectC05Diagnostics(
   >,
   source: string,
   file: string,
-  diagnostics: Diagnostic[],
+  diagnostics: Diagnostic[]
 ): void {
   const moduleExportNames = collectExportNames(program, moduleInfo);
 
@@ -140,7 +134,7 @@ export function detectC05Diagnostics(
     if (!qrlName) continue;
     for (const site of sites) {
       diagnostics.push(
-        emitC05(exportName, qrlName, file, buildHighlight(source, site.start, site.end)),
+        emitC05(exportName, qrlName, file, buildHighlight(source, site.start, site.end))
       );
     }
   }
@@ -150,15 +144,15 @@ export function emitPassiveConflictDiagnostics(
   conflicts: ReadonlyArray<PassiveConflict>,
   file: string,
   source: string,
-  diagnostics: Diagnostic[],
+  diagnostics: Diagnostic[]
 ): void {
   for (const conflict of conflicts) {
     diagnostics.push(
       emitPassiveConflictWarning(
         conflict.eventName,
         file,
-        buildHighlight(source, conflict.start, conflict.end),
-      ),
+        buildHighlight(source, conflict.start, conflict.end)
+      )
     );
   }
 }
@@ -168,7 +162,7 @@ export function detectPassivePreventdefaultConflicts(
   program: AstProgram,
   file: string,
   source: string,
-  diagnostics: Diagnostic[],
+  diagnostics: Diagnostic[]
 ): void {
   walk(program, {
     enter(node: AstNode) {
@@ -193,7 +187,11 @@ export function detectPassivePreventdefaultConflicts(
       for (const eventName of passiveEvents) {
         if (preventdefaultEvents.has(eventName)) {
           diagnostics.push(
-            emitPassiveConflictWarning(eventName, file, buildHighlight(source, node.start, node.end)),
+            emitPassiveConflictWarning(
+              eventName,
+              file,
+              buildHighlight(source, node.start, node.end)
+            )
           );
         }
       }
@@ -203,7 +201,7 @@ export function detectPassivePreventdefaultConflicts(
 
 function collectCallSitesByName(
   program: AstProgram,
-  names: Set<string>,
+  names: Set<string>
 ): Map<string, SourceRange[]> {
   const out = new Map<string, SourceRange[]>();
   walk(program, {
@@ -212,7 +210,8 @@ function collectCallSitesByName(
         node.type !== 'CallExpression' ||
         node.callee?.type !== 'Identifier' ||
         !names.has(node.callee.name)
-      ) return;
+      )
+        return;
       const name = node.callee.name;
       const bucket = out.get(name);
       const entry = { start: node.callee.start, end: node.callee.end };
@@ -225,7 +224,7 @@ function collectCallSitesByName(
 
 function collectIdentifierReferenceSites(
   closureNode: AstFunction,
-  names: Set<string>,
+  names: Set<string>
 ): Map<string, SourceRange> {
   const out = new Map<string, SourceRange>();
   if (names.size === 0) return out;

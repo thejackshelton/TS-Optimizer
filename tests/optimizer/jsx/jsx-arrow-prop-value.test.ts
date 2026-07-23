@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
@@ -16,12 +15,12 @@ function findComponentSegment(result: ReturnType<typeof transform>, namePrefix: 
     (m) =>
       m.kind === 'segment' &&
       m.segment.name.startsWith(namePrefix) &&
-      m.segment.ctxName === 'component$',
+      m.segment.ctxName === 'component$'
   );
 }
 
 describe('JSX inside arrow-function bodies on JSX prop values', () => {
-  it('Bug A: inner JSX in `() => <p>…</p>` prop value gets Qwik\'s `_jsxSorted`, not React `_jsx`', () => {
+  it("Bug A: inner JSX in `() => <p>…</p>` prop value gets Qwik's `_jsxSorted`, not React `_jsx`", () => {
     const source = `
 import { component$ } from "@qwik.dev/core";
 const Resource = (props: any) => props.value;
@@ -43,7 +42,7 @@ export default component$((props: any) => {
     expect(seg.code).not.toMatch(/_jsx\(/);
   });
 
-  it('Bug A: inner JSX in `(arg) => …<X/>` prop value gets Qwik\'s rewrite (with logical operator)', () => {
+  it("Bug A: inner JSX in `(arg) => …<X/>` prop value gets Qwik's rewrite (with logical operator)", () => {
     const source = `
 import { component$ } from "@qwik.dev/core";
 const Resource = (props: any) => props.value;

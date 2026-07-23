@@ -3,11 +3,7 @@ import { transformModule } from '../../../src/index.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
 import type { EntryStrategy, EmitMode } from '../../../src/optimizer/types/types.js';
 
-function allEmittedCode(
-  code: string,
-  entryStrategy: EntryStrategy,
-  mode: EmitMode,
-): string {
+function allEmittedCode(code: string, entryStrategy: EntryStrategy, mode: EmitMode): string {
   const result = transformModule({
     input: [{ path: mkFilePath('n.tsx'), code: mkSourceText(code), devPath: 'n.tsx' }],
     srcDir: mkFilePath('.'),
@@ -26,8 +22,7 @@ export const Widget = component$((props) => {
   return <div ref={ref} onClick$={() => console.log('hi')}><span>{props.label}</span><Slot /></div>;
 });`;
 
-const countUseHmr = (code: string): number =>
-  (code.match(/_useHmr\(/g) ?? []).length;
+const countUseHmr = (code: string): number => (code.match(/_useHmr\(/g) ?? []).length;
 
 describe('inline/hoist strategy injects _useHmr for component bodies in hmr mode', () => {
   for (const strategy of ['hoist', 'inline'] as const) {

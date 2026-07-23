@@ -1,6 +1,6 @@
 /**
- * SipHash-1-3 (zero keys) hashing for Qwik symbol names, with URL-safe base64
- * encoding: no padding, `-`/`_` replaced with `0`.
+ * SipHash-1-3 (zero keys) hashing for Qwik symbol names, with URL-safe base64 encoding: no padding,
+ * `-`/`_` replaced with `0`.
  */
 
 import { charIn, createRegExp, exactly, global as g, oneOrMore } from 'magic-regexp';
@@ -10,20 +10,16 @@ import { type Hash, mkHash } from '../optimizer/types/brands.js';
 const ZERO_KEY: [number, number, number, number] = [0, 0, 0, 0];
 
 /** Hash a symbol from `scope + relPath + displayName` to an 11-char base64 string. */
-export function qwikHash(
-  scope: string | undefined,
-  relPath: string,
-  displayName: string
-): Hash {
+export function qwikHash(scope: string | undefined, relPath: string, displayName: string): Hash {
   const input = (scope ?? '') + relPath + displayName;
   return encodeHash(input);
 }
 
 /**
- * Hash a raw seed string directly, without the `scope + relPath + displayName`
- * concat. The import-aware naming path uses it so `useStyles$(css3)` with
- * `import css3 from './style.css'` hashes the seed `./style.css#default`, keeping
- * the segment hash stable across files importing the same asset under the same name.
+ * Hash a raw seed string directly, without the `scope + relPath + displayName` concat. The
+ * import-aware naming path uses it so `useStyles$(css3)` with `import css3 from './style.css'`
+ * hashes the seed `./style.css#default`, keeping the segment hash stable across files importing the
+ * same asset under the same name.
  */
 export function qwikHashFromSeed(seed: string): Hash {
   return encodeHash(seed);

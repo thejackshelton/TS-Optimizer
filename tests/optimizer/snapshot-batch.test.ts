@@ -54,9 +54,7 @@ describe('snapshot batch validation', () => {
         if (!parsed.input) return;
 
         const filename =
-          parsed.segments[0]?.metadata?.origin ||
-          parsed.parentModules[0]?.filename ||
-          'test.tsx';
+          parsed.segments[0]?.metadata?.origin || parsed.parentModules[0]?.filename || 'test.tsx';
 
         const result = transformModule({
           input: [{ path: mkFilePath(filename), code: mkSourceText(parsed.input) }],
@@ -73,7 +71,7 @@ describe('snapshot batch validation', () => {
             astResult.match,
             `Parent module AST mismatch for ${snapName}.\n` +
               `Expected parse error: ${astResult.expectedParseError}\n` +
-              `Actual parse error: ${astResult.actualParseError}`,
+              `Actual parse error: ${astResult.actualParseError}`
           ).toBe(true);
         }
 
@@ -81,7 +79,7 @@ describe('snapshot batch validation', () => {
           if (!expectedSeg.metadata) continue;
 
           const actualSeg = result.modules.find(
-            (m) => m.kind === 'segment' && m.segment.name === expectedSeg.metadata!.name,
+            (m) => m.kind === 'segment' && m.segment.name === expectedSeg.metadata!.name
           );
           expect(actualSeg, `Missing segment: ${expectedSeg.metadata.name}`).toBeDefined();
 
@@ -92,7 +90,7 @@ describe('snapshot batch validation', () => {
               astResult.match,
               `Segment ${expectedSeg.metadata.name} AST mismatch for ${snapName}.\n` +
                 `Expected parse error: ${astResult.expectedParseError}\n` +
-                `Actual parse error: ${astResult.actualParseError}`,
+                `Actual parse error: ${astResult.actualParseError}`
             ).toBe(true);
           }
 
@@ -128,9 +126,7 @@ describe('snapshot batch validation', () => {
         if (!parsed.input) return;
 
         const filename =
-          parsed.segments[0]?.metadata?.origin ||
-          parsed.parentModules[0]?.filename ||
-          'test.tsx';
+          parsed.segments[0]?.metadata?.origin || parsed.parentModules[0]?.filename || 'test.tsx';
 
         const result = transformModule({
           input: [{ path: mkFilePath(filename), code: mkSourceText(parsed.input) }],
@@ -145,7 +141,7 @@ describe('snapshot batch validation', () => {
           if (!expectedSeg.metadata) continue;
 
           const actualSeg = result.modules.find(
-            (m) => m.kind === 'segment' && m.segment.name === expectedSeg.metadata!.name,
+            (m) => m.kind === 'segment' && m.segment.name === expectedSeg.metadata!.name
           );
 
           if (!actualSeg) {
@@ -189,9 +185,7 @@ describe('snapshot batch validation', () => {
         if (!parsed.input) return;
 
         const filename =
-          parsed.segments[0]?.metadata?.origin ||
-          parsed.parentModules[0]?.filename ||
-          'test.tsx';
+          parsed.segments[0]?.metadata?.origin || parsed.parentModules[0]?.filename || 'test.tsx';
 
         const result = transformModule({
           input: [{ path: mkFilePath(filename), code: mkSourceText(parsed.input) }],
@@ -208,7 +202,7 @@ describe('snapshot batch validation', () => {
             astResult.match,
             `Parent module AST mismatch for ${snapName}.\n` +
               `Expected parse error: ${astResult.expectedParseError}\n` +
-              `Actual parse error: ${astResult.actualParseError}`,
+              `Actual parse error: ${astResult.actualParseError}`
           ).toBe(true);
         }
       });

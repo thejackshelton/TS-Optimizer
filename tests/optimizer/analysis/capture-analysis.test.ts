@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { parseSync } from 'oxc-parser';
 import { walk } from 'oxc-walker';
@@ -296,4 +295,3 @@ describe('analyzeCaptures', () => {
     expect(result.captureNames).toEqual(['qrl']);
   });
 });
-

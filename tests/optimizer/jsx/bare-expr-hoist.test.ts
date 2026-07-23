@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import type { TransformModule } from '../../../src/optimizer/types/types.js';
@@ -83,7 +82,9 @@ export const C = component$(({some = 1+2}) => {
 
     const code = findParent(result).code;
     expect(code).toMatch(/const _hf0\b[^=]*=\s*\(p0\)\s*=>\s*p0\.some\s*\?\?\s*3/);
-    expect(code).toMatch(/const _hf1\b[^=]*=\s*\(p0\)\s*=>\s*\(?\{\s*some:\s*\(?p0\.some\s*\?\?\s*3/);
+    expect(code).toMatch(
+      /const _hf1\b[^=]*=\s*\(p0\)\s*=>\s*\(?\{\s*some:\s*\(?p0\.some\s*\?\?\s*3/
+    );
     expect(code).toMatch(/some:\s*_fnSignal\(_hf0,/);
     expect(code).toMatch(/params:\s*_fnSignal\(_hf1,/);
   });

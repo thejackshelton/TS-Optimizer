@@ -1,7 +1,6 @@
 /**
- * Earlier body transforms (JSX, nested calls, sync$) can introduce identifier
- * references absent from the original segmentImports; this scans the final
- * body text and adds the missing imports.
+ * Earlier body transforms (JSX, nested calls, sync$) can introduce identifier references absent
+ * from the original segmentImports; this scans the final body text and adds the missing imports.
  */
 
 import { createRegExp, oneOrMore, wordChar, wordBoundary, global } from 'magic-regexp';
@@ -21,7 +20,7 @@ interface SegmentImportSpec {
 
 const qrlSuffixPattern = createRegExp(
   wordBoundary.and(oneOrMore(wordChar).and('Qrl').grouped()).and(wordBoundary),
-  [global],
+  [global]
 );
 
 function collectBodyIdentifiers(bodyText: string): Set<string> {
@@ -34,17 +33,25 @@ function collectBodyIdentifiers(bodyText: string): Set<string> {
     const bareIds = new Set<string>();
     walk(session.program, {
       enter(node: AstNode) {
-        if (!funcNode && (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression')) {
+        if (
+          !funcNode &&
+          (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression')
+        ) {
           funcNode = node;
         }
-        if (node.type === 'JSXIdentifier' && node.name && node.name[0] >= 'A' && node.name[0] <= 'Z') {
+        if (
+          node.type === 'JSXIdentifier' &&
+          node.name &&
+          node.name[0] >= 'A' &&
+          node.name[0] <= 'Z'
+        ) {
           ids.add(node.name);
           return;
         }
         if (node.type === 'Identifier' && node.name) {
           bareIds.add(node.name);
         }
-      }
+      },
     });
 
     if (funcNode) {
@@ -68,7 +75,7 @@ export function recollectPostTransformImports(
   importContext: SegmentImportData,
   importsBySource: Map<string, SegmentImportSpec[]>,
   capturedNames: Set<string>,
-  nestedCallSites: NestedCallSiteInfo[] | undefined,
+  nestedCallSites: NestedCallSiteInfo[] | undefined
 ): void {
   const bodyIdentifiers = collectBodyIdentifiers(bodyText);
 
@@ -77,16 +84,21 @@ export function recollectPostTransformImports(
 
     let alreadyImported = false;
     for (const specs of importsBySource.values()) {
-      if (specs.some(s => s.localName === id)) { alreadyImported = true; break; }
+      if (specs.some((s) => s.localName === id)) {
+        alreadyImported = true;
+        break;
+      }
     }
     if (alreadyImported) continue;
     if (partsHaveImport(parts, id)) continue;
 
-    const moduleImp = importContext.moduleImports.find(m => m.localName === id);
+    const moduleImp = importContext.moduleImports.find((m) => m.localName === id);
     if (moduleImp) {
       let importStmt = buildModuleImportStatement(moduleImp);
       if (moduleImp.importAttributes) {
-        const attrs = Object.entries(moduleImp.importAttributes).map(([k, v]) => `${k}: "${v}"`).join(', ');
+        const attrs = Object.entries(moduleImp.importAttributes)
+          .map(([k, v]) => `${k}: "${v}"`)
+          .join(', ');
         importStmt = importStmt.replace('";', `" with { ${attrs} };`);
       }
       insertImportBeforeSeparator(parts, importStmt);
@@ -101,24 +113,29 @@ export function recollectPostTransformImports(
   addQrlCalleeImports(parts, bodyText, nestedCallSites, importContext);
 }
 
-function buildModuleImportStatement(imp: { localName: string; importedName: string; source: string }): string {
+function buildModuleImportStatement(imp: {
+  localName: string;
+  importedName: string;
+  source: string;
+}): string {
   const rewrittenSource = rewriteImportSource(imp.source);
   if (imp.importedName === '*') return `import * as ${imp.localName} from "${rewrittenSource}";`;
   if (imp.importedName === 'default') return `import ${imp.localName} from "${rewrittenSource}";`;
-  if (imp.importedName !== imp.localName) return `import { ${imp.importedName} as ${imp.localName} } from "${rewrittenSource}";`;
+  if (imp.importedName !== imp.localName)
+    return `import { ${imp.importedName} as ${imp.localName} } from "${rewrittenSource}";`;
   return `import { ${imp.localName} } from "${rewrittenSource}";`;
 }
 
 /**
- * The reexport and default arms never both match one symbol: a default export
- * is always `isExported`, so it can't satisfy the `reexport && !isExported`
- * predicate callers pass as `isReexported`. Order between them is therefore free.
+ * The reexport and default arms never both match one symbol: a default export is always
+ * `isExported`, so it can't satisfy the `reexport && !isExported` predicate callers pass as
+ * `isReexported`. Order between them is therefore free.
  */
 export function resolveSameFileImportName(
   id: string,
   isReexported: boolean,
   defaultExportedNames: ReadonlySet<string> | undefined,
-  renamedExports: ReadonlyMap<string, string> | undefined,
+  renamedExports: ReadonlyMap<string, string> | undefined
 ): string {
   if (isReexported) return `_auto_${id}`;
   if (defaultExportedNames?.has(id)) return 'default';
@@ -131,42 +148,48 @@ export function formatSameFileImport(id: string, importedName: string, source: s
 }
 
 function addSameFileImport(parts: string[], id: string, importContext: SegmentImportData): void {
-  const migrationDecision = importContext.migrationDecisions.find(d => d.varName === id);
+  const migrationDecision = importContext.migrationDecisions.find((d) => d.varName === id);
   if (migrationDecision && migrationDecision.action === 'move') return;
 
   const isReexported = migrationDecision?.action === 'reexport' && !migrationDecision.isExported;
   const importedName = resolveSameFileImportName(
-    id, isReexported, importContext.defaultExportedNames, importContext.renamedExports,
+    id,
+    isReexported,
+    importContext.defaultExportedNames,
+    importContext.renamedExports
   );
-  insertImportBeforeSeparator(parts, formatSameFileImport(id, importedName, importContext.parentModulePath));
+  insertImportBeforeSeparator(
+    parts,
+    formatSameFileImport(id, importedName, importContext.parentModulePath)
+  );
 }
 
 function addQrlCalleeImports(
   parts: string[],
   bodyText: string,
   nestedCallSites: NestedCallSiteInfo[] | undefined,
-  importContext: SegmentImportData,
+  importContext: SegmentImportData
 ): void {
   if (!nestedCallSites) {
     qrlSuffixPattern.lastIndex = 0;
     const qrlSuffixRegex = qrlSuffixPattern;
-      let qrlMatch;
-      while ((qrlMatch = qrlSuffixRegex.exec(bodyText)) !== null) {
-        const qrlName = qrlMatch[1];
-        if (parts.some(p => p.includes(qrlName))) continue;
-        const markerName = `${qrlName.slice(0, -3)}$`;
-        if (getQrlCalleeName(markerName) !== qrlName) continue;
-        // Gate on the name being a legitimate `*Qrl` import — either from the
-        // source file's imports or the optimizer's runtime-imports injection
-        // list. Without this gate, ANY user-named identifier ending in `Qrl`
-        // (e.g. a function parameter named `reactCmpQrl` in qwik-react's
-        // `qwikifyQrl`) gets a bogus `import { reactCmpQrl } from
-        // "@qwik.dev/core";` emitted — getQrlCalleeName's check above is
-        // trivially true since it literally re-suffixes `Qrl` onto its input.
-        if (!importContext.moduleImports.some(m => m.localName === qrlName)) continue;
-        const importSource = getQrlImportSource(qrlName);
-        insertImportBeforeSeparator(parts, `import { ${qrlName} } from "${importSource}";`);
-      }
+    let qrlMatch;
+    while ((qrlMatch = qrlSuffixRegex.exec(bodyText)) !== null) {
+      const qrlName = qrlMatch[1];
+      if (parts.some((p) => p.includes(qrlName))) continue;
+      const markerName = `${qrlName.slice(0, -3)}$`;
+      if (getQrlCalleeName(markerName) !== qrlName) continue;
+      // Gate on the name being a legitimate `*Qrl` import — either from the
+      // source file's imports or the optimizer's runtime-imports injection
+      // list. Without this gate, ANY user-named identifier ending in `Qrl`
+      // (e.g. a function parameter named `reactCmpQrl` in qwik-react's
+      // `qwikifyQrl`) gets a bogus `import { reactCmpQrl } from
+      // "@qwik.dev/core";` emitted — getQrlCalleeName's check above is
+      // trivially true since it literally re-suffixes `Qrl` onto its input.
+      if (!importContext.moduleImports.some((m) => m.localName === qrlName)) continue;
+      const importSource = getQrlImportSource(qrlName);
+      insertImportBeforeSeparator(parts, `import { ${qrlName} } from "${importSource}";`);
+    }
     return;
   }
 
@@ -174,7 +197,7 @@ function addQrlCalleeImports(
   for (const site of nestedCallSites) {
     if (!site.qrlCallee || addedQrlCallees.has(site.qrlCallee)) continue;
     addedQrlCallees.add(site.qrlCallee);
-    if (parts.some(p => p.includes(site.qrlCallee!))) continue;
+    if (parts.some((p) => p.includes(site.qrlCallee!))) continue;
     const importSource = getQrlImportSource(site.qrlCallee!, site.importSource);
     insertImportBeforeSeparator(parts, `import { ${site.qrlCallee} } from "${importSource}";`);
   }

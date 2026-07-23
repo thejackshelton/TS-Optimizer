@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
@@ -33,10 +32,12 @@ export const Root = component$(() => {
 });
 `;
     const result = transform(source);
-    const segments = result.modules.filter(m => m.kind === 'segment');
+    const segments = result.modules.filter((m) => m.kind === 'segment');
 
-    const fooSeg = segments.find(s => s.kind === 'segment' && s.segment.name.startsWith('Foo_'));
-    const rootSeg = segments.find(s => s.kind === 'segment' && s.segment.name.startsWith('Root_'));
+    const fooSeg = segments.find((s) => s.kind === 'segment' && s.segment.name.startsWith('Foo_'));
+    const rootSeg = segments.find(
+      (s) => s.kind === 'segment' && s.segment.name.startsWith('Root_')
+    );
     if (fooSeg?.kind !== 'segment' || rootSeg?.kind !== 'segment') {
       throw new Error('expected Foo and Root segments');
     }
@@ -59,11 +60,13 @@ const Foo = component$(() => {
 `;
     const result = transform(source);
     const innerSeg = result.modules.find(
-      m => m.kind === 'segment' && m.segment.name.includes('Inner_component'),
+      (m) => m.kind === 'segment' && m.segment.name.includes('Inner_component')
     );
     const fooSeg = result.modules.find(
-      m => m.kind === 'segment' && m.segment.name.startsWith('Foo_component_') &&
-        !m.segment.name.includes('Inner'),
+      (m) =>
+        m.kind === 'segment' &&
+        m.segment.name.startsWith('Foo_component_') &&
+        !m.segment.name.includes('Inner')
     );
     if (innerSeg?.kind !== 'segment' || fooSeg?.kind !== 'segment') {
       throw new Error('expected Inner and Foo segments');
@@ -92,10 +95,10 @@ export const Root = component$(() => {
 `;
     const result = transform(source);
     const clickSeg = result.modules.find(
-      m => m.kind === 'segment' && m.segment.ctxKind === 'eventHandler',
+      (m) => m.kind === 'segment' && m.segment.ctxKind === 'eventHandler'
     );
     const rootSeg = result.modules.find(
-      m => m.kind === 'segment' && m.segment.name.startsWith('Root_component_'),
+      (m) => m.kind === 'segment' && m.segment.name.startsWith('Root_component_')
     );
     if (clickSeg?.kind !== 'segment' || rootSeg?.kind !== 'segment') {
       throw new Error('expected click handler and Root segments');

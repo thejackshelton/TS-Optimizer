@@ -1,0 +1,7 @@
+dist
+node_modules
+pnpm-lock.yaml
+match-these-snaps
+swc-reference-only
+.ci
+*.snap

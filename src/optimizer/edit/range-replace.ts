@@ -1,10 +1,9 @@
 /**
- * One AST walk that dispatches every node to every registered collector and
- * gathers their range replacements. Collectors must emit disjoint ranges — the
- * orchestrator does not check for overlap. A collector returning
- * `skipSubtree: true` suppresses recursion into that node's children for all
- * collectors (used when replacing an entire subtree, e.g. folding `1 + 2 + 3`
- * to `6`, where recursing would emit overlapping inner ranges).
+ * One AST walk that dispatches every node to every registered collector and gathers their range
+ * replacements. Collectors must emit disjoint ranges — the orchestrator does not check for overlap.
+ * A collector returning `skipSubtree: true` suppresses recursion into that node's children for all
+ * collectors (used when replacing an entire subtree, e.g. folding `1 + 2 + 3` to `6`, where
+ * recursing would emit overlapping inner ranges).
  */
 
 import type { AstMaybeNode, AstNode, AstParentNode } from '../../ast-types.js';
@@ -17,8 +16,8 @@ export interface RangeReplacement {
 }
 
 /**
- * Context threaded to each collector at every visited node. `exprStart` is the
- * source-absolute offset of `exprText[0]`; replacement ranges index into `exprText`.
+ * Context threaded to each collector at every visited node. `exprStart` is the source-absolute
+ * offset of `exprText[0]`; replacement ranges index into `exprText`.
  */
 export interface CollectorContext {
   readonly parentKey?: string;
@@ -28,9 +27,9 @@ export interface CollectorContext {
 }
 
 /**
- * Result returned by a collector for a single node. `skipSubtree: true`
- * suppresses recursion into this node's children for all collectors — use it
- * when replacing an entire subtree (e.g. simplifying `1 + 2 + 3` to `6`).
+ * Result returned by a collector for a single node. `skipSubtree: true` suppresses recursion into
+ * this node's children for all collectors — use it when replacing an entire subtree (e.g.
+ * simplifying `1 + 2 + 3` to `6`).
  */
 export interface CollectorResult {
   readonly replacements: readonly RangeReplacement[];
@@ -40,13 +39,13 @@ export interface CollectorResult {
 /** Per-node visitor. Return `null` for "not interested, recurse normally". */
 export type RangeReplacementCollector = (
   node: AstNode,
-  ctx: CollectorContext,
+  ctx: CollectorContext
 ) => CollectorResult | null;
 
 /** Apply a list of disjoint range replacements to a source string. */
 export function applyReplacements(
   text: string,
-  replacements: ReadonlyArray<RangeReplacement>,
+  replacements: ReadonlyArray<RangeReplacement>
 ): string {
   if (replacements.length === 0) return text;
   const sorted = [...replacements].sort((a, b) => a.start - b.start);
@@ -65,7 +64,7 @@ export function collectRangeReplacements(
   root: AstMaybeNode,
   exprStart: number,
   exprText: string,
-  collectors: readonly RangeReplacementCollector[],
+  collectors: readonly RangeReplacementCollector[]
 ): RangeReplacement[] {
   const out: RangeReplacement[] = [];
   if (collectors.length === 0) return out;
@@ -73,7 +72,7 @@ export function collectRangeReplacements(
   function walk(
     node: AstMaybeNode,
     parentKey: string | undefined,
-    parentNode: AstParentNode | undefined,
+    parentNode: AstParentNode | undefined
   ): void {
     if (!node || typeof node !== 'object') return;
     const ctx: CollectorContext = { parentKey, parentNode, exprStart, exprText };
@@ -96,25 +95,24 @@ export function collectRangeReplacements(
 
 export interface ReplaceableIdentifierPositionOptions {
   /**
-   * How to treat MemberExpression `property` positions. `'nonComputed'` (default)
-   * excludes `.foo` but allows `[foo]`; `'all'` excludes both.
+   * How to treat MemberExpression `property` positions. `'nonComputed'` (default) excludes `.foo`
+   * but allows `[foo]`; `'all'` excludes both.
    */
   memberPropertyMode?: 'all' | 'nonComputed';
 }
 
 /**
- * Whether an Identifier at this position is a *reference* worth substituting —
- * `false` for declarator names, property keys, member-access properties (per
- * `memberPropertyMode`), and function parameters.
+ * Whether an Identifier at this position is a _reference_ worth substituting — `false` for
+ * declarator names, property keys, member-access properties (per `memberPropertyMode`), and
+ * function parameters.
  *
- * Shorthand `Property` value positions return `true` here (not excluded); they
- * need special-case emit and the caller detects them via
- * `parentKey === 'value' && parentNode.shorthand === true`.
+ * Shorthand `Property` value positions return `true` here (not excluded); they need special-case
+ * emit and the caller detects them via `parentKey === 'value' && parentNode.shorthand === true`.
  */
 export function isReplaceableIdentifierPosition(
   parentKey: string | undefined,
   parentNode: AstParentNode | undefined,
-  options: ReplaceableIdentifierPositionOptions = {},
+  options: ReplaceableIdentifierPositionOptions = {}
 ): boolean {
   if (parentKey === 'key' && parentNode?.type === 'Property') return false;
   if (parentKey === 'property' && parentNode?.type === 'MemberExpression') {
@@ -127,13 +125,13 @@ export function isReplaceableIdentifierPosition(
 }
 
 /**
- * Whether a `??` expression at this position needs wrapping parens. Returns
- * `true` for parents with precedence ≥ `??`; `LogicalExpression` is included
- * because mixing `??` with `||`/`&&` is a syntax error without explicit parens.
+ * Whether a `??` expression at this position needs wrapping parens. Returns `true` for parents with
+ * precedence ≥ `??`; `LogicalExpression` is included because mixing `??` with `||`/`&&` is a syntax
+ * error without explicit parens.
  */
 export function expressionNeedsParens(
   parentKey: string | undefined,
-  parentNode: AstParentNode | undefined,
+  parentNode: AstParentNode | undefined
 ): boolean {
   if (!parentNode) return false;
   switch (parentNode.type) {

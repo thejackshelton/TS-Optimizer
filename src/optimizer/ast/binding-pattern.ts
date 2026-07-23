@@ -6,8 +6,8 @@ import type {
 } from '@oxc-project/types';
 
 /**
- * `BindingRestElement` and `FormalParameterRest` both surface as
- * `type: "RestElement"` at runtime, so `visitBindingNames` handles them in one arm.
+ * `BindingRestElement` and `FormalParameterRest` both surface as `type: "RestElement"` at runtime,
+ * so `visitBindingNames` handles them in one arm.
  */
 export type BindingPatternLike =
   | BindingPattern
@@ -17,7 +17,7 @@ export type BindingPatternLike =
 
 function visitBindingNames(
   node: BindingPatternLike | null | undefined,
-  visit: (name: string) => void,
+  visit: (name: string) => void
 ): void {
   if (!node) return;
 
@@ -59,7 +59,7 @@ function visitBindingNames(
 }
 
 export function collectBindingNamesFromPattern(
-  pattern: BindingPatternLike | null | undefined,
+  pattern: BindingPatternLike | null | undefined
 ): string[] {
   const names: string[] = [];
   visitBindingNames(pattern, (name) => names.push(name));
@@ -68,14 +68,14 @@ export function collectBindingNamesFromPattern(
 
 export function appendBindingNamesFromPattern(
   pattern: BindingPatternLike | null | undefined,
-  target: string[],
+  target: string[]
 ): void {
   visitBindingNames(pattern, (name) => target.push(name));
 }
 
 export function addBindingNamesFromPatternToSet(
   pattern: BindingPatternLike | null | undefined,
-  target: Set<string>,
+  target: Set<string>
 ): void {
   visitBindingNames(pattern, (name) => target.add(name));
 }

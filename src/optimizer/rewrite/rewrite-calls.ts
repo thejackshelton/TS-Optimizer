@@ -1,4 +1,13 @@
-import { createRegExp, exactly, oneOrMore, whitespace, wordChar, charIn, charNotIn, global } from 'magic-regexp';
+import {
+  createRegExp,
+  exactly,
+  oneOrMore,
+  whitespace,
+  wordChar,
+  charIn,
+  charNotIn,
+  global,
+} from 'magic-regexp';
 import { transformSync as oxcTransformSync } from 'oxc-transform';
 import { rewriteImportSource } from './rewrite-imports.js';
 import { isQwikPackageSource } from '../qwik/qwik-packages.js';
@@ -13,14 +22,15 @@ const lineComment = createRegExp(exactly('//').and(charNotIn('\n').times.any()),
 const collapsedWhitespace = createRegExp(oneOrMore(whitespace), [global]);
 
 const spacesAroundOperators = createRegExp(
-  whitespace.times.any()
+  whitespace.times
+    .any()
     .and(charIn('{}(),:;=<>+\\-*/%&|!?.').grouped())
     .and(whitespace.times.any()),
-  [global],
+  [global]
 );
 
 const singleArrowParam = createRegExp(
-  exactly('(').and(oneOrMore(wordChar).grouped()).and(')=>').at.lineStart(),
+  exactly('(').and(oneOrMore(wordChar).grouped()).and(')=>').at.lineStart()
 );
 
 export { getQrlCalleeName } from '../qwik/qrl-naming.js';
@@ -30,7 +40,7 @@ export function buildQrlDeclaration(
   canonicalFilename: string,
   explicitExtensions?: boolean,
   _segmentExtension?: string,
-  outputExtension?: string,
+  outputExtension?: string
 ): string {
   const ext = explicitExtensions ? (outputExtension ?? '.js') : '';
   return `const q_${symbolName} = /*#__PURE__*/ qrl(()=>import("./${canonicalFilename}${ext}"), "${symbolName}");`;
@@ -93,9 +103,7 @@ export function getQrlImportSource(qrlCalleeName: string, originalSource?: strin
 
   if (qrlCalleeName === 'qwikifyQrl') return '@qwik.dev/react';
 
-  const ROUTER_QRLS = new Set([
-    'globalActionQrl', 'routeActionQrl', 'routeLoaderQrl', 'zodQrl',
-  ]);
+  const ROUTER_QRLS = new Set(['globalActionQrl', 'routeActionQrl', 'routeLoaderQrl', 'zodQrl']);
   if (ROUTER_QRLS.has(qrlCalleeName)) return '@qwik.dev/router';
 
   return '@qwik.dev/core';

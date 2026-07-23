@@ -20,10 +20,7 @@ import {
   type ScopeAwareBindings,
 } from './jsx.js';
 
-function buildAdditionalSpreadsPart(
-  additionalSpreads: string[],
-  spreadArg: string,
-): string {
+function buildAdditionalSpreadsPart(additionalSpreads: string[], spreadArg: string): string {
   if (additionalSpreads.length === 0) {
     return '';
   }
@@ -40,7 +37,7 @@ function buildAdditionalSpreadsPart(
 function buildConstPropsPart(
   constEntries: string[],
   spreadArg: string,
-  hasDuplicateSpreads: boolean,
+  hasDuplicateSpreads: boolean
 ): string {
   if (constEntries.length > 0) {
     return `{ ${constEntries.join(', ')} }`;
@@ -59,7 +56,7 @@ function injectQpProp(
   qpOverrides: Map<number, string[]> | undefined,
   varEntries: string[],
   constEntries: string[],
-  qrlsWithCaptures: Set<string> | undefined,
+  qrlsWithCaptures: Set<string> | undefined
 ): void {
   if (!tagIsHtml) return;
 
@@ -74,15 +71,19 @@ function injectQpProp(
 
   if (!inLoop || qpOverrides) return;
 
-  const hasEventHandlers = varEntries.some(e => isRewrittenEventEntry(e) || e.startsWith('"host:'))
-    || constEntries.some(e => isRewrittenEventEntry(e) || e.startsWith('"host:'));
+  const hasEventHandlers =
+    varEntries.some((e) => isRewrittenEventEntry(e) || e.startsWith('"host:')) ||
+    constEntries.some((e) => isRewrittenEventEntry(e) || e.startsWith('"host:'));
   if (!hasEventHandlers) return;
 
   // Suppress the iterVars fallback when an event handler references a QRL with
   // hoisted cross-scope captures: those handlers receive data via `.w([captures])`
   // bindings hoisted to the outer loop scope, so an immediate-iterVars `q:p`
   // would be redundant.
-  if (qrlsWithCaptures && eventHandlerReferencesCapturingQrl(varEntries, constEntries, qrlsWithCaptures)) {
+  if (
+    qrlsWithCaptures &&
+    eventHandlerReferencesCapturingQrl(varEntries, constEntries, qrlsWithCaptures)
+  ) {
     return;
   }
 
@@ -92,12 +93,14 @@ function injectQpProp(
   }
 }
 
-/** The prop name itself contains a colon (`q-e:click`), so the value separator
- * is the colon *after* the name's closing quote. */
+/**
+ * The prop name itself contains a colon (`q-e:click`), so the value separator is the colon _after_
+ * the name's closing quote.
+ */
 function eventHandlerReferencesCapturingQrl(
   varEntries: string[],
   constEntries: string[],
-  qrlsWithCaptures: Set<string>,
+  qrlsWithCaptures: Set<string>
 ): boolean {
   for (const e of [...varEntries, ...constEntries]) {
     if (!isRewrittenEventEntry(e)) continue;
@@ -121,7 +124,7 @@ function moveEventHandlersForNonConstCaptures(
   importedNames: Set<string>,
   varEntries: string[],
   constEntries: string[],
-  hasSpread: boolean,
+  hasSpread: boolean
 ): boolean {
   if (!tagIsHtml || inLoop) return false;
 
@@ -129,7 +132,7 @@ function moveEventHandlersForNonConstCaptures(
   if (!overrideParams || overrideParams.length === 0) return false;
 
   const hasNonConstParam = overrideParams.some(
-    p => bindings?.classify(p, node.start) !== 'const' && !importedNames.has(p),
+    (p) => bindings?.classify(p, node.start) !== 'const' && !importedNames.has(p)
   );
   if (!hasNonConstParam) return false;
 
@@ -157,7 +160,7 @@ function buildCreateElementCall(
   constEntries: string[],
   explicitKey: string,
   childrenText: string | null,
-  neededImports: Set<string>,
+  neededImports: Set<string>
 ): JsxTransformResult {
   neededImports.add('createElement as _createElement');
 
@@ -179,16 +182,14 @@ function buildCreateElementCall(
 }
 
 /**
- * Source-ordered `_jsxSplit` emission. Returns null when the rule doesn't apply
- * (single spread, no spread, or no real-const-after-all-spreads — the
- * wrapper-based path handles those).
+ * Source-ordered `_jsxSplit` emission. Returns null when the rule doesn't apply (single spread, no
+ * spread, or no real-const-after-all-spreads — the wrapper-based path handles those).
  *
  * Rule: with MULTIPLE spreads AND at least one explicit "real-const" prop
- * (literal/stable-QRL/identifier value, not event-handler routing or `q:p*`
- * metadata) positioned AFTER all spreads, the explicit const props cover the
- * const-bag completely; spreads contribute only raw `...expr` to the var-bag at
- * their source position, and the var-bag preserves source order. Single-spread
- * cases go through the wrapper-based path so the spread's keys are classified
+ * (literal/stable-QRL/identifier value, not event-handler routing or `q:p*` metadata) positioned
+ * AFTER all spreads, the explicit const props cover the const-bag completely; spreads contribute
+ * only raw `...expr` to the var-bag at their source position, and the var-bag preserves source
+ * order. Single-spread cases go through the wrapper-based path so the spread's keys are classified
  * at runtime.
  */
 function tryBuildSourceOrderedJsxSplit(
@@ -197,7 +198,7 @@ function tryBuildSourceOrderedJsxSplit(
   childrenText: string | null,
   flags: number,
   keyStr: string | null,
-  neededImports: Set<string>,
+  neededImports: Set<string>
 ): JsxTransformResult | null {
   let spreadCount = 0;
   let lastSpreadStart = -1;
@@ -237,8 +238,7 @@ function tryBuildSourceOrderedJsxSplit(
   neededImports.add('_jsxSplit');
   const varPropsPart = varParts.length > 0 ? `{ ${varParts.join(', ')} }` : 'null';
   const constPropsPart = constParts.length > 0 ? `{ ${constParts.join(', ')} }` : 'null';
-  const callString =
-    `_jsxSplit(${tag}, ${varPropsPart}, ${constPropsPart}, ${childrenText ?? 'null'}, ${flags}, ${keyStr ?? 'null'})`;
+  const callString = `_jsxSplit(${tag}, ${varPropsPart}, ${constPropsPart}, ${childrenText ?? 'null'}, ${flags}, ${keyStr ?? 'null'})`;
 
   return {
     tag,
@@ -264,11 +264,16 @@ function buildJsxSplitCall(
   flags: number,
   keyStr: string | null,
   neededImports: Set<string>,
-  slotOrder?: readonly SlotEntry[],
+  slotOrder?: readonly SlotEntry[]
 ): JsxTransformResult {
   if (slotOrder && slotOrder.length > 0) {
     const sourceOrdered = tryBuildSourceOrderedJsxSplit(
-      tag, slotOrder, childrenText, flags, keyStr, neededImports,
+      tag,
+      slotOrder,
+      childrenText,
+      flags,
+      keyStr,
+      neededImports
     );
     if (sourceOrdered !== null) return sourceOrdered;
   }
@@ -284,10 +289,12 @@ function buildJsxSplitCall(
   let varPropsPart: string;
   let constPropsPart: string;
 
-  const componentHasExtras = !tagIsHtml && (
-    constEntries.length > 0 || varEntries.length > 0 ||
-    beforeSpreadEntries.length > 0 || additionalSpreads.length > 0
-  );
+  const componentHasExtras =
+    !tagIsHtml &&
+    (constEntries.length > 0 ||
+      varEntries.length > 0 ||
+      beforeSpreadEntries.length > 0 ||
+      additionalSpreads.length > 0);
 
   const partitionableComponentSpread =
     componentHasExtras && additionalSpreads.length === 0 && constEntries.length > 0;
@@ -303,10 +310,15 @@ function buildJsxSplitCall(
     varPropsPart = `{ ${beforePart}..._getVarProps(${spreadArg}), ..._getConstProps(${spreadArg})${afterPart}${constPart}${additionalSpreadsPart} }`;
     constPropsPart = 'null';
   } else {
-    const hasNonBindNonEventVarEntries = varEntries.some(e =>
-      !e.startsWith('"bind:') && !isRewrittenEventEntry(e) &&
-      !e.startsWith('"q:p') && !e.startsWith('"q:ps'));
-    const shouldMergeConst = (varEntries.length > 0 && constEntries.length > 0) || hasNonBindNonEventVarEntries;
+    const hasNonBindNonEventVarEntries = varEntries.some(
+      (e) =>
+        !e.startsWith('"bind:') &&
+        !isRewrittenEventEntry(e) &&
+        !e.startsWith('"q:p') &&
+        !e.startsWith('"q:ps')
+    );
+    const shouldMergeConst =
+      (varEntries.length > 0 && constEntries.length > 0) || hasNonBindNonEventVarEntries;
 
     if (shouldMergeConst) {
       // When const entries include a "real" const prop (not just event-handler
@@ -314,25 +326,22 @@ function buildJsxSplitCall(
       // the const bag alongside the real const entries. Event-handler-only const
       // entries keep the merged form (both spreads in the var bag).
       const hasRealConstEntries = constEntries.some(
-        (e) => !isRewrittenEventEntry(e) && !e.startsWith('"q:'),
+        (e) => !isRewrittenEventEntry(e) && !e.startsWith('"q:')
       );
       if (hasRealConstEntries) {
         varPropsPart = `{ ${beforePart}..._getVarProps(${spreadArg})${afterPart}${additionalSpreadsPart} }`;
         constPropsPart = `{ ..._getConstProps(${spreadArg}), ${constEntries.join(', ')} }`;
       } else {
         varPropsPart = `{ ${beforePart}..._getVarProps(${spreadArg}), ..._getConstProps(${spreadArg})${afterPart}${additionalSpreadsPart} }`;
-        const hasDuplicateSpreads = additionalSpreads.some(s => s === spreadArg);
-        constPropsPart = buildConstPropsPart(
-          constEntries,
-          spreadArg,
-          hasDuplicateSpreads,
-        );
+        const hasDuplicateSpreads = additionalSpreads.some((s) => s === spreadArg);
+        constPropsPart = buildConstPropsPart(constEntries, spreadArg, hasDuplicateSpreads);
       }
     } else {
       varPropsPart = `{ ${beforePart}..._getVarProps(${spreadArg})${afterPart}${additionalSpreadsPart} }`;
-      constPropsPart = constEntries.length > 0
-        ? `{ ..._getConstProps(${spreadArg}), ${constEntries.join(', ')} }`
-        : `_getConstProps(${spreadArg})`;
+      constPropsPart =
+        constEntries.length > 0
+          ? `{ ..._getConstProps(${spreadArg}), ${constEntries.join(', ')} }`
+          : `_getConstProps(${spreadArg})`;
     }
   }
 
@@ -353,11 +362,20 @@ function buildJsxSplitCall(
 export function transformJsxElement(
   ctx: JsxTransformContext,
   node: JSXElement,
-  opts: JsxElementOptions = {},
+  opts: JsxElementOptions = {}
 ): JsxTransformResult | null {
   if (node.type !== 'JSXElement') return null;
 
-  const { source, s, importedNames, keyCounter, signalHoister, bindings, allDeclaredNames, qrlsWithCaptures } = ctx;
+  const {
+    source,
+    s,
+    importedNames,
+    keyCounter,
+    signalHoister,
+    bindings,
+    allDeclaredNames,
+    qrlsWithCaptures,
+  } = ctx;
   const { passiveEvents, loopCtx, isSoleChild, enableChildSignals = true, qpOverrides } = opts;
 
   const neededImports = new Set<string>();
@@ -369,14 +387,16 @@ export function transformJsxElement(
   const elementPassiveEvents = passiveEvents ?? collectPassiveDirectives(openingElement.attributes);
   const inLoop = !!loopCtx && loopCtx.iterVars.length > 0;
 
-  const preHasSpread = openingElement.attributes?.some(
-    (a: JSXAttributeItem) => a.type === 'JSXSpreadAttribute',
-  ) ?? false;
-  const preHasKey = openingElement.attributes?.some(
-    (a: JSXAttributeItem) => a.type === 'JSXAttribute' &&
-      ((a.name?.type === 'JSXIdentifier' && a.name.name === 'key') ||
-       (a.name?.type === 'JSXNamespacedName' && a.name.name?.name === 'key')),
-  ) ?? false;
+  const preHasSpread =
+    openingElement.attributes?.some((a: JSXAttributeItem) => a.type === 'JSXSpreadAttribute') ??
+    false;
+  const preHasKey =
+    openingElement.attributes?.some(
+      (a: JSXAttributeItem) =>
+        a.type === 'JSXAttribute' &&
+        ((a.name?.type === 'JSXIdentifier' && a.name.name === 'key') ||
+          (a.name?.type === 'JSXNamespacedName' && a.name.name?.name === 'key'))
+    ) ?? false;
   const willUseCreateElement = preHasSpread && preHasKey;
 
   const {
@@ -402,12 +422,30 @@ export function transformJsxElement(
     neededImports.add(imp);
   }
 
-  injectQpProp(node, tagIsHtml, inLoop, loopCtx, qpOverrides, varEntries, constEntries, qrlsWithCaptures);
+  injectQpProp(
+    node,
+    tagIsHtml,
+    inLoop,
+    loopCtx,
+    qpOverrides,
+    varEntries,
+    constEntries,
+    qrlsWithCaptures
+  );
 
-  if (moveEventHandlersForNonConstCaptures(
-    node, tagIsHtml, inLoop, qpOverrides, bindings, importedNames,
-    varEntries, constEntries, hasSpread,
-  )) {
+  if (
+    moveEventHandlersForNonConstCaptures(
+      node,
+      tagIsHtml,
+      inLoop,
+      qpOverrides,
+      bindings,
+      importedNames,
+      varEntries,
+      constEntries,
+      hasSpread
+    )
+  ) {
     hasVarEventHandler = true;
   }
 
@@ -417,21 +455,33 @@ export function transformJsxElement(
     enableSignalAnalysis: childSignalsEnabled,
   });
 
-  const hasQpProp = varEntries.some(e => e.startsWith('"q:p"') || e.startsWith('"q:ps"'))
-    || constEntries.some(e => e.startsWith('"q:p"') || e.startsWith('"q:ps"'));
-  const effectiveLoopCtx = tagIsHtml && (qpOverrides ? hasQpProp : (!!loopCtx && hasQpProp));
+  const hasQpProp =
+    varEntries.some((e) => e.startsWith('"q:p"') || e.startsWith('"q:ps"')) ||
+    constEntries.some((e) => e.startsWith('"q:p"') || e.startsWith('"q:ps"'));
+  const effectiveLoopCtx = tagIsHtml && (qpOverrides ? hasQpProp : !!loopCtx && hasQpProp);
   const effectiveHasVarProps = varEntries.length > 0 || beforeSpreadEntries.length > 0;
   const isRealLoop = !!loopCtx && loopCtx.iterVars.length > 0;
   const isCaptureOnly = effectiveLoopCtx && !isRealLoop;
 
   let flags: number;
   if (hasSpread) {
-    const hasQpEntry = varEntries.some(e => e.startsWith('"q:p"') || e.startsWith('"q:p":') || e.startsWith('"q:ps"') || e.startsWith('"q:ps":'));
+    const hasQpEntry = varEntries.some(
+      (e) =>
+        e.startsWith('"q:p"') ||
+        e.startsWith('"q:p":') ||
+        e.startsWith('"q:ps"') ||
+        e.startsWith('"q:ps":')
+    );
     flags = hasQpEntry ? 4 : 0;
   } else if (isCaptureOnly) {
     flags = computeJsxFlags(hasVarProps, childrenType, false, hasVarEventHandler) | 4;
   } else {
-    flags = computeJsxFlags(effectiveHasVarProps, childrenType, effectiveLoopCtx, hasVarEventHandler);
+    flags = computeJsxFlags(
+      effectiveHasVarProps,
+      childrenType,
+      effectiveLoopCtx,
+      hasVarEventHandler
+    );
   }
 
   let keyStr: string | null;
@@ -445,7 +495,7 @@ export function transformJsxElement(
 
   if (hasSpread) {
     const spreadAttr = openingElement.attributes.find(
-      (a: JSXAttributeItem) => a.type === 'JSXSpreadAttribute',
+      (a: JSXAttributeItem) => a.type === 'JSXSpreadAttribute'
     );
     const spreadArg = spreadAttr
       ? source.slice(spreadAttr.argument.start, spreadAttr.argument.end)
@@ -453,18 +503,34 @@ export function transformJsxElement(
 
     if (explicitKey !== null) {
       return buildCreateElementCall(
-        tag, spreadArg, beforeSpreadEntries, varEntries, constEntries,
-        explicitKey, childrenText, neededImports,
+        tag,
+        spreadArg,
+        beforeSpreadEntries,
+        varEntries,
+        constEntries,
+        explicitKey,
+        childrenText,
+        neededImports
       );
     }
 
     return buildJsxSplitCall(
-      tag, tagIsHtml, spreadArg, beforeSpreadEntries, varEntries, constEntries,
-      additionalSpreads, childrenText, flags, keyStr, neededImports, slotOrder,
+      tag,
+      tagIsHtml,
+      spreadArg,
+      beforeSpreadEntries,
+      varEntries,
+      constEntries,
+      additionalSpreads,
+      childrenText,
+      flags,
+      keyStr,
+      neededImports,
+      slotOrder
     );
   }
 
-  const hasBindInConst = !tagIsHtml && constEntries.some(e => e.startsWith('"bind:'));
+  const hasBindInConst = !tagIsHtml && constEntries.some((e) => e.startsWith('"bind:'));
   const varProps = varEntries.length > 0 ? `{ ${varEntries.join(', ')} }` : null;
   const constProps = constEntries.length > 0 ? `{ ${constEntries.join(', ')} }` : null;
   const jsxFn = hasBindInConst ? '_jsxSplit' : '_jsxSorted';
@@ -485,7 +551,7 @@ export function transformJsxElement(
 
 export function transformJsxFragment(
   ctx: JsxTransformContext,
-  node: JSXFragment,
+  node: JSXFragment
 ): JsxTransformResult | null {
   if (node.type !== 'JSXFragment') return null;
 

@@ -22,7 +22,11 @@ export function collectJsxFunctionNames(importContext: SegmentImportData): Set<s
 }
 
 export function collectJsxFunctionNamesFromIterable(
-  imports: Iterable<{ readonly localName: string; readonly importedName: string; readonly source: string }>,
+  imports: Iterable<{
+    readonly localName: string;
+    readonly importedName: string;
+    readonly source: string;
+  }>
 ): Set<string> {
   const result = new Set<string>();
   for (const imp of imports) {
@@ -48,13 +52,17 @@ interface JsxCallTransformOptions {
   keyCounter: JsxKeyCounter;
   neededImports: Set<string>;
   reactiveBindings?: ReadonlySet<string>;
-  /** Byte ranges `[start, end)` to skip. Used by the parent-rewrite path so
-   * `jsx()` calls already inside a marker extraction's argument tree (handled
-   * by segment-codegen) aren't double-transformed. */
+  /**
+   * Byte ranges `[start, end)` to skip. Used by the parent-rewrite path so `jsx()` calls already
+   * inside a marker extraction's argument tree (handled by segment-codegen) aren't
+   * double-transformed.
+   */
   skipRanges?: ReadonlyArray<{ readonly start: number; readonly end: number }>;
-  /** Maps an event-handler QRL var (`q_<sym>`) to the lexical-capture params
-   * delivered positionally. When a const handler on an element references one,
-   * the element gets a `q:p`/`q:ps` prop so the runtime passes captures through. */
+  /**
+   * Maps an event-handler QRL var (`q_<sym>`) to the lexical-capture params delivered positionally.
+   * When a const handler on an element references one, the element gets a `q:p`/`q:ps` prop so the
+   * runtime passes captures through.
+   */
   qpByQrl?: ReadonlyMap<string, readonly string[]>;
   importedNames?: ReadonlySet<string>;
   signalHoister?: SignalHoister;
@@ -64,18 +72,17 @@ interface JsxCallTransformOptions {
 }
 
 /**
- * Rewrite every `jsx(Tag, propsObj, ...)` whose callee is in `jsxFunctions`
- * to `_jsxSorted(...)`. Two passes: gather reactive bindings first (a
- * `const X = use*()` can appear after the first `jsx()` call in document order,
- * so the set must be complete before any wrap decision), then rewrite
- * bottom-up so an outer call's sliced source contains already-rewritten inner
- * calls. Mutates `s` and `opts.neededImports`.
+ * Rewrite every `jsx(Tag, propsObj, ...)` whose callee is in `jsxFunctions` to `_jsxSorted(...)`.
+ * Two passes: gather reactive bindings first (a `const X = use*()` can appear after the first
+ * `jsx()` call in document order, so the set must be complete before any wrap decision), then
+ * rewrite bottom-up so an outer call's sliced source contains already-rewritten inner calls.
+ * Mutates `s` and `opts.neededImports`.
  */
 export function transformJsxCalls(
   source: string,
   s: MagicString,
   program: AstProgram,
-  opts: JsxCallTransformOptions,
+  opts: JsxCallTransformOptions
 ): void {
   if (opts.jsxFunctions.size === 0) return;
 
@@ -164,7 +171,7 @@ function isJsxCall(node: AstNode, jsxFunctions: ReadonlySet<string>): boolean {
 function markDirectJsxChildren(
   node: AstNode,
   jsxFunctions: ReadonlySet<string>,
-  out: Set<number>,
+  out: Set<number>
 ): void {
   if (node.type !== 'CallExpression') return;
   const propsArg = node.arguments?.[1];
@@ -230,23 +237,32 @@ function wrapReactiveValue(node: AstNode | null | undefined, ctx: WrapReactiveCo
     node,
     ctx.source,
     ctx.importedNames as Set<string>,
-    ctx.localNames as Set<string> | undefined,
+    ctx.localNames as Set<string> | undefined
   );
   if (result.type === 'wrapProp') {
     ctx.s.overwrite(node.start, node.end, result.code);
     ctx.neededImports.add('_wrapProp');
     return;
   }
-  if (result.type === 'fnSignal' && ctx.signalHoister !== undefined && isHoistableSignalExpr(node)) {
+  if (
+    result.type === 'fnSignal' &&
+    ctx.signalHoister !== undefined &&
+    isHoistableSignalExpr(node)
+  ) {
     const hf = ctx.signalHoister.hoist(result.hoistedFn, result.hoistedStr, node.start ?? 0);
-    ctx.s.overwrite(node.start, node.end, `_fnSignal(${hf}, [${result.deps.join(', ')}], ${hf}_str)`);
+    ctx.s.overwrite(
+      node.start,
+      node.end,
+      `_fnSignal(${hf}, [${result.deps.join(', ')}], ${hf}_str)`
+    );
     ctx.neededImports.add('_fnSignal');
   }
 }
 
-/** Only scalar reactive expressions hoist to `_fnSignal`; arrays/objects and
- * call/chain exprs (`items.map(...)`) stay verbatim — hoisting them would
- * strand their callback bindings. */
+/**
+ * Only scalar reactive expressions hoist to `_fnSignal`; arrays/objects and call/chain exprs
+ * (`items.map(...)`) stay verbatim — hoisting them would strand their callback bindings.
+ */
 function isHoistableSignalExpr(node: AstNode): boolean {
   return (
     node.type !== 'ArrayExpression' &&
@@ -256,17 +272,18 @@ function isHoistableSignalExpr(node: AstNode): boolean {
   );
 }
 
-/** Which prop bag a `_jsxDEV` prop value belongs in. A reactive-wrapped value
- * goes in the const bag so only its wrapper subscribes, not the host (a var-bag
- * reactive read re-renders the whole component on a mid-render write). A
- * store-field read on an HTML element keeps its var/const split by the object's
- * binding. Everything else — including non-reactive props carrying pre-analysed
- * peer-tool markers (`[_IMMUTABLE]`) — stays in the var bag. */
+/**
+ * Which prop bag a `_jsxDEV` prop value belongs in. A reactive-wrapped value goes in the const bag
+ * so only its wrapper subscribes, not the host (a var-bag reactive read re-renders the whole
+ * component on a mid-render write). A store-field read on an HTML element keeps its var/const split
+ * by the object's binding. Everything else — including non-reactive props carrying pre-analysed
+ * peer-tool markers (`[_IMMUTABLE]`) — stays in the var bag.
+ */
 function classifyProp(
   valueNode: AstNode,
   opts: JsxCallTransformOptions,
   isHtmlTag: boolean,
-  s: MagicString,
+  s: MagicString
 ): 'const' | 'var' {
   const importedNames = (opts.importedNames ?? EMPTY_SET) as Set<string>;
   const bindings = opts.bindings;
@@ -289,8 +306,12 @@ function classifyProp(
     isHoistableSignalExpr(valueNode)
   ) {
     const depsAllConst = fnSignalDepsAllConst(
-      sig.deps, importedNames, bindings, pos, isHtmlTag,
-      (dep) => opts.paramNames?.includes(dep) ?? false,
+      sig.deps,
+      importedNames,
+      bindings,
+      pos,
+      isHtmlTag,
+      (dep) => opts.paramNames?.includes(dep) ?? false
     );
     return depsAllConst ? 'const' : 'var';
   }
@@ -303,7 +324,7 @@ function constBagEligible(
   opts: JsxCallTransformOptions,
   isHtmlTag: boolean,
   reactiveConst: boolean,
-  s: MagicString,
+  s: MagicString
 ): boolean {
   if (reactiveConst || isConstExpr(valueNode, opts)) return true;
   if (isHtmlTag) return false;
@@ -311,7 +332,9 @@ function constBagEligible(
   const localNames = opts.localNames as Set<string> | undefined;
   const sig = analyzeSignalExpression(valueNode, s.original, importedNames, localNames);
   if (sig.type === 'wrapProp') return true;
-  return sig.type === 'fnSignal' && opts.signalHoister !== undefined && isHoistableSignalExpr(valueNode);
+  return (
+    sig.type === 'fnSignal' && opts.signalHoister !== undefined && isHoistableSignalExpr(valueNode)
+  );
 }
 
 function isConstExpr(node: AstNode, opts: JsxCallTransformOptions): boolean {
@@ -333,9 +356,9 @@ function isValueChild(key: string, parent: AstNode): boolean {
 }
 
 /**
- * `isConst` picks the bag the prop lands in; `rawConst` is const-ness of the
- * raw value (governs a following spread's merge). They differ for a component's
- * reactive prop — const bag, yet its member-read value isn't a const expression.
+ * `isConst` picks the bag the prop lands in; `rawConst` is const-ness of the raw value (governs a
+ * following spread's merge). They differ for a component's reactive prop — const bag, yet its
+ * member-read value isn't a const expression.
  */
 type PropSlot =
   | { readonly kind: 'spread'; readonly getVar: string; readonly getConst: string }
@@ -347,20 +370,17 @@ type PropSlot =
     };
 
 /**
- * Partition a spread-carrying prop list into `_jsxSplit`'s var/const bags. A
- * named prop before any remaining spread is var even when statically const — a
- * later spread can override it; a prop after all spreads keeps its static bag.
+ * Partition a spread-carrying prop list into `_jsxSplit`'s var/const bags. A named prop before any
+ * remaining spread is var even when statically const — a later spread can override it; a prop after
+ * all spreads keeps its static bag.
  */
 function partitionSpreadProps(slots: readonly PropSlot[]): {
   varBag: string[];
   constBag: string[];
 } {
-  const lastSpreadIndex = slots.reduce(
-    (acc, slot, i) => (slot.kind === 'spread' ? i : acc),
-    -1,
-  );
+  const lastSpreadIndex = slots.reduce((acc, slot, i) => (slot.kind === 'spread' ? i : acc), -1);
   const hasVarPropAfterLastSpread = slots.some(
-    (slot, i) => i > lastSpreadIndex && slot.kind === 'named' && !slot.rawConst,
+    (slot, i) => i > lastSpreadIndex && slot.kind === 'named' && !slot.rawConst
   );
 
   let spreadRemaining = slots.filter((slot) => slot.kind === 'spread').length;
@@ -393,7 +413,7 @@ function buildJsxSortedCall(
   s: MagicString,
   callNode: AstNode,
   opts: JsxCallTransformOptions,
-  isDirectJsxChild: boolean,
+  isDirectJsxChild: boolean
 ): string | null {
   // The CallExpression check is required for type-checker narrowing before
   // destructuring, even though the caller already gated on it.
@@ -406,7 +426,8 @@ function buildJsxSortedCall(
     tagArg.type === 'SpreadElement' ||
     !propsArg ||
     propsArg.type !== 'ObjectExpression'
-  ) return null;
+  )
+    return null;
 
   const tag = s.slice(tagArg.start, tagArg.end);
   // HTML tags are string-literal first args; component tags are identifiers.
@@ -481,7 +502,12 @@ function buildJsxSortedCall(
     if (isHandlerPropKey(keyName)) {
       const handlerText = s.slice(prop.start, prop.end);
       const isConst = isConstEventHandlerValue(prop.value);
-      slots.push({ kind: 'named', text: handlerText, isConst, rawConst: isConstExpr(prop.value, opts) });
+      slots.push({
+        kind: 'named',
+        text: handlerText,
+        isConst,
+        rawConst: isConstExpr(prop.value, opts),
+      });
       if (isConst) {
         constEntries.push(handlerText);
       } else {
@@ -526,9 +552,8 @@ function buildJsxSortedCall(
   }
 
   const childrenSlot = childrenText ?? 'null';
-  const childrenType: 'none' | 'static' | 'dynamic' = childrenText === null
-    ? 'none'
-    : childrenIsDynamic ? 'dynamic' : 'static';
+  const childrenType: 'none' | 'static' | 'dynamic' =
+    childrenText === null ? 'none' : childrenIsDynamic ? 'dynamic' : 'static';
 
   if (spreadArgs.length > 0) {
     opts.neededImports.add('_jsxSplit');
@@ -554,10 +579,9 @@ function buildJsxSortedCall(
 }
 
 /**
- * A const event-handler value is a bare QRL identifier (`q_<sym>`); its captures
- * ride the element's `q:p`/`q:ps` prop. A `q_<sym>.w([captures])` handler is NOT
- * const — `.w()` binds captures inline so the reference varies with them (var
- * bag, static_listeners cleared).
+ * A const event-handler value is a bare QRL identifier (`q_<sym>`); its captures ride the element's
+ * `q:p`/`q:ps` prop. A `q_<sym>.w([captures])` handler is NOT const — `.w()` binds captures inline
+ * so the reference varies with them (var bag, static_listeners cleared).
  */
 function isConstEventHandlerValue(value: AstNode): boolean {
   return value.type === 'Identifier';
@@ -571,9 +595,11 @@ function propertyKeyName(prop: AstNode): string | null {
   return null;
 }
 
-/** Classify a children expression as static. The reactive-binding check runs
- * against the SOURCE AST (pre-wrap), since `isStaticChildren` runs before the
- * `_wrapProp` overwrite in `buildJsxSortedCall`. */
+/**
+ * Classify a children expression as static. The reactive-binding check runs against the SOURCE AST
+ * (pre-wrap), since `isStaticChildren` runs before the `_wrapProp` overwrite in
+ * `buildJsxSortedCall`.
+ */
 function isStaticChildren(value: AstNode, reactive: ReadonlySet<string>): boolean {
   if (value.type === 'Literal') return true;
   if (value.type === 'TemplateLiteral' && (value.expressions ?? []).length === 0) return true;
@@ -581,7 +607,8 @@ function isStaticChildren(value: AstNode, reactive: ReadonlySet<string>): boolea
     value.type === 'CallExpression' &&
     value.callee?.type === 'Identifier' &&
     value.callee.name === '_wrapProp'
-  ) return true;
+  )
+    return true;
   if (
     value.type === 'MemberExpression' &&
     value.object?.type === 'Identifier' &&

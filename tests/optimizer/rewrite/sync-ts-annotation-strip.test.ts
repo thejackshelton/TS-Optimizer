@@ -3,11 +3,7 @@ import { transformModule } from '../../../src/index.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
 import type { EntryStrategy, EmitMode } from '../../../src/optimizer/types/types.js';
 
-function allEmittedCode(
-  code: string,
-  entryStrategy: EntryStrategy,
-  mode: EmitMode,
-): string {
+function allEmittedCode(code: string, entryStrategy: EntryStrategy, mode: EmitMode): string {
   const result = transformModule({
     input: [
       {

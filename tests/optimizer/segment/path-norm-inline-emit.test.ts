@@ -15,34 +15,25 @@ describe('path normalization preserves leading ./', () => {
   it('computeRelPath preserves leading ./ when input has it', () => {
     const result = computeRelPath(
       mkFilePath('./node_modules/qwik-tree/index.qwik.jsx'),
-      mkFilePath('/user/qwik/src/'),
+      mkFilePath('/user/qwik/src/')
     );
     expect(result).toBe('./node_modules/qwik-tree/index.qwik.jsx');
   });
 
   it('computeRelPath leaves input without ./ unchanged', () => {
-    const result = computeRelPath(
-      mkFilePath('test.tsx'),
-      mkFilePath('/user/qwik/src/'),
-    );
+    const result = computeRelPath(mkFilePath('test.tsx'), mkFilePath('/user/qwik/src/'));
     expect(result).toBe('test.tsx');
     expect(result.startsWith('./')).toBe(false);
   });
 
   it('buildDevFilePath strips leading ./ from inputPath before concat', () => {
-    const result = buildDevFilePath(
-      './node_modules/qwik-tree/index.qwik.jsx',
-      '/user/qwik/src/',
-    );
+    const result = buildDevFilePath('./node_modules/qwik-tree/index.qwik.jsx', '/user/qwik/src/');
     expect(result).toBe('/user/qwik/src/node_modules/qwik-tree/index.qwik.jsx');
     expect(result).not.toContain('/./');
   });
 
   it('buildDevFilePath without ./ input still works', () => {
-    const result = buildDevFilePath(
-      'node_modules/qwik-tree/index.qwik.jsx',
-      '/user/qwik/src/',
-    );
+    const result = buildDevFilePath('node_modules/qwik-tree/index.qwik.jsx', '/user/qwik/src/');
     expect(result).toBe('/user/qwik/src/node_modules/qwik-tree/index.qwik.jsx');
   });
 });

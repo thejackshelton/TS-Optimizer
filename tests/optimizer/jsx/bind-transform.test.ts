@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import {
   transformBindProp,
@@ -88,9 +87,7 @@ describe('bind-transform', () => {
 
       expect(result.propName).toBe('value');
       expect(result.propValue).toBe('localValue');
-      expect(result.handler!.code).toBe(
-        'inlinedQrl(_val, "_val", [localValue])'
-      );
+      expect(result.handler!.code).toBe('inlinedQrl(_val, "_val", [localValue])');
     });
 
     it('handles bind:checked with a different expression', () => {
@@ -98,9 +95,7 @@ describe('bind-transform', () => {
 
       expect(result.propName).toBe('checked');
       expect(result.propValue).toBe('localChecked');
-      expect(result.handler!.code).toBe(
-        'inlinedQrl(_chk, "_chk", [localChecked])'
-      );
+      expect(result.handler!.code).toBe('inlinedQrl(_chk, "_chk", [localChecked])');
     });
 
     it('passes through bind:disabled without handler', () => {
@@ -127,9 +122,7 @@ describe('bind-transform', () => {
       const bindHandler = 'inlinedQrl(_chk, "_chk", [localValue])';
       const existingHandler = 'q_FieldInput_component_input_q_e_input_wqR1xEjZjf4';
       const result = mergeEventHandlers(existingHandler, bindHandler);
-      expect(result).toBe(
-        `[${bindHandler}, ${existingHandler}]`
-      );
+      expect(result).toBe(`[${bindHandler}, ${existingHandler}]`);
     });
   });
 

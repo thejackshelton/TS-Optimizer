@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
@@ -168,7 +167,9 @@ export const App = component$(() => {
     const parent = result.modules[0];
     const segments = result.modules.filter((m) => m.kind === 'segment');
 
-    const innerSegment = segments.find((s) => s.segment!.ctxName === '$' && s.segment!.parent !== null);
+    const innerSegment = segments.find(
+      (s) => s.segment!.ctxName === '$' && s.segment!.parent !== null
+    );
     expect(innerSegment).toBeDefined();
 
     expect(innerSegment!.segment!.captures).toBe(true);
@@ -339,9 +340,7 @@ export const App = component$(() => {
     });
 
     const segments = result.modules.filter((m) => m.kind === 'segment');
-    const transparentSeg = segments.find(
-      (s) => s.segment!.ctxName === 'transparent$'
-    );
+    const transparentSeg = segments.find((s) => s.segment!.ctxName === 'transparent$');
     expect(transparentSeg).toBeDefined();
     expect(transparentSeg!.segment!.ctxKind).toBe('eventHandler');
   });
@@ -362,9 +361,7 @@ export const App = component$(() => {
     });
 
     const segments = result.modules.filter((m) => m.kind === 'segment');
-    const clickSeg = segments.find(
-      (s) => s.segment!.ctxName === 'onClick$'
-    );
+    const clickSeg = segments.find((s) => s.segment!.ctxName === 'onClick$');
     expect(clickSeg).toBeDefined();
     expect(clickSeg!.segment!.ctxKind).toBe('eventHandler');
   });
@@ -620,7 +617,9 @@ export const App = component$(() => {
 
     const code = appSegment!.code;
     expect(code).toContain('"q:p": item');
-    const divMatch = code.match(/_jsxSorted\("div",\s*\{[^}]+\},\s*(?:null|\{[^}]*\}),\s*\w+,\s*(\d+),/);
+    const divMatch = code.match(
+      /_jsxSorted\("div",\s*\{[^}]+\},\s*(?:null|\{[^}]*\}),\s*\w+,\s*(\d+),/
+    );
     expect(divMatch).toBeTruthy();
     const flags = parseInt(divMatch![1], 10);
     expect(flags & 4).toBe(4);
@@ -668,7 +667,9 @@ export const Comp = (props) => {
     });
 
     const parent = result.modules[0];
-    const divMatch = parent.code.match(/_jsxSorted\("div",\s*null,\s*\{[^}]+\},\s*"world",\s*(\d+),/);
+    const divMatch = parent.code.match(
+      /_jsxSorted\("div",\s*null,\s*\{[^}]+\},\s*"world",\s*(\d+),/
+    );
     expect(divMatch).toBeTruthy();
     const flags = parseInt(divMatch![1], 10);
     expect(flags & 4).toBe(0);

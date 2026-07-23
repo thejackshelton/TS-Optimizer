@@ -13,10 +13,7 @@ import * as nodePath from 'pathe';
 
 import { transformModule } from './optimizer/transform/index.js';
 
-import type {
-  AstEcmaScriptModule,
-  AstProgram,
-} from './ast-types.js';
+import type { AstEcmaScriptModule, AstProgram } from './ast-types.js';
 import type {
   Diagnostic,
   EmitMode,
@@ -29,21 +26,15 @@ import type {
 import { mkFilePath, mkSourceText } from './optimizer/types/brands.js';
 
 /**
- * Runtime environment the optimizer is executing in. Default `'node'` — the only
- * environment this optimizer has been exercised in.
+ * Runtime environment the optimizer is executing in. Default `'node'` — the only environment this
+ * optimizer has been exercised in.
  */
-export type SystemEnvironment =
-  | 'node'
-  | 'deno'
-  | 'bun'
-  | 'webworker'
-  | 'browsermain'
-  | 'unknown';
+export type SystemEnvironment = 'node' | 'deno' | 'bun' | 'webworker' | 'browsermain' | 'unknown';
 
 /**
- * Path utilities, shaped like Node's `path` module; `pathe` provides the
- * implementation. `win32` is intentionally `null` — `pathe` normalises
- * separators, so the platform-specific variant isn't needed at this boundary.
+ * Path utilities, shaped like Node's `path` module; `pathe` provides the implementation. `win32` is
+ * intentionally `null` — `pathe` normalises separators, so the platform-specific variant isn't
+ * needed at this boundary.
  */
 export interface Path {
   resolve(...paths: string[]): string;
@@ -75,9 +66,9 @@ export interface Path {
 }
 
 /**
- * Host-system surface the optimizer can call back into. The transform pipeline
- * never reads `sys` today — the field exists for compatibility at the public
- * boundary so provider-swapping consumers find the same field set.
+ * Host-system surface the optimizer can call back into. The transform pipeline never reads `sys`
+ * today — the field exists for compatibility at the public boundary so provider-swapping consumers
+ * find the same field set.
  */
 export interface OptimizerSystem {
   cwd: () => string;
@@ -90,12 +81,11 @@ export interface OptimizerSystem {
 }
 
 /**
- * Options for `createOptimizer`. All fields are passthrough: `sys` is preserved
- * on the instance if provided (otherwise a default stub is built); the others
- * (`binding`/`inlineStylesUpToBytes`/`sourcemap`/`_optimizer`) are accepted for
- * type-compatibility but not read. The bundler call site currently passes
- * `undefined`; the passthrough fields let an existing options object be reused
- * unmodified when swapping providers.
+ * Options for `createOptimizer`. All fields are passthrough: `sys` is preserved on the instance if
+ * provided (otherwise a default stub is built); the others
+ * (`binding`/`inlineStylesUpToBytes`/`sourcemap`/`_optimizer`) are accepted for type-compatibility
+ * but not read. The bundler call site currently passes `undefined`; the passthrough fields let an
+ * existing options object be reused unmodified when swapping providers.
  */
 export interface OptimizerOptions {
   sys?: OptimizerSystem;
@@ -113,9 +103,9 @@ export interface OptimizerOptions {
 // includes `'jSXProp'` because the optimizer emits a JSX-prop segment kind.
 
 /**
- * One source file for {@link QwikOptimizer.transformModules}. `program` is an
- * optional pre-parsed Program (e.g. Rolldown's `meta.ast`) that skips the
- * internal parse; `module` is its ESM-metadata sibling.
+ * One source file for {@link QwikOptimizer.transformModules}. `program` is an optional pre-parsed
+ * Program (e.g. Rolldown's `meta.ast`) that skips the internal parse; `module` is its ESM-metadata
+ * sibling.
  */
 export interface NapiTransformModuleInput {
   path: string;
@@ -165,8 +155,8 @@ export interface NapiSegmentAnalysis {
 }
 
 /**
- * Module record with no `kind` discriminant — the `segment`/`origPath` null-arms
- * distinguish the two shapes (parents carry `origPath`, segments carry `segment`).
+ * Module record with no `kind` discriminant — the `segment`/`origPath` null-arms distinguish the
+ * two shapes (parents carry `origPath`, segments carry `segment`).
  */
 export interface NapiTransformModule {
   path: string;
@@ -188,8 +178,8 @@ export interface NapiSourceLocation {
 }
 
 /**
- * Diagnostic record. `category` includes `'sourceError'` for boundary
- * compatibility, though this implementation only emits `'error' | 'warning'`.
+ * Diagnostic record. `category` includes `'sourceError'` for boundary compatibility, though this
+ * implementation only emits `'error' | 'warning'`.
  */
 export interface NapiDiagnostic {
   scope: string;
@@ -210,19 +200,17 @@ export interface NapiTransformOutput {
 }
 
 /**
- * Optimizer instance. `transformModules` wraps the synchronous `transformModule`
- * and returns a Promise so the call site can `await` it; it speaks the raw
- * NAPI-parity types (inputs branded internally, outputs mapped to the public
- * shape). `sys` is the host-system surface (see {@link OptimizerSystem}).
+ * Optimizer instance. `transformModules` wraps the synchronous `transformModule` and returns a
+ * Promise so the call site can `await` it; it speaks the raw NAPI-parity types (inputs branded
+ * internally, outputs mapped to the public shape). `sys` is the host-system surface (see
+ * {@link OptimizerSystem}).
  */
 export interface QwikOptimizer {
   transformModules(opts: NapiTransformModulesOptions): Promise<NapiTransformOutput>;
   sys: OptimizerSystem;
 }
 
-function brandTransformOptions(
-  opts: NapiTransformModulesOptions,
-): TransformModulesOptions {
+function brandTransformOptions(opts: NapiTransformModulesOptions): TransformModulesOptions {
   return {
     ...opts,
     srcDir: mkFilePath(opts.srcDir),
@@ -260,9 +248,7 @@ function toNapiModule(module: TransformModule): NapiTransformModule {
       };
     default: {
       const _exhaustive: never = module;
-      throw new Error(
-        `unhandled module kind: ${(module as { kind?: string }).kind}`,
-      );
+      throw new Error(`unhandled module kind: ${(module as { kind?: string }).kind}`);
     }
   }
 }
@@ -276,9 +262,9 @@ function toNapiDiagnostic(diagnostic: Diagnostic): NapiDiagnostic {
 }
 
 /**
- * `pathe` provides a full Node-`path`-shaped module. Cast through the
- * structural-subset boundary once here so consumers need no per-call casts.
- * `win32` is narrowed to `null`; separator normalisation is sufficient.
+ * `pathe` provides a full Node-`path`-shaped module. Cast through the structural-subset boundary
+ * once here so consumers need no per-call casts. `win32` is narrowed to `null`; separator
+ * normalisation is sufficient.
  */
 function buildDefaultPath(): Path {
   const path: Path = {
@@ -315,14 +301,12 @@ function buildDefaultSystem(): OptimizerSystem {
 }
 
 /**
- * Build an optimizer instance. Returns a Promise so a `await createOptimizer(...)`
- * call site can await it, though the underlying `transformModule` is synchronous.
- * `options.sys` is preserved if provided; otherwise a default stub is built. Other
- * `OptimizerOptions` fields are accepted for type-compatibility but not read.
+ * Build an optimizer instance. Returns a Promise so a `await createOptimizer(...)` call site can
+ * await it, though the underlying `transformModule` is synchronous. `options.sys` is preserved if
+ * provided; otherwise a default stub is built. Other `OptimizerOptions` fields are accepted for
+ * type-compatibility but not read.
  */
-export function createOptimizer(
-  options?: OptimizerOptions,
-): Promise<QwikOptimizer> {
+export function createOptimizer(options?: OptimizerOptions): Promise<QwikOptimizer> {
   const sys = options?.sys ?? buildDefaultSystem();
   const instance: QwikOptimizer = {
     sys,

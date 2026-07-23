@@ -13,36 +13,33 @@ describe('inline-strategy', () => {
     it('produces _noopQrl const declaration', () => {
       const result = buildNoopQrlDeclaration('Child_component_9GyF01GDKqw');
       expect(result).toBe(
-        'const q_Child_component_9GyF01GDKqw = /*#__PURE__*/ _noopQrl("Child_component_9GyF01GDKqw");',
+        'const q_Child_component_9GyF01GDKqw = /*#__PURE__*/ _noopQrl("Child_component_9GyF01GDKqw");'
       );
     });
 
     it('works with different symbol names', () => {
       const result = buildNoopQrlDeclaration('App_component_ckEPmXZlub0');
       expect(result).toBe(
-        'const q_App_component_ckEPmXZlub0 = /*#__PURE__*/ _noopQrl("App_component_ckEPmXZlub0");',
+        'const q_App_component_ckEPmXZlub0 = /*#__PURE__*/ _noopQrl("App_component_ckEPmXZlub0");'
       );
     });
   });
 
   describe('buildNoopQrlDevDeclaration', () => {
     it('produces _noopQrlDEV const declaration with dev metadata', () => {
-      const result = buildNoopQrlDevDeclaration(
-        'App_component_Cmp_p_q_e_click_Yl4ybrJWrt4',
-        {
-          file: '/user/qwik/src/test.tsx',
-          lo: 144,
-          hi: 169,
-          displayName: 'test.tsx_App_component_Cmp_p_q_e_click',
-        },
-      );
+      const result = buildNoopQrlDevDeclaration('App_component_Cmp_p_q_e_click_Yl4ybrJWrt4', {
+        file: '/user/qwik/src/test.tsx',
+        lo: 144,
+        hi: 169,
+        displayName: 'test.tsx_App_component_Cmp_p_q_e_click',
+      });
       expect(result).toBe(
         'const q_App_component_Cmp_p_q_e_click_Yl4ybrJWrt4 = /*#__PURE__*/ _noopQrlDEV("App_component_Cmp_p_q_e_click_Yl4ybrJWrt4", {\n' +
           '    file: "/user/qwik/src/test.tsx",\n' +
           '    lo: 144,\n' +
           '    hi: 169,\n' +
           '    displayName: "test.tsx_App_component_Cmp_p_q_e_click"\n' +
-          '});',
+          '});'
       );
     });
   });
@@ -68,16 +65,12 @@ describe('inline-strategy', () => {
   describe('buildStrippedNoopQrl', () => {
     it('produces sentinel-named _noopQrl for index 0', () => {
       const result = buildStrippedNoopQrl('s_r1qAHX7Opp0', 0);
-      expect(result).toBe(
-        'const q_qrl_4294901760 = /*#__PURE__*/ _noopQrl("s_r1qAHX7Opp0");',
-      );
+      expect(result).toBe('const q_qrl_4294901760 = /*#__PURE__*/ _noopQrl("s_r1qAHX7Opp0");');
     });
 
     it('produces sentinel-named _noopQrl for index 1', () => {
       const result = buildStrippedNoopQrl('s_ddV1irobfWI', 1);
-      expect(result).toBe(
-        'const q_qrl_4294901762 = /*#__PURE__*/ _noopQrl("s_ddV1irobfWI");',
-      );
+      expect(result).toBe('const q_qrl_4294901762 = /*#__PURE__*/ _noopQrl("s_ddV1irobfWI");');
     });
   });
 
@@ -95,7 +88,7 @@ describe('inline-strategy', () => {
           '    lo: 0,\n' +
           '    hi: 0,\n' +
           '    displayName: "test.tsx_App_component_serverStuff"\n' +
-          '});',
+          '});'
       );
     });
   });

@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { buildSkipRangeIndex, isInSkipRange } from '../../../src/optimizer/jsx/jsx.js';
 
@@ -12,8 +11,10 @@ function expectParity(ranges: Range[], maxPos: number): void {
   const index = buildSkipRangeIndex(ranges);
   for (let start = 0; start <= maxPos; start++) {
     for (let end = start; end <= maxPos; end++) {
-      expect(isInSkipRange(start, end, index), `node [${start}, ${end}] over ${JSON.stringify(ranges)}`)
-        .toBe(naiveIsInSkipRange(start, end, ranges));
+      expect(
+        isInSkipRange(start, end, index),
+        `node [${start}, ${end}] over ${JSON.stringify(ranges)}`
+      ).toBe(naiveIsInSkipRange(start, end, ranges));
     }
   }
 }
@@ -24,21 +25,45 @@ describe('skip-range index', () => {
   });
 
   it('matches the linear scan on disjoint ranges', () => {
-    expectParity([{ start: 2, end: 5 }, { start: 8, end: 11 }], 13);
+    expectParity(
+      [
+        { start: 2, end: 5 },
+        { start: 8, end: 11 },
+      ],
+      13
+    );
   });
 
   it('matches the linear scan on nested ranges', () => {
-    expectParity([{ start: 4, end: 6 }, { start: 0, end: 12 }, { start: 5, end: 5 }], 14);
+    expectParity(
+      [
+        { start: 4, end: 6 },
+        { start: 0, end: 12 },
+        { start: 5, end: 5 },
+      ],
+      14
+    );
   });
 
   it('matches the linear scan on partially overlapping ranges', () => {
-    expectParity([{ start: 0, end: 7 }, { start: 4, end: 12 }], 14);
+    expectParity(
+      [
+        { start: 0, end: 7 },
+        { start: 4, end: 12 },
+      ],
+      14
+    );
   });
 
   it('matches the linear scan on duplicate and same-start ranges', () => {
     expectParity(
-      [{ start: 3, end: 9 }, { start: 3, end: 9 }, { start: 3, end: 5 }, { start: 6, end: 9 }],
-      11,
+      [
+        { start: 3, end: 9 },
+        { start: 3, end: 9 },
+        { start: 3, end: 5 },
+        { start: 6, end: 9 },
+      ],
+      11
     );
   });
 

@@ -7,11 +7,7 @@ import {
   whitespace,
   wordBoundary,
 } from 'magic-regexp';
-import {
-  isInsideString,
-  findMatchingBrace,
-  findExpressionEnd,
-} from '../edit/text-scanning.js';
+import { isInsideString, findMatchingBrace, findExpressionEnd } from '../edit/text-scanning.js';
 import { applyReplacements } from '../edit/range-replace.js';
 
 const notTrueLiteral = createRegExp(exactly('!true').and(wordBoundary), [global]);
@@ -29,36 +25,40 @@ const ifBracedBoolLiteral = createRegExp(
     .and(')')
     .and(whitespace.times.any())
     .and('{'),
-  [global],
+  [global]
 );
 
 const trueAndOp = createRegExp(
   wordBoundary.and('true').and(whitespace.times.any()).and('&&').and(whitespace.times.any()),
-  [global],
+  [global]
 );
 
 const falseOrOp = createRegExp(
   wordBoundary.and('false').and(whitespace.times.any()).and('||').and(whitespace.times.any()),
-  [global],
+  [global]
 );
 
 const falseAndOp = createRegExp(
   wordBoundary.and('false').and(whitespace.times.any()).and('&&').and(whitespace.times.any()),
-  [global],
+  [global]
 );
 
 const elseClause = createRegExp(
-  whitespace.times.any().and('else').and(whitespace.times.any()).and('{').at.lineStart(),
+  whitespace.times.any().and('else').and(whitespace.times.any()).and('{').at.lineStart()
 );
 
 const ifBracelessPattern = createRegExp(
-  wordBoundary.and(exactly('if')).and(whitespace.times.any()).and(exactly('('))
+  wordBoundary
+    .and(exactly('if'))
+    .and(whitespace.times.any())
+    .and(exactly('('))
     .and(whitespace.times.any())
     .and(anyOf('true', 'false').grouped())
-    .and(whitespace.times.any()).and(exactly(')'))
+    .and(whitespace.times.any())
+    .and(exactly(')'))
     .and(oneOrMore(whitespace))
     .notBefore(exactly('{')),
-  [global],
+  [global]
 );
 
 const dceGuard = createRegExp(
@@ -72,9 +72,9 @@ const dceGuard = createRegExp(
         .and(wordBoundary),
       exactly('true').and(whitespace.times.any()).and('&&'),
       exactly('false').and(whitespace.times.any()).and('||'),
-      exactly('false').and(whitespace.times.any()).and('&&'),
-    ),
-  ),
+      exactly('false').and(whitespace.times.any()).and('&&')
+    )
+  )
 );
 
 export function hasSegmentDcePatterns(code: string): boolean {
@@ -136,7 +136,7 @@ export function applySegmentDCE(code: string): string {
         }
       }
 
-      const replacement = condValue ? ifBody : elseBody ?? '';
+      const replacement = condValue ? ifBody : (elseBody ?? '');
       replacements.push({
         start: match.index,
         end: totalEnd,
@@ -211,4 +211,3 @@ function simplifyFalseAndExpressions(code: string): string {
 
   return applyReplacements(code, replacements);
 }
-

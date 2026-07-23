@@ -126,7 +126,7 @@ export const Wrapper = component$((props) => {
 });
 `).replace(/\s+/g, ' ');
     expect(out).toMatch(
-      /_jsxSplit\(Inner, \{ tabIndex: -1, \.\.\._getVarProps\(props\) \}, \{ \.\.\._getConstProps\(props\), id: "x" \}/,
+      /_jsxSplit\(Inner, \{ tabIndex: -1, \.\.\._getVarProps\(props\) \}, \{ \.\.\._getConstProps\(props\), id: "x" \}/
     );
   });
 
@@ -139,7 +139,7 @@ export const Wrapper = component$((props) => {
 });
 `).replace(/\s+/g, ' ');
     expect(out).toMatch(
-      /_jsxSplit\(Inner, \{ id: "x", \.\.\._getVarProps\(props\) \}, _getConstProps\(props\),/,
+      /_jsxSplit\(Inner, \{ id: "x", \.\.\._getVarProps\(props\) \}, _getConstProps\(props\),/
     );
   });
 
@@ -152,7 +152,7 @@ export const Wrapper = component$((props) => {
 });
 `).replace(/\s+/g, ' ');
     expect(out).toMatch(
-      /_jsxSplit\(Inner, \{ \.\.\._getVarProps\(props\), \.\.\._getConstProps\(props\), onChange\$: props\.onChange\$ \}, \{ role: "switch" \}/,
+      /_jsxSplit\(Inner, \{ \.\.\._getVarProps\(props\), \.\.\._getConstProps\(props\), onChange\$: props\.onChange\$ \}, \{ role: "switch" \}/
     );
   });
 
@@ -165,7 +165,7 @@ export const Wrapper = component$((props) => {
 });
 `).replace(/\s+/g, ' ');
     expect(out).toMatch(
-      /_jsxSplit\(Inner, \{ \.\.\._getVarProps\(props\), \.\.\._getConstProps\(props\), sharedId \}, null,/,
+      /_jsxSplit\(Inner, \{ \.\.\._getVarProps\(props\), \.\.\._getConstProps\(props\), sharedId \}, null,/
     );
   });
 

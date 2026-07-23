@@ -1,6 +1,6 @@
 /**
- * Enter and exit get distinct context types so the enter handler cannot reach
- * edit helpers — editing during enter yields plausible-but-wrong output.
+ * Enter and exit get distinct context types so the enter handler cannot reach edit helpers —
+ * editing during enter yields plausible-but-wrong output.
  */
 
 import { walk } from 'oxc-walker';
@@ -17,7 +17,7 @@ export function walkWithProtocol<E extends object, X extends E>(
   enterCtx: E,
   exitCtx: X,
   handlers: ProtocolHandlers<E, X>,
-  opts?: { readonly scopeTracker?: ScopeTracker },
+  opts?: { readonly scopeTracker?: ScopeTracker }
 ): void {
   walk(program, {
     scopeTracker: opts?.scopeTracker,

@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -16,11 +15,7 @@ import {
 } from '../../../src/optimizer/jsx/event-capture-promotion.js';
 import { parseSnapshot } from '../../../src/testing/snapshot-parser.js';
 import { RAW_TRANSFER_PARSER_OPTIONS } from '../../../src/ast-types.js';
-import type {
-  AstEcmaScriptModule,
-  AstFunction,
-  AstProgram,
-} from '../../../src/ast-types.js';
+import type { AstEcmaScriptModule, AstFunction, AstProgram } from '../../../src/ast-types.js';
 
 const SNAP_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../match-these-snaps');
 
@@ -43,8 +38,17 @@ function mapOfSetsToPlain(m: ReadonlyMap<string, Set<string>>): Record<string, s
 }
 
 function loopMapToComparable(
-  m: ReadonlyMap<string, Array<{ type: string; iterVars: string[]; loopNode: unknown; loopBodyStart: number; loopBodyEnd: number }>>,
-  nodeIds: Map<unknown, number>,
+  m: ReadonlyMap<
+    string,
+    Array<{
+      type: string;
+      iterVars: string[];
+      loopNode: unknown;
+      loopBodyStart: number;
+      loopBodyEnd: number;
+    }>
+  >,
+  nodeIds: Map<unknown, number>
 ): Record<string, Array<Record<string, unknown>>> {
   const out: Record<string, Array<Record<string, unknown>>> = {};
   for (const [k, stack] of m) {
@@ -77,7 +81,7 @@ function diffFixture(source: string, filename: string, combo: FlagCombo): string
     program,
     parserModule,
     oracleClosures,
-    combo.explicitTranspileJsx,
+    combo.explicitTranspileJsx
   );
 
   const fusedClosures = new Map<string, AstFunction>();
@@ -123,12 +127,12 @@ function diffFixture(source: string, filename: string, combo: FlagCombo): string
   check(
     'extractionLoopMap',
     loopMapToComparable(facts.extractionLoopMap, nodeIds),
-    loopMapToComparable(oracleLoop.extractionLoopMap, nodeIds),
+    loopMapToComparable(oracleLoop.extractionLoopMap, nodeIds)
   );
   check(
     'loopBodyVarDecls',
     Object.fromEntries(facts.loopBodyVarDecls),
-    Object.fromEntries(oracleLoop.loopBodyVarDecls),
+    Object.fromEntries(oracleLoop.loopBodyVarDecls)
   );
 
   if (fusedExtractions.length === 0) {
@@ -137,7 +141,11 @@ function diffFixture(source: string, filename: string, combo: FlagCombo): string
     check('allScopeEntries(empty)', facts.allScopeEntries.length, 0);
   } else {
     const oracleUsage = computeSegmentUsage(program, oracleArr);
-    check('segmentUsage', mapOfSetsToPlain(facts.segmentUsage), mapOfSetsToPlain(oracleUsage.segmentUsage));
+    check(
+      'segmentUsage',
+      mapOfSetsToPlain(facts.segmentUsage),
+      mapOfSetsToPlain(oracleUsage.segmentUsage)
+    );
     check('rootUsage', [...facts.rootUsage].sort(), [...oracleUsage.rootUsage].sort());
     check('allScopeEntries', facts.allScopeEntries, collectAllScopeEntries(program));
   }
@@ -155,7 +163,7 @@ function diffFixture(source: string, filename: string, combo: FlagCombo): string
     check(
       `freeIdentifiers[${sym}]`,
       facts.closureFreeIdentifiers.get(fn) ?? [],
-      oracleFree.get(fn) ?? [],
+      oracleFree.get(fn) ?? []
     );
   }
 

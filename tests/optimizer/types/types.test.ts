@@ -152,7 +152,14 @@ describe('Diagnostic', () => {
       file: 'test.tsx',
       message: 'Function reference error',
       highlights: [
-        { lo: mkByteOffset(0), hi: mkByteOffset(10), startLine: mkLineNumber(1), startCol: mkColumnNumber(0), endLine: mkLineNumber(1), endCol: mkColumnNumber(10) },
+        {
+          lo: mkByteOffset(0),
+          hi: mkByteOffset(10),
+          startLine: mkLineNumber(1),
+          startCol: mkColumnNumber(0),
+          endLine: mkLineNumber(1),
+          endCol: mkColumnNumber(10),
+        },
       ],
       suggestions: null,
       scope: 'optimizer',

@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { transformModule } from '../../../src/optimizer/transform/index.js';
-import type { TransformModule, SegmentMetadataInternal } from '../../../src/optimizer/types/types.js';
+import type {
+  TransformModule,
+  SegmentMetadataInternal,
+} from '../../../src/optimizer/types/types.js';
 import { mkFilePath, mkSourceText } from '../../../src/optimizer/types/brands.js';
 
 function findParent(result: { modules: readonly TransformModule[] }): TransformModule {
@@ -11,11 +14,9 @@ function findParent(result: { modules: readonly TransformModule[] }): TransformM
 
 function findSegmentByCtx(
   result: { modules: readonly TransformModule[] },
-  ctxName: string,
+  ctxName: string
 ): TransformModule {
-  const m = result.modules.find(
-    (mod) => mod.kind === 'segment' && mod.segment.ctxName === ctxName,
-  );
+  const m = result.modules.find((mod) => mod.kind === 'segment' && mod.segment.ctxName === ctxName);
   if (!m) throw new Error(`segment with ctxName=${ctxName} not found`);
   return m;
 }
@@ -32,7 +33,8 @@ export const Parent = component$(() => {
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       entryStrategy: { type: 'inline' },
       stripEventHandlers: true,
     });
@@ -54,7 +56,8 @@ export const Parent = component$(() => {
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       entryStrategy: { type: 'inline' },
       stripEventHandlers: true,
     });
@@ -77,7 +80,8 @@ export const Parent = component$(() => {
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       entryStrategy: { type: 'inline' },
       stripCtxName: ['useClientMount$'],
     });
@@ -99,7 +103,8 @@ export const Parent = component$(() => {
     const result = transformModule({
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       entryStrategy: { type: 'inline' },
     });
     const parent = findParent(result);

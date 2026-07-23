@@ -21,7 +21,8 @@ export const App = component$(() => {
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
       entryStrategy: { type: 'inline' },
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
     });
     const segments = findSegments(result);
     expect(segments.length).toBe(0);
@@ -40,7 +41,8 @@ export const App = component$(() => {
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
       entryStrategy: { type: 'inline' },
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       stripCtxName: ['useClientMount$'],
     });
     const segments = findSegments(result);
@@ -70,7 +72,8 @@ export const Parent = component$(() => {
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
       entryStrategy: { type: 'inline' },
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
       stripCtxName: ['useClientMount$'],
       stripEventHandlers: true,
     });
@@ -97,7 +100,8 @@ export const App = component$(() => {
       input: [{ path: mkFilePath('test.tsx'), code: mkSourceText(input) }],
       srcDir: mkFilePath('.'),
       entryStrategy: { type: 'segment' },
-      transpileTs: true, transpileJsx: true,
+      transpileTs: true,
+      transpileJsx: true,
     });
     const segments = findSegments(result);
     expect(segments.length).toBe(2);

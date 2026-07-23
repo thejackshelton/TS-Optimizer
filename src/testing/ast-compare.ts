@@ -21,17 +21,15 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-export function compareAst(
-  expected: string,
-  actual: string,
-  filename: string,
-): AstCompareResult {
+export function compareAst(expected: string, actual: string, filename: string): AstCompareResult {
   // Some snapshots use .js/.ts filenames but contain JSX; retry as .tsx.
   let expectedResult = parseSync(filename, expected);
   let actualResult = parseSync(filename, actual);
 
-  if ((expectedResult.errors?.length || actualResult.errors?.length) &&
-      (filename.endsWith('.js') || filename.endsWith('.ts'))) {
+  if (
+    (expectedResult.errors?.length || actualResult.errors?.length) &&
+    (filename.endsWith('.js') || filename.endsWith('.ts'))
+  ) {
     const jsxFilename = filename.replace(/\.(js|ts)$/, '.tsx');
     const retryExpected = parseSync(jsxFilename, expected);
     const retryActual = parseSync(jsxFilename, actual);
@@ -179,8 +177,8 @@ function normalizeImportOrder(program: AstCompatNode): void {
 }
 
 /**
- * Rewrite `import { X as Y }` (X !== Y) back to the un-aliased `X`, renaming all
- * references, but skip aliases that would collide with another declaration.
+ * Rewrite `import { X as Y }` (X !== Y) back to the un-aliased `X`, renaming all references, but
+ * skip aliases that would collide with another declaration.
  */
 function normalizeImportAliases(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -241,7 +239,10 @@ function normalizeImportAliases(program: AstCompatNode): void {
 
   function renameIdents(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) renameIdents(item); return; }
+    if (arr) {
+      for (const item of arr) renameIdents(item);
+      return;
+    }
     if (!isRecord(node)) return;
     if (node.type === 'Identifier') {
       const name = asString(node.name);
@@ -263,7 +264,10 @@ function normalizeImportAliases(program: AstCompatNode): void {
 
 function collectDeclNames(node: unknown, names: Set<string>): void {
   const arr = asArray(node);
-  if (arr) { for (const item of arr) collectDeclNames(item, names); return; }
+  if (arr) {
+    for (const item of arr) collectDeclNames(item, names);
+    return;
+  }
   if (!isRecord(node)) return;
   if (node.type === 'VariableDeclaration') {
     for (const decl of asArray(node.declarations) ?? []) {
@@ -319,7 +323,8 @@ function isReorderableDeclaration(decl: unknown): boolean {
   }
 
   const idName = asString(id.name);
-  if (idName !== undefined && (idName.startsWith('q_') || /^_hf\d+(_str)?$/.test(idName))) return true;
+  if (idName !== undefined && (idName.startsWith('q_') || /^_hf\d+(_str)?$/.test(idName)))
+    return true;
 
   // Otherwise only side-effect-free inits (reads, function expressions, `x.w(...)`) are reorderable.
   if (!isRecord(init)) return false;
@@ -331,9 +336,13 @@ function isReorderableDeclaration(decl: unknown): boolean {
     case 'FunctionExpression':
       return true;
     case 'CallExpression':
-      return isRecord(init.callee) && init.callee.type === 'MemberExpression' &&
-             isRecord(init.callee.property) && init.callee.property.type === 'Identifier' &&
-             init.callee.property.name === 'w';
+      return (
+        isRecord(init.callee) &&
+        init.callee.type === 'MemberExpression' &&
+        isRecord(init.callee.property) &&
+        init.callee.property.type === 'Identifier' &&
+        init.callee.property.name === 'w'
+      );
     default:
       return false;
   }
@@ -349,9 +358,14 @@ function sortReorderableBlock(body: unknown): void {
   if (!arr) return;
   let i = 0;
   while (i < arr.length) {
-    if (!isReorderableDeclaration(arr[i])) { i++; continue; }
+    if (!isReorderableDeclaration(arr[i])) {
+      i++;
+      continue;
+    }
     const blockStart = i;
-    while (i < arr.length && isReorderableDeclaration(arr[i])) { i++; }
+    while (i < arr.length && isReorderableDeclaration(arr[i])) {
+      i++;
+    }
     if (i - blockStart <= 1) continue;
     const block = arr.slice(blockStart, i);
     block.sort((a: unknown, b: unknown) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
@@ -361,7 +375,10 @@ function sortReorderableBlock(body: unknown): void {
 
 function walkBodies(node: unknown, cb: (body: unknown[]) => void): void {
   const arr = asArray(node);
-  if (arr) { arr.forEach(n => walkBodies(n, cb)); return; }
+  if (arr) {
+    arr.forEach((n) => walkBodies(n, cb));
+    return;
+  }
   if (!isRecord(node)) return;
   const body = asArray(node.body);
   if (node.type === 'BlockStatement' && body) {
@@ -374,9 +391,8 @@ function walkBodies(node: unknown, cb: (body: unknown[]) => void): void {
 }
 
 /**
- * Canonicalize QRL variable names to `q_<symbolName>`, taken from the symbol
- * string argument of qrl/_noopQrl calls, so differing var-naming conventions
- * compare equal.
+ * Canonicalize QRL variable names to `q_<symbolName>`, taken from the symbol string argument of
+ * qrl/_noopQrl calls, so differing var-naming conventions compare equal.
  */
 function canonicalizeQrlVarNames(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -399,8 +415,13 @@ function canonicalizeQrlVarNames(program: AstCompatNode): void {
       let symbolArg: string | null = null;
       const args = asArray(init.arguments);
 
-      if (callee.type === 'Identifier' &&
-          (callee.name === '_noopQrl' || callee.name === 'qrl' || callee.name === '_noopQrlDEV' || callee.name === 'qrlDEV')) {
+      if (
+        callee.type === 'Identifier' &&
+        (callee.name === '_noopQrl' ||
+          callee.name === 'qrl' ||
+          callee.name === '_noopQrlDEV' ||
+          callee.name === 'qrlDEV')
+      ) {
         if (callee.name === '_noopQrl' || callee.name === '_noopQrlDEV') {
           const a0 = args?.[0];
           if (isRecord(a0) && a0.type === 'Literal' && typeof a0.value === 'string') {
@@ -427,7 +448,10 @@ function canonicalizeQrlVarNames(program: AstCompatNode): void {
 
   function renameIdents(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) renameIdents(item); return; }
+    if (arr) {
+      for (const item of arr) renameIdents(item);
+      return;
+    }
     if (!isRecord(node)) return;
     if (node.type === 'Identifier') {
       const name = asString(node.name);
@@ -453,8 +477,10 @@ function shouldStripRaw(node: unknown, ancestors: unknown[]): boolean {
   // but observable for tagged templates via strings.raw.
   const [parent, grandparent, greatGrandparent] = ancestors;
   return (
-    isRecord(parent) && parent.type === 'TemplateElement' &&
-    isRecord(grandparent) && grandparent.type === 'TemplateLiteral' &&
+    isRecord(parent) &&
+    parent.type === 'TemplateElement' &&
+    isRecord(grandparent) &&
+    grandparent.type === 'TemplateLiteral' &&
     (!isRecord(greatGrandparent) || greatGrandparent.type !== 'TaggedTemplateExpression')
   );
 }
@@ -472,14 +498,13 @@ function stripPositions(node: unknown, ancestors: unknown[] = []): unknown {
     if (body && body.length === 1) {
       const parentNode = ancestors[0];
       if (
-        isRecord(parentNode) && (
-          parentNode.type === 'IfStatement' ||
+        isRecord(parentNode) &&
+        (parentNode.type === 'IfStatement' ||
           parentNode.type === 'ForStatement' ||
           parentNode.type === 'ForInStatement' ||
           parentNode.type === 'ForOfStatement' ||
           parentNode.type === 'WhileStatement' ||
-          parentNode.type === 'DoWhileStatement'
-        )
+          parentNode.type === 'DoWhileStatement')
       ) {
         return stripPositions(body[0], ancestors);
       }
@@ -496,9 +521,15 @@ function stripPositions(node: unknown, ancestors: unknown[] = []): unknown {
     const cleaned: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(normalizedNode)) {
       if (
-        key === 'start' || key === 'end' || key === 'loc' || key === 'range' ||
-        key === 'shorthand' || key === 'typeAnnotation' || key === 'returnType' ||
-        key === 'typeParameters' || key === 'typeArguments' ||
+        key === 'start' ||
+        key === 'end' ||
+        key === 'loc' ||
+        key === 'range' ||
+        key === 'shorthand' ||
+        key === 'typeAnnotation' ||
+        key === 'returnType' ||
+        key === 'typeParameters' ||
+        key === 'typeArguments' ||
         (key === 'decorators' && Array.isArray(value) && value.length === 0) ||
         (key === 'optional' && value === false) ||
         (key === 'raw' && shouldStripRaw(normalizedNode, ancestors))
@@ -545,10 +576,14 @@ function sortSpecifiersWithinImports(program: AstCompatNode): void {
     const specs = asArray(stmt.specifiers);
     if (specs && specs.length > 1) {
       specs.sort((a: unknown, b: unknown) => {
-        const aName = (isRecord(a) && isRecord(a.local) && asString(a.local.name)) ||
-                      (isRecord(a) && isRecord(a.imported) && asString(a.imported.name)) || '';
-        const bName = (isRecord(b) && isRecord(b.local) && asString(b.local.name)) ||
-                      (isRecord(b) && isRecord(b.imported) && asString(b.imported.name)) || '';
+        const aName =
+          (isRecord(a) && isRecord(a.local) && asString(a.local.name)) ||
+          (isRecord(a) && isRecord(a.imported) && asString(a.imported.name)) ||
+          '';
+        const bName =
+          (isRecord(b) && isRecord(b.local) && asString(b.local.name)) ||
+          (isRecord(b) && isRecord(b.imported) && asString(b.imported.name)) ||
+          '';
         return aName.localeCompare(bName);
       });
     }
@@ -560,7 +595,10 @@ function sortIndependentExpressionStatements(program: AstCompatNode): void {
   if (!body) return;
   let i = 0;
   while (i < body.length) {
-    if (!isIndependentExprStatement(body[i])) { i++; continue; }
+    if (!isIndependentExprStatement(body[i])) {
+      i++;
+      continue;
+    }
     const start = i;
     while (i < body.length && isIndependentExprStatement(body[i])) i++;
     if (i - start <= 1) continue;
@@ -574,14 +612,25 @@ function isIndependentExprStatement(stmt: unknown): boolean {
   if (!isRecord(stmt) || stmt.type !== 'ExpressionStatement') return false;
   const expr = stmt.expression;
   if (!isRecord(expr)) return false;
-  if (expr.type === 'CallExpression' &&
-      isRecord(expr.callee) && expr.callee.type === 'MemberExpression' &&
-      isRecord(expr.callee.object) && expr.callee.object.type === 'Identifier' &&
-      asString(expr.callee.object.name)?.startsWith('q_') &&
-      isRecord(expr.callee.property) && expr.callee.property.name === 's') return true;
-  if (expr.type === 'CallExpression' &&
-      isRecord(expr.callee) && expr.callee.type === 'Identifier' &&
-      typeof expr.callee.name === 'string' && /^_hf\d+/.test(expr.callee.name)) return true;
+  if (
+    expr.type === 'CallExpression' &&
+    isRecord(expr.callee) &&
+    expr.callee.type === 'MemberExpression' &&
+    isRecord(expr.callee.object) &&
+    expr.callee.object.type === 'Identifier' &&
+    asString(expr.callee.object.name)?.startsWith('q_') &&
+    isRecord(expr.callee.property) &&
+    expr.callee.property.name === 's'
+  )
+    return true;
+  if (
+    expr.type === 'CallExpression' &&
+    isRecord(expr.callee) &&
+    expr.callee.type === 'Identifier' &&
+    typeof expr.callee.name === 'string' &&
+    /^_hf\d+/.test(expr.callee.name)
+  )
+    return true;
   return false;
 }
 
@@ -590,7 +639,10 @@ function sortIndependentTopLevelStatements(program: AstCompatNode): void {
   if (!body) return;
   let i = 0;
   while (i < body.length) {
-    if (!isIndependentTopLevel(body[i])) { i++; continue; }
+    if (!isIndependentTopLevel(body[i])) {
+      i++;
+      continue;
+    }
     const start = i;
     while (i < body.length && isIndependentTopLevel(body[i])) i++;
     if (i - start <= 1) continue;
@@ -604,15 +656,27 @@ function isIndependentTopLevel(stmt: unknown): boolean {
   if (!isRecord(stmt)) return false;
   if (stmt.type === 'ExpressionStatement') {
     const expr = stmt.expression;
-    if (isRecord(expr) && expr.type === 'CallExpression' &&
-        isRecord(expr.callee) && expr.callee.type === 'Identifier' &&
-        (expr.callee.name === 'qrl' || expr.callee.name === 'qrlDEV')) return true;
-    if (isRecord(expr) && expr.type === 'CallExpression' &&
-        isRecord(expr.callee) && expr.callee.type === 'MemberExpression' &&
-        isRecord(expr.callee.object) && expr.callee.object.type === 'Identifier' &&
-        asString(expr.callee.object.name)?.startsWith('q_') &&
-        isRecord(expr.callee.property) && expr.callee.property.type === 'Identifier' &&
-        expr.callee.property.name === 's') return true;
+    if (
+      isRecord(expr) &&
+      expr.type === 'CallExpression' &&
+      isRecord(expr.callee) &&
+      expr.callee.type === 'Identifier' &&
+      (expr.callee.name === 'qrl' || expr.callee.name === 'qrlDEV')
+    )
+      return true;
+    if (
+      isRecord(expr) &&
+      expr.type === 'CallExpression' &&
+      isRecord(expr.callee) &&
+      expr.callee.type === 'MemberExpression' &&
+      isRecord(expr.callee.object) &&
+      expr.callee.object.type === 'Identifier' &&
+      asString(expr.callee.object.name)?.startsWith('q_') &&
+      isRecord(expr.callee.property) &&
+      expr.callee.property.type === 'Identifier' &&
+      expr.callee.property.name === 's'
+    )
+      return true;
   }
   if (stmt.type === 'ExportNamedDeclaration') return true;
   if (stmt.type === 'ExportDefaultDeclaration') return true;
@@ -621,9 +685,15 @@ function isIndependentTopLevel(stmt: unknown): boolean {
   // complex inits could have order-dependent side effects.
   const decls = asArray(stmt.declarations);
   const first = decls?.[0];
-  if (stmt.type === 'VariableDeclaration' && stmt.kind === 'const' &&
-      decls && decls.length === 1 &&
-      isRecord(first) && isRecord(first.init) && first.init.type === 'Literal') {
+  if (
+    stmt.type === 'VariableDeclaration' &&
+    stmt.kind === 'const' &&
+    decls &&
+    decls.length === 1 &&
+    isRecord(first) &&
+    isRecord(first.init) &&
+    first.init.type === 'Literal'
+  ) {
     return true;
   }
   return false;
@@ -631,8 +701,14 @@ function isIndependentTopLevel(stmt: unknown): boolean {
 
 function normalizeVoidZero(program: AstCompatNode): void {
   walkAndReplace(program, (node: unknown) => {
-    if (isRecord(node) && node.type === 'UnaryExpression' && node.operator === 'void' &&
-        isRecord(node.argument) && node.argument.type === 'Literal' && node.argument.value === 0) {
+    if (
+      isRecord(node) &&
+      node.type === 'UnaryExpression' &&
+      node.operator === 'void' &&
+      isRecord(node.argument) &&
+      node.argument.type === 'Literal' &&
+      node.argument.value === 0
+    ) {
       return { type: 'Identifier', name: 'undefined' };
     }
     return node;
@@ -641,8 +717,14 @@ function normalizeVoidZero(program: AstCompatNode): void {
 
 function normalizeBooleanLiterals(program: AstCompatNode): void {
   walkAndReplace(program, (node: unknown) => {
-    if (isRecord(node) && node.type === 'UnaryExpression' && node.operator === '!' &&
-        isRecord(node.argument) && node.argument.type === 'Literal' && typeof node.argument.value === 'number') {
+    if (
+      isRecord(node) &&
+      node.type === 'UnaryExpression' &&
+      node.operator === '!' &&
+      isRecord(node.argument) &&
+      node.argument.type === 'Literal' &&
+      typeof node.argument.value === 'number'
+    ) {
       if (node.argument.value === 0) return { type: 'Literal', value: true };
       if (node.argument.value === 1) return { type: 'Literal', value: false };
     }
@@ -655,9 +737,14 @@ function stripDirectives(program: AstCompatNode): void {
   if (!body) return;
   program.body = body.filter((stmt: unknown) => {
     if (isRecord(stmt) && stmt.type === 'ExpressionStatement' && stmt.directive) return false;
-    if (isRecord(stmt) && stmt.type === 'ExpressionStatement' &&
-        isRecord(stmt.expression) && stmt.expression.type === 'Literal' &&
-        stmt.expression.value === 'use strict') return false;
+    if (
+      isRecord(stmt) &&
+      stmt.type === 'ExpressionStatement' &&
+      isRecord(stmt.expression) &&
+      stmt.expression.type === 'Literal' &&
+      stmt.expression.value === 'use strict'
+    )
+      return false;
     return true;
   });
 }
@@ -673,12 +760,20 @@ function normalizeArrowBodies(node: unknown): void {
     if (key === 'type') continue;
     normalizeArrowBodies(node[key]);
   }
-  if (node.type === 'ArrowFunctionExpression' &&
-      isRecord(node.body) && node.body.type === 'BlockStatement') {
+  if (
+    node.type === 'ArrowFunctionExpression' &&
+    isRecord(node.body) &&
+    node.body.type === 'BlockStatement'
+  ) {
     const inner = asArray(node.body.body);
     const first = inner?.[0];
-    if (inner && inner.length === 1 &&
-        isRecord(first) && first.type === 'ReturnStatement' && first.argument != null) {
+    if (
+      inner &&
+      inner.length === 1 &&
+      isRecord(first) &&
+      first.type === 'ReturnStatement' &&
+      first.argument != null
+    ) {
       node.body = first.argument;
       node.expression = true;
     }
@@ -686,8 +781,8 @@ function normalizeArrowBodies(node: unknown): void {
 }
 
 /**
- * Renumber `_hfN` / `_hfN_str` by stringified body content so both sides use the
- * same index for identical hoisted functions; renames all references.
+ * Renumber `_hfN` / `_hfN_str` by stringified body content so both sides use the same index for
+ * identical hoisted functions; renames all references.
  */
 function renumberHoistedFunctions(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -712,7 +807,7 @@ function renumberHoistedFunctions(program: AstCompatNode): void {
       if (!match) continue;
       hfDecls.push({
         oldName: name,
-        initJson: JSON.stringify(decl.init, (k, v) => k === 'raw' ? undefined : v),
+        initJson: JSON.stringify(decl.init, (k, v) => (k === 'raw' ? undefined : v)),
         stmtIdx: i,
         isStr: !!match[2],
         oldIndex: parseInt(match[1], 10),
@@ -730,8 +825,8 @@ function renumberHoistedFunctions(program: AstCompatNode): void {
   }
 
   const sortedOldIndices = [...byOldIndex.keys()].sort((a, b) => {
-    const aFn = byOldIndex.get(a)!.find(d => !d.isStr);
-    const bFn = byOldIndex.get(b)!.find(d => !d.isStr);
+    const aFn = byOldIndex.get(a)!.find((d) => !d.isStr);
+    const bFn = byOldIndex.get(b)!.find((d) => !d.isStr);
     const aKey = aFn?.initJson ?? '';
     const bKey = bFn?.initJson ?? '';
     return aKey.localeCompare(bKey);
@@ -744,13 +839,19 @@ function renumberHoistedFunctions(program: AstCompatNode): void {
 
   let isIdentity = true;
   for (const [old, nw] of indexMap) {
-    if (old !== nw) { isIdentity = false; break; }
+    if (old !== nw) {
+      isIdentity = false;
+      break;
+    }
   }
   if (isIdentity) return;
 
   function renameHf(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) renameHf(item); return; }
+    if (arr) {
+      for (const item of arr) renameHf(item);
+      return;
+    }
     if (!isRecord(node)) return;
     if (node.type === 'Identifier' && typeof node.name === 'string') {
       const m = /^_hf(\d+)(_str)?$/.exec(node.name);
@@ -787,20 +888,26 @@ function unwrapSingleStatementBlocks(node: unknown): void {
   for (const prop of bodyProps) {
     const child = node[prop];
     const childBody = isRecord(child) ? asArray(child.body) : undefined;
-    if (isRecord(child) && child.type === 'BlockStatement' &&
-        childBody && childBody.length === 1 &&
-        (node.type === 'ForStatement' || node.type === 'ForInStatement' ||
-         node.type === 'ForOfStatement' || node.type === 'WhileStatement' ||
-         node.type === 'DoWhileStatement' || node.type === 'IfStatement')) {
+    if (
+      isRecord(child) &&
+      child.type === 'BlockStatement' &&
+      childBody &&
+      childBody.length === 1 &&
+      (node.type === 'ForStatement' ||
+        node.type === 'ForInStatement' ||
+        node.type === 'ForOfStatement' ||
+        node.type === 'WhileStatement' ||
+        node.type === 'DoWhileStatement' ||
+        node.type === 'IfStatement')
+    ) {
       node[prop] = childBody[0];
     }
   }
 }
 
 /**
- * Normalize transpiled TS enum IIFE patterns to a canonical form:
- * `var X = function(X){...}(X || {})` becomes `(function(X){...})({})`,
- * replacing the `X || {}` argument with `{}`.
+ * Normalize transpiled TS enum IIFE patterns to a canonical form: `var X = function(X){...}(X ||
+ * {})` becomes `(function(X){...})({})`, replacing the `X || {}` argument with `{}`.
  */
 function normalizeEnumIIFE(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -811,8 +918,11 @@ function normalizeEnumIIFE(program: AstCompatNode): void {
     if (!isRecord(stmt)) continue;
 
     let varDecl: Record<string, unknown> | null = null;
-    if (stmt.type === 'ExportNamedDeclaration' && isRecord(stmt.declaration) &&
-        stmt.declaration.type === 'VariableDeclaration') {
+    if (
+      stmt.type === 'ExportNamedDeclaration' &&
+      isRecord(stmt.declaration) &&
+      stmt.declaration.type === 'VariableDeclaration'
+    ) {
       varDecl = stmt.declaration;
     } else if (stmt.type === 'VariableDeclaration') {
       varDecl = stmt;
@@ -826,7 +936,8 @@ function normalizeEnumIIFE(program: AstCompatNode): void {
       if (!isRecord(init)) continue;
 
       let callExpr: unknown = init;
-      if (isRecord(callExpr) && callExpr.type === 'ParenthesizedExpression') callExpr = callExpr.expression;
+      if (isRecord(callExpr) && callExpr.type === 'ParenthesizedExpression')
+        callExpr = callExpr.expression;
 
       if (!isRecord(callExpr) || callExpr.type !== 'CallExpression') continue;
 
@@ -837,8 +948,10 @@ function normalizeEnumIIFE(program: AstCompatNode): void {
       const params = asArray(callee.params);
       if (!params || params.length !== 1) continue;
       const p0 = params[0];
-      const paramName = (isRecord(p0) && asString(p0.name)) ||
-                        (isRecord(p0) && isRecord(p0.id) && asString(p0.id.name)) || undefined;
+      const paramName =
+        (isRecord(p0) && asString(p0.name)) ||
+        (isRecord(p0) && isRecord(p0.id) && asString(p0.id.name)) ||
+        undefined;
       const declName = isRecord(decl.id) ? asString(decl.id.name) : undefined;
       if (!paramName || !declName || paramName !== declName) continue;
 
@@ -860,8 +973,8 @@ function normalizeEnumIIFE(program: AstCompatNode): void {
 }
 
 /**
- * Rename `_jsxSplit` to `_jsxSorted`; they share the arg layout and the
- * distinction is a runtime optimization hint, not semantic.
+ * Rename `_jsxSplit` to `_jsxSorted`; they share the arg layout and the distinction is a runtime
+ * optimization hint, not semantic.
  */
 function normalizeJsxCalleeNames(node: unknown): void {
   const arr = asArray(node);
@@ -874,9 +987,12 @@ function normalizeJsxCalleeNames(node: unknown): void {
     if (key === 'type') continue;
     normalizeJsxCalleeNames(node[key]);
   }
-  if (node.type === 'CallExpression' &&
-      isRecord(node.callee) && node.callee.type === 'Identifier' &&
-      node.callee.name === '_jsxSplit') {
+  if (
+    node.type === 'CallExpression' &&
+    isRecord(node.callee) &&
+    node.callee.type === 'Identifier' &&
+    node.callee.name === '_jsxSplit'
+  ) {
     node.callee.name = '_jsxSorted';
   }
 }
@@ -896,8 +1012,12 @@ function mergeJsxSplitProps(node: unknown): void {
   // varProps/constProps split is an optimization hint, not semantic.
   if (node.type !== 'CallExpression') return;
   const callee = node.callee;
-  if (!isRecord(callee) || callee.type !== 'Identifier' ||
-      (callee.name !== '_jsxSplit' && callee.name !== '_jsxSorted')) return;
+  if (
+    !isRecord(callee) ||
+    callee.type !== 'Identifier' ||
+    (callee.name !== '_jsxSplit' && callee.name !== '_jsxSorted')
+  )
+    return;
 
   const args = asArray(node.arguments);
   if (!args || args.length < 3) return;
@@ -908,17 +1028,29 @@ function mergeJsxSplitProps(node: unknown): void {
   if (!constProps) return;
   if (isRecord(constProps) && constProps.type === 'Literal' && constProps.value === null) return;
 
-  const varIsNull = !varProps || (isRecord(varProps) && varProps.type === 'Literal' && varProps.value === null);
+  const varIsNull =
+    !varProps || (isRecord(varProps) && varProps.type === 'Literal' && varProps.value === null);
 
   if (varIsNull && isRecord(constProps) && constProps.type === 'ObjectExpression') {
     args[1] = constProps;
     args[2] = { type: 'Literal', value: null };
-  } else if (isRecord(varProps) && varProps.type === 'ObjectExpression' &&
-             isRecord(constProps) && constProps.type === 'ObjectExpression') {
-    varProps.properties = [...(asArray(varProps.properties) ?? []), ...(asArray(constProps.properties) ?? [])];
+  } else if (
+    isRecord(varProps) &&
+    varProps.type === 'ObjectExpression' &&
+    isRecord(constProps) &&
+    constProps.type === 'ObjectExpression'
+  ) {
+    varProps.properties = [
+      ...(asArray(varProps.properties) ?? []),
+      ...(asArray(constProps.properties) ?? []),
+    ];
     args[2] = { type: 'Literal', value: null };
-  } else if (isRecord(varProps) && varProps.type === 'ObjectExpression' &&
-             isRecord(constProps) && constProps.type === 'CallExpression') {
+  } else if (
+    isRecord(varProps) &&
+    varProps.type === 'ObjectExpression' &&
+    isRecord(constProps) &&
+    constProps.type === 'CallExpression'
+  ) {
     varProps.properties = [
       ...(asArray(varProps.properties) ?? []),
       { type: 'SpreadElement', argument: constProps },
@@ -928,8 +1060,8 @@ function mergeJsxSplitProps(node: unknown): void {
 }
 
 /**
- * Unwrap `_wrapProp(obj, "prop")` to `obj.prop` and `_wrapProp(obj)` to
- * `obj.value` — the reactive wrapper resolves to a property access at runtime.
+ * Unwrap `_wrapProp(obj, "prop")` to `obj.prop` and `_wrapProp(obj)` to `obj.value` — the reactive
+ * wrapper resolves to a property access at runtime.
  */
 function normalizeWrapProp(node: unknown): void {
   const arr = asArray(node);
@@ -991,8 +1123,8 @@ function unwrapWrapProp(node: unknown): unknown {
 }
 
 /**
- * Inline `_fnSignal(_hfN, [args], _hfN_str)` by substituting `args` for the
- * hoisted function's params in a clone of its body, removing the indirection.
+ * Inline `_fnSignal(_hfN, [args], _hfN_str)` by substituting `args` for the hoisted function's
+ * params in a clone of its body, removing the indirection.
  */
 function inlineFnSignalSimple(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -1030,7 +1162,7 @@ function inlineFnSignalSimple(program: AstCompatNode): void {
 
   function substituteParams(node: unknown, paramMap: Map<string, unknown>): unknown {
     const arr = asArray(node);
-    if (arr) return arr.map(n => substituteParams(n, paramMap));
+    if (arr) return arr.map((n) => substituteParams(n, paramMap));
     if (!isRecord(node)) return node;
     if (node.type === 'Identifier') {
       const name = asString(node.name);
@@ -1048,7 +1180,9 @@ function inlineFnSignalSimple(program: AstCompatNode): void {
   function processNode(node: unknown): unknown {
     const arr = asArray(node);
     if (arr) {
-      for (let i = 0; i < arr.length; i++) { arr[i] = processNode(arr[i]); }
+      for (let i = 0; i < arr.length; i++) {
+        arr[i] = processNode(arr[i]);
+      }
       return arr;
     }
     if (!isRecord(node)) return node;
@@ -1062,7 +1196,12 @@ function inlineFnSignalSimple(program: AstCompatNode): void {
     }
 
     if (node.type !== 'CallExpression') return node;
-    if (!isRecord(node.callee) || node.callee.type !== 'Identifier' || node.callee.name !== '_fnSignal') return node;
+    if (
+      !isRecord(node.callee) ||
+      node.callee.type !== 'Identifier' ||
+      node.callee.name !== '_fnSignal'
+    )
+      return node;
     const nodeArgs = asArray(node.arguments);
     if (!nodeArgs || nodeArgs.length < 2) return node;
 
@@ -1101,8 +1240,12 @@ function normalizeJsxFlags(node: unknown): void {
   }
   if (node.type !== 'CallExpression') return;
   const callee = node.callee;
-  if (!isRecord(callee) || callee.type !== 'Identifier' ||
-      (callee.name !== '_jsxSorted' && callee.name !== '_jsxSplit')) return;
+  if (
+    !isRecord(callee) ||
+    callee.type !== 'Identifier' ||
+    (callee.name !== '_jsxSorted' && callee.name !== '_jsxSplit')
+  )
+    return;
   const args = asArray(node.arguments);
   if (!args || args.length < 5) return;
   const flagsArg = args[4];
@@ -1113,8 +1256,8 @@ function normalizeJsxFlags(node: unknown): void {
 }
 
 /**
- * Strip `q:p` / `q:ps` properties — signal-tracking optimization hints whose
- * presence and contents vary between outputs, not correctness.
+ * Strip `q:p` / `q:ps` properties — signal-tracking optimization hints whose presence and contents
+ * vary between outputs, not correctness.
  */
 function stripQpProperties(node: unknown): void {
   const arr = asArray(node);
@@ -1138,8 +1281,8 @@ function stripQpProperties(node: unknown): void {
 }
 
 /**
- * Rename local bindings of `_captures[N]` to canonical `_cap0`, `_cap1`, …
- * (updating references) so differing capture-variable names compare equal.
+ * Rename local bindings of `_captures[N]` to canonical `_cap0`, `_cap1`, … (updating references) so
+ * differing capture-variable names compare equal.
  */
 function canonicalizeCaptureBindings(program: AstCompatNode): void {
   const programBody = asArray(program.body);
@@ -1171,7 +1314,10 @@ function canonicalizeCaptureBindings(program: AstCompatNode): void {
 
     function renameIdents(node: unknown): void {
       const arr = asArray(node);
-      if (arr) { for (const item of arr) renameIdents(item); return; }
+      if (arr) {
+        for (const item of arr) renameIdents(item);
+        return;
+      }
       if (!isRecord(node)) return;
       if (node.type === 'Identifier') {
         const name = asString(node.name);
@@ -1190,9 +1336,17 @@ function canonicalizeCaptureBindings(program: AstCompatNode): void {
   }
 
   function isCapturesAccess(node: unknown): boolean {
-    if (isRecord(node) && node.type === 'MemberExpression' && node.computed &&
-        isRecord(node.object) && node.object.type === 'Identifier' && node.object.name === '_captures' &&
-        isRecord(node.property) && node.property.type === 'Literal' && typeof node.property.value === 'number') {
+    if (
+      isRecord(node) &&
+      node.type === 'MemberExpression' &&
+      node.computed &&
+      isRecord(node.object) &&
+      node.object.type === 'Identifier' &&
+      node.object.name === '_captures' &&
+      isRecord(node.property) &&
+      node.property.type === 'Literal' &&
+      typeof node.property.value === 'number'
+    ) {
       return true;
     }
     return false;
@@ -1200,11 +1354,19 @@ function canonicalizeCaptureBindings(program: AstCompatNode): void {
 
   function visitNode(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) visitNode(item); return; }
+    if (arr) {
+      for (const item of arr) visitNode(item);
+      return;
+    }
     if (!isRecord(node)) return;
 
-    if ((node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' ||
-         node.type === 'FunctionDeclaration') && isRecord(node.body) && node.body.type === 'BlockStatement') {
+    if (
+      (node.type === 'ArrowFunctionExpression' ||
+        node.type === 'FunctionExpression' ||
+        node.type === 'FunctionDeclaration') &&
+      isRecord(node.body) &&
+      node.body.type === 'BlockStatement'
+    ) {
       processBody(node.body.body);
     }
 
@@ -1239,8 +1401,13 @@ function mergeGetVarConstProps(node: unknown): void {
     const a = props[i];
     if (!isRecord(a) || a.type !== 'SpreadElement') continue;
     const aCall = a.argument;
-    if (!isRecord(aCall) || aCall.type !== 'CallExpression' ||
-        !isRecord(aCall.callee) || aCall.callee.type !== 'Identifier') continue;
+    if (
+      !isRecord(aCall) ||
+      aCall.type !== 'CallExpression' ||
+      !isRecord(aCall.callee) ||
+      aCall.callee.type !== 'Identifier'
+    )
+      continue;
     const aName = aCall.callee.name;
     if (aName !== '_getVarProps' && aName !== '_getConstProps') continue;
 
@@ -1251,8 +1418,13 @@ function mergeGetVarConstProps(node: unknown): void {
       const b = props[j];
       if (!isRecord(b) || b.type !== 'SpreadElement') continue;
       const bCall = b.argument;
-      if (!isRecord(bCall) || bCall.type !== 'CallExpression' ||
-          !isRecord(bCall.callee) || bCall.callee.type !== 'Identifier') continue;
+      if (
+        !isRecord(bCall) ||
+        bCall.type !== 'CallExpression' ||
+        !isRecord(bCall.callee) ||
+        bCall.callee.type !== 'Identifier'
+      )
+        continue;
       if (bCall.callee.name !== otherName) continue;
 
       const aArg = JSON.stringify(aCall.arguments);
@@ -1271,8 +1443,8 @@ function mergeGetVarConstProps(node: unknown): void {
 }
 
 /**
- * Zero the dev-mode `lo`/`hi` byte offsets in qrlDEV/_noopQrlDEV calls so
- * differing position tracking doesn't affect comparison.
+ * Zero the dev-mode `lo`/`hi` byte offsets in qrlDEV/_noopQrlDEV calls so differing position
+ * tracking doesn't affect comparison.
  */
 function normalizeDevModePositions(node: unknown): void {
   const arr = asArray(node);
@@ -1287,9 +1459,18 @@ function normalizeDevModePositions(node: unknown): void {
   }
   const props = asArray(node.properties);
   if (node.type === 'ObjectExpression' && props) {
-    const hasLo = props.some((p: unknown) => isRecord(p) && isRecord(p.key) && (p.key.name === 'lo' || p.key.value === 'lo'));
-    const hasHi = props.some((p: unknown) => isRecord(p) && isRecord(p.key) && (p.key.name === 'hi' || p.key.value === 'hi'));
-    const hasFile = props.some((p: unknown) => isRecord(p) && isRecord(p.key) && (p.key.name === 'file' || p.key.value === 'file'));
+    const hasLo = props.some(
+      (p: unknown) =>
+        isRecord(p) && isRecord(p.key) && (p.key.name === 'lo' || p.key.value === 'lo')
+    );
+    const hasHi = props.some(
+      (p: unknown) =>
+        isRecord(p) && isRecord(p.key) && (p.key.name === 'hi' || p.key.value === 'hi')
+    );
+    const hasFile = props.some(
+      (p: unknown) =>
+        isRecord(p) && isRecord(p.key) && (p.key.name === 'file' || p.key.value === 'file')
+    );
     if (hasLo && hasHi && hasFile) {
       for (const prop of props) {
         if (!isRecord(prop) || !isRecord(prop.key)) continue;
@@ -1299,9 +1480,16 @@ function normalizeDevModePositions(node: unknown): void {
         }
       }
     }
-    const hasLine = props.some((p: unknown) => isRecord(p) && isRecord(p.key) && (p.key.name || p.key.value) === 'lineNumber');
-    const hasCol = props.some((p: unknown) => isRecord(p) && isRecord(p.key) && (p.key.name || p.key.value) === 'columnNumber');
-    const hasFileName = props.some((p: unknown) => isRecord(p) && isRecord(p.key) && (p.key.name || p.key.value) === 'fileName');
+    const hasLine = props.some(
+      (p: unknown) => isRecord(p) && isRecord(p.key) && (p.key.name || p.key.value) === 'lineNumber'
+    );
+    const hasCol = props.some(
+      (p: unknown) =>
+        isRecord(p) && isRecord(p.key) && (p.key.name || p.key.value) === 'columnNumber'
+    );
+    const hasFileName = props.some(
+      (p: unknown) => isRecord(p) && isRecord(p.key) && (p.key.name || p.key.value) === 'fileName'
+    );
     if (hasLine && hasCol && hasFileName) {
       for (const prop of props) {
         if (!isRecord(prop) || !isRecord(prop.key)) continue;
@@ -1315,8 +1503,8 @@ function normalizeDevModePositions(node: unknown): void {
 }
 
 /**
- * Strip dev-mode QRL calls to their non-dev form: `qrlDEV(fn, "sym", devInfo)`
- * to `qrl(fn, "sym")` and `_noopQrlDEV("sym", devInfo)` to `_noopQrl("sym")`.
+ * Strip dev-mode QRL calls to their non-dev form: `qrlDEV(fn, "sym", devInfo)` to `qrl(fn, "sym")`
+ * and `_noopQrlDEV("sym", devInfo)` to `_noopQrl("sym")`.
  */
 function normalizeDevQrlCalls(node: unknown): void {
   const arr = asArray(node);
@@ -1365,8 +1553,8 @@ function normalizeDevQrlCalls(node: unknown): void {
 }
 
 /**
- * Strip the optional 7th argument (dev-mode JSX source info) from
- * _jsxSorted/_jsxSplit calls, which one side may add and the other omit.
+ * Strip the optional 7th argument (dev-mode JSX source info) from _jsxSorted/_jsxSplit calls, which
+ * one side may add and the other omit.
  */
 function stripJsxSourceInfo(node: unknown): void {
   const arr = asArray(node);
@@ -1390,8 +1578,8 @@ function stripJsxSourceInfo(node: unknown): void {
 }
 
 /**
- * Strip `_useHmr(...)` calls — dev-only HMR injection one side may add in
- * component segments and the other omit.
+ * Strip `_useHmr(...)` calls — dev-only HMR injection one side may add in component segments and
+ * the other omit.
  */
 function stripUseHmrCalls(program: AstCompatNode): void {
   function processBody(bodyInput: unknown): void {
@@ -1402,17 +1590,30 @@ function stripUseHmrCalls(program: AstCompatNode): void {
       if (!isRecord(stmt) || stmt.type !== 'ExpressionStatement') continue;
       const expr = stmt.expression;
       if (!isRecord(expr) || expr.type !== 'CallExpression') continue;
-      if (!isRecord(expr.callee) || expr.callee.type !== 'Identifier' || expr.callee.name !== '_useHmr') continue;
+      if (
+        !isRecord(expr.callee) ||
+        expr.callee.type !== 'Identifier' ||
+        expr.callee.name !== '_useHmr'
+      )
+        continue;
       body.splice(i, 1);
     }
   }
 
   function visit(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) visit(item); return; }
+    if (arr) {
+      for (const item of arr) visit(item);
+      return;
+    }
     if (!isRecord(node)) return;
-    if ((node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' ||
-         node.type === 'FunctionDeclaration') && isRecord(node.body) && node.body.type === 'BlockStatement') {
+    if (
+      (node.type === 'ArrowFunctionExpression' ||
+        node.type === 'FunctionExpression' ||
+        node.type === 'FunctionDeclaration') &&
+      isRecord(node.body) &&
+      node.body.type === 'BlockStatement'
+    ) {
       processBody(node.body.body);
     }
     for (const key of Object.keys(node)) {
@@ -1425,8 +1626,8 @@ function stripUseHmrCalls(program: AstCompatNode): void {
 }
 
 /**
- * Merge duplicate object keys into an array value: `{ k: a, k: b }` becomes
- * `{ k: [a, b] }`, matching a side that already emits the array form.
+ * Merge duplicate object keys into an array value: `{ k: a, k: b }` becomes `{ k: [a, b] }`,
+ * matching a side that already emits the array form.
  */
 function mergeDuplicateObjectProperties(node: unknown): void {
   const arr = asArray(node);
@@ -1445,7 +1646,7 @@ function mergeDuplicateObjectProperties(node: unknown): void {
     for (let i = 0; i < props.length; i++) {
       const prop = props[i];
       if (!isRecord(prop) || prop.type !== 'Property' || prop.computed) continue;
-      const keyRaw = isRecord(prop.key) ? (prop.key.name || prop.key.value) : undefined;
+      const keyRaw = isRecord(prop.key) ? prop.key.name || prop.key.value : undefined;
       const keyName = asString(keyRaw);
       if (!keyName) continue;
       const indices = keyMap.get(keyName) || [];
@@ -1510,8 +1711,14 @@ function sortObjectProperties(node: unknown): void {
       spreads.sort((a: unknown, b: unknown) => {
         const aArg = isRecord(a) ? a.argument : undefined;
         const bArg = isRecord(b) ? b.argument : undefined;
-        const aKey = (isRecord(aArg) && isRecord(aArg.callee) && aArg.callee.name) || (isRecord(aArg) && aArg.name) || '';
-        const bKey = (isRecord(bArg) && isRecord(bArg.callee) && bArg.callee.name) || (isRecord(bArg) && bArg.name) || '';
+        const aKey =
+          (isRecord(aArg) && isRecord(aArg.callee) && aArg.callee.name) ||
+          (isRecord(aArg) && aArg.name) ||
+          '';
+        const bKey =
+          (isRecord(bArg) && isRecord(bArg.callee) && bArg.callee.name) ||
+          (isRecord(bArg) && bArg.name) ||
+          '';
         return String(aKey).localeCompare(String(bKey));
       });
       named.sort((a: unknown, b: unknown) => {
@@ -1525,8 +1732,8 @@ function sortObjectProperties(node: unknown): void {
 }
 
 /**
- * Strip an unused call binding to a bare call: `const x = useSignal(0)` becomes
- * `useSignal(0)` when `x` is never referenced.
+ * Strip an unused call binding to a bare call: `const x = useSignal(0)` becomes `useSignal(0)` when
+ * `x` is never referenced.
  */
 function stripUnusedCallBindings(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -1534,14 +1741,18 @@ function stripUnusedCallBindings(program: AstCompatNode): void {
 
   function collectRefs(node: unknown, refs: Set<string>, skipDecl?: string): void {
     const arr = asArray(node);
-    if (arr) { arr.forEach(n => collectRefs(n, refs, skipDecl)); return; }
+    if (arr) {
+      arr.forEach((n) => collectRefs(n, refs, skipDecl));
+      return;
+    }
     if (!isRecord(node)) return;
     if (node.type === 'Identifier') {
       const name = asString(node.name);
       if (name && name !== skipDecl) refs.add(name);
     }
     for (const key of Object.keys(node)) {
-      if (key === 'type' || key === 'start' || key === 'end' || key === 'loc' || key === 'range') continue;
+      if (key === 'type' || key === 'start' || key === 'end' || key === 'loc' || key === 'range')
+        continue;
       collectRefs(node[key], refs, skipDecl);
     }
   }
@@ -1580,8 +1791,8 @@ function stripUnusedCallBindings(program: AstCompatNode): void {
 }
 
 /**
- * Canonicalize `_fnSignal` argument order by sorting the args array and
- * rewriting the `_hf` body's param references. Runs after renumberHoistedFunctions.
+ * Canonicalize `_fnSignal` argument order by sorting the args array and rewriting the `_hf` body's
+ * param references. Runs after renumberHoistedFunctions.
  */
 function canonicalizeFnSignalArgs(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -1612,7 +1823,10 @@ function canonicalizeFnSignalArgs(program: AstCompatNode): void {
 
   function processFnSignalCalls(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) processFnSignalCalls(item); return; }
+    if (arr) {
+      for (const item of arr) processFnSignalCalls(item);
+      return;
+    }
     if (!isRecord(node)) return;
 
     for (const key of Object.keys(node)) {
@@ -1621,7 +1835,12 @@ function canonicalizeFnSignalArgs(program: AstCompatNode): void {
     }
 
     if (node.type !== 'CallExpression') return;
-    if (!isRecord(node.callee) || node.callee.type !== 'Identifier' || node.callee.name !== '_fnSignal') return;
+    if (
+      !isRecord(node.callee) ||
+      node.callee.type !== 'Identifier' ||
+      node.callee.name !== '_fnSignal'
+    )
+      return;
     const nodeArgs = asArray(node.arguments);
     if (!nodeArgs || nodeArgs.length < 2) return;
 
@@ -1657,7 +1876,10 @@ function canonicalizeFnSignalArgs(program: AstCompatNode): void {
 
     let alreadySorted = true;
     for (let i = 0; i < sorted.length; i++) {
-      if (sorted[i].origIdx !== i) { alreadySorted = false; break; }
+      if (sorted[i].origIdx !== i) {
+        alreadySorted = false;
+        break;
+      }
     }
     if (alreadySorted) return;
 
@@ -1673,7 +1895,10 @@ function canonicalizeFnSignalArgs(program: AstCompatNode): void {
 
     function remapParams(n: unknown): void {
       const nArr = asArray(n);
-      if (nArr) { for (const item of nArr) remapParams(item); return; }
+      if (nArr) {
+        for (const item of nArr) remapParams(item);
+        return;
+      }
       if (!isRecord(n)) return;
       if (n.type === 'Identifier') {
         const nm = asString(n.name);
@@ -1694,7 +1919,10 @@ function canonicalizeFnSignalArgs(program: AstCompatNode): void {
 
     function finalizeParams(n: unknown): void {
       const nArr = asArray(n);
-      if (nArr) { for (const item of nArr) finalizeParams(item); return; }
+      if (nArr) {
+        for (const item of nArr) finalizeParams(item);
+        return;
+      }
       if (!isRecord(n)) return;
       if (n.type === 'Identifier' && typeof n.name === 'string' && n.name.startsWith('__canon_p')) {
         n.name = n.name.replace('__canon_', '');
@@ -1723,8 +1951,12 @@ function deduplicateImports(program: AstCompatNode): void {
     if (!isRecord(stmt) || stmt.type !== 'ImportDeclaration') continue;
     const source = JSON.stringify(stmt.source);
     const specs = asArray(stmt.specifiers);
-    const hasDefault = specs?.some((s: unknown) => isRecord(s) && s.type === 'ImportDefaultSpecifier');
-    const hasNamespace = specs?.some((s: unknown) => isRecord(s) && s.type === 'ImportNamespaceSpecifier');
+    const hasDefault = specs?.some(
+      (s: unknown) => isRecord(s) && s.type === 'ImportDefaultSpecifier'
+    );
+    const hasNamespace = specs?.some(
+      (s: unknown) => isRecord(s) && s.type === 'ImportNamespaceSpecifier'
+    );
     if (hasDefault || hasNamespace) continue;
 
     const existing = importMap.get(source);
@@ -1753,10 +1985,7 @@ function deduplicateImports(program: AstCompatNode): void {
   }
 }
 
-/**
- * Inline `const X = fn; q_X.s(X)` to `q_X.s(fn)` when `X` is only referenced
- * by the `.s()` call.
- */
+/** Inline `const X = fn; q_X.s(X)` to `q_X.s(fn)` when `X` is only referenced by the `.s()` call. */
 function inlineSegmentBodyIntoSCall(program: AstCompatNode): void {
   const body = asArray(program.body);
   if (!body) return;
@@ -1766,7 +1995,12 @@ function inlineSegmentBodyIntoSCall(program: AstCompatNode): void {
     const stmt = body[i];
     if (!isRecord(stmt)) continue;
     const decls = asArray(stmt.declarations);
-    if (stmt.type === 'VariableDeclaration' && stmt.kind === 'const' && decls && decls.length === 1) {
+    if (
+      stmt.type === 'VariableDeclaration' &&
+      stmt.kind === 'const' &&
+      decls &&
+      decls.length === 1
+    ) {
       const decl = decls[0];
       if (isRecord(decl) && isRecord(decl.id) && decl.id.type === 'Identifier' && decl.init) {
         const name = asString(decl.id.name);
@@ -1784,7 +2018,12 @@ function inlineSegmentBodyIntoSCall(program: AstCompatNode): void {
     if (!isRecord(expr) || expr.type !== 'CallExpression') continue;
     if (!isRecord(expr.callee) || expr.callee.type !== 'MemberExpression') continue;
     if (!isRecord(expr.callee.object) || expr.callee.object.type !== 'Identifier') continue;
-    if (!isRecord(expr.callee.property) || expr.callee.property.type !== 'Identifier' || expr.callee.property.name !== 's') continue;
+    if (
+      !isRecord(expr.callee.property) ||
+      expr.callee.property.type !== 'Identifier' ||
+      expr.callee.property.name !== 's'
+    )
+      continue;
     if (!asString(expr.callee.object.name)?.startsWith('q_')) continue;
     const exprArgs = asArray(expr.arguments);
     if (!exprArgs || exprArgs.length !== 1) continue;
@@ -1823,9 +2062,8 @@ function inlineSegmentBodyIntoSCall(program: AstCompatNode): void {
 }
 
 /**
- * Normalize the compiler's `_auto_` re-export convention: strip
- * `export { X as _auto_X }` specifiers and rewrite `import { _auto_X as X }`
- * to `import { X }`.
+ * Normalize the compiler's `_auto_` re-export convention: strip `export { X as _auto_X }`
+ * specifiers and rewrite `import { _auto_X as X }` to `import { X }`.
  */
 function normalizeAutoExports(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -1837,7 +2075,8 @@ function normalizeAutoExports(program: AstCompatNode): void {
     const specs = asArray(stmt.specifiers);
     if (!specs) continue;
     const kept = specs.filter((spec: unknown) => {
-      const exported = (isRecord(spec) && isRecord(spec.exported) && asString(spec.exported.name)) || '';
+      const exported =
+        (isRecord(spec) && isRecord(spec.exported) && asString(spec.exported.name)) || '';
       return !exported.startsWith('_auto_');
     });
     stmt.specifiers = kept;
@@ -1861,8 +2100,8 @@ function normalizeAutoExports(program: AstCompatNode): void {
 }
 
 /**
- * Strip import declarations whose local bindings are never referenced —
- * e.g. a stale `import { component$ }` left after rewriting to the Qrl form.
+ * Strip import declarations whose local bindings are never referenced — e.g. a stale `import {
+ * component$ }` left after rewriting to the Qrl form.
  */
 function stripUnusedImports(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -1871,14 +2110,18 @@ function stripUnusedImports(program: AstCompatNode): void {
   const usedNames = new Set<string>();
   function collectIdents(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { arr.forEach(collectIdents); return; }
+    if (arr) {
+      arr.forEach(collectIdents);
+      return;
+    }
     if (!isRecord(node)) return;
     if (node.type === 'Identifier') {
       const name = asString(node.name);
       if (name) usedNames.add(name);
     }
     for (const key of Object.keys(node)) {
-      if (key === 'start' || key === 'end' || key === 'loc' || key === 'range' || key === 'type') continue;
+      if (key === 'start' || key === 'end' || key === 'loc' || key === 'range' || key === 'type')
+        continue;
       collectIdents(node[key]);
     }
   }
@@ -1895,7 +2138,8 @@ function stripUnusedImports(program: AstCompatNode): void {
     if (!specs || specs.length === 0) continue; // side-effect import
 
     const kept = specs.filter((spec: unknown) => {
-      const localName = isRecord(spec) && isRecord(spec.local) ? asString(spec.local.name) : undefined;
+      const localName =
+        isRecord(spec) && isRecord(spec.local) ? asString(spec.local.name) : undefined;
       return localName && usedNames.has(localName);
     });
     stmt.specifiers = kept;
@@ -1907,18 +2151,14 @@ function stripUnusedImports(program: AstCompatNode): void {
 }
 
 /**
- * Strip tool-emitted framework-helper imports from `@qwik.dev/core` (and its
- * `jsx-runtime` subpath): any specifier whose imported name starts with `_`,
- * is `qrl` / `inlinedQrl`, or ends with `Qrl`. Import presence is bookkeeping
- * that varies between outputs; body references remain authoritative. User-facing
- * names like `component$`, `Slot` are preserved.
+ * Strip tool-emitted framework-helper imports from `@qwik.dev/core` (and its `jsx-runtime`
+ * subpath): any specifier whose imported name starts with `_`, is `qrl` / `inlinedQrl`, or ends
+ * with `Qrl`. Import presence is bookkeeping that varies between outputs; body references remain
+ * authoritative. User-facing names like `component$`, `Slot` are preserved.
  */
 function stripFrameworkHelperImports(program: AstCompatNode): void {
   const isFrameworkHelper = (name: string): boolean =>
-    name.startsWith('_') ||
-    name === 'qrl' ||
-    name === 'inlinedQrl' ||
-    name.endsWith('Qrl');
+    name.startsWith('_') || name === 'qrl' || name === 'inlinedQrl' || name.endsWith('Qrl');
 
   // A ModuleExportName may be an Identifier (carries `name`) or StringLiteral (carries `value`).
   const importedNameOf = (imported: unknown): string | undefined => {
@@ -1954,8 +2194,8 @@ function stripFrameworkHelperImports(program: AstCompatNode): void {
 }
 
 /**
- * Strip `if (!isServer) return;` guards — a no-op one side adds to server-only
- * segments and the other omits, since those segments only run on the server.
+ * Strip `if (!isServer) return;` guards — a no-op one side adds to server-only segments and the
+ * other omits, since those segments only run on the server.
  */
 function stripIsServerGuards(program: AstCompatNode): void {
   function visitBody(bodyInput: unknown): void {
@@ -1963,14 +2203,20 @@ function stripIsServerGuards(program: AstCompatNode): void {
     if (!body) return;
     for (let i = body.length - 1; i >= 0; i--) {
       const stmt = body[i];
-      if (isRecord(stmt) && stmt.type === 'IfStatement' &&
-          isRecord(stmt.consequent) && stmt.consequent.type === 'ReturnStatement' &&
-          !stmt.consequent.argument &&
-          !stmt.alternate &&
-          isRecord(stmt.test) && stmt.test.type === 'UnaryExpression' &&
-          stmt.test.operator === '!' &&
-          isRecord(stmt.test.argument) && stmt.test.argument.type === 'Identifier' &&
-          stmt.test.argument.name === 'isServer') {
+      if (
+        isRecord(stmt) &&
+        stmt.type === 'IfStatement' &&
+        isRecord(stmt.consequent) &&
+        stmt.consequent.type === 'ReturnStatement' &&
+        !stmt.consequent.argument &&
+        !stmt.alternate &&
+        isRecord(stmt.test) &&
+        stmt.test.type === 'UnaryExpression' &&
+        stmt.test.operator === '!' &&
+        isRecord(stmt.test.argument) &&
+        stmt.test.argument.type === 'Identifier' &&
+        stmt.test.argument.name === 'isServer'
+      ) {
         body.splice(i, 1);
       }
     }
@@ -1978,14 +2224,22 @@ function stripIsServerGuards(program: AstCompatNode): void {
 
   function visitNode(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) visitNode(item); return; }
+    if (arr) {
+      for (const item of arr) visitNode(item);
+      return;
+    }
     if (!isRecord(node)) return;
     const nodeBody = asArray(node.body);
     if (node.type === 'BlockStatement' && nodeBody) {
       visitBody(nodeBody);
     }
-    if ((node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' ||
-         node.type === 'FunctionDeclaration') && isRecord(node.body) && node.body.type === 'BlockStatement') {
+    if (
+      (node.type === 'ArrowFunctionExpression' ||
+        node.type === 'FunctionExpression' ||
+        node.type === 'FunctionDeclaration') &&
+      isRecord(node.body) &&
+      node.body.type === 'BlockStatement'
+    ) {
       visitBody(node.body.body);
     }
     for (const key of Object.keys(node)) {
@@ -1998,8 +2252,8 @@ function stripIsServerGuards(program: AstCompatNode): void {
 }
 
 /**
- * Strip side-effect-free expression statements (bare identifiers, sequences of
- * identifiers, literals) — e.g. dangling `p, pi;` from loop-variable hoisting.
+ * Strip side-effect-free expression statements (bare identifiers, sequences of identifiers,
+ * literals) — e.g. dangling `p, pi;` from loop-variable hoisting.
  */
 function stripPureExpressionStatements(program: AstCompatNode): void {
   function isPure(expr: unknown): boolean {
@@ -2025,14 +2279,22 @@ function stripPureExpressionStatements(program: AstCompatNode): void {
 
   function visitNode(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) visitNode(item); return; }
+    if (arr) {
+      for (const item of arr) visitNode(item);
+      return;
+    }
     if (!isRecord(node)) return;
     const nodeBody = asArray(node.body);
     if (node.type === 'BlockStatement' && nodeBody) {
       visitBody(nodeBody);
     }
-    if ((node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' ||
-         node.type === 'FunctionDeclaration') && isRecord(node.body) && node.body.type === 'BlockStatement') {
+    if (
+      (node.type === 'ArrowFunctionExpression' ||
+        node.type === 'FunctionExpression' ||
+        node.type === 'FunctionDeclaration') &&
+      isRecord(node.body) &&
+      node.body.type === 'BlockStatement'
+    ) {
       visitBody(node.body.body);
     }
     for (const key of Object.keys(node)) {
@@ -2047,11 +2309,19 @@ function stripPureExpressionStatements(program: AstCompatNode): void {
 function stripUnusedLocalDeclarations(program: AstCompatNode): void {
   function visitNode(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { arr.forEach(visitNode); return; }
+    if (arr) {
+      arr.forEach(visitNode);
+      return;
+    }
     if (!isRecord(node)) return;
 
-    if ((node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' ||
-         node.type === 'FunctionDeclaration') && isRecord(node.body) && node.body.type === 'BlockStatement') {
+    if (
+      (node.type === 'ArrowFunctionExpression' ||
+        node.type === 'FunctionExpression' ||
+        node.type === 'FunctionDeclaration') &&
+      isRecord(node.body) &&
+      node.body.type === 'BlockStatement'
+    ) {
       stripUnusedDeclsInBlock(node.body, asArray(node.params) ?? []);
     }
 
@@ -2086,9 +2356,13 @@ function stripNoopLabeledStatements(node: unknown): void {
             continue;
           }
           const first = innerBody[0];
-          if (innerBody.length === 1 &&
-              isRecord(first) && first.type === 'BreakStatement' &&
-              isRecord(first.label) && first.label.name === label) {
+          if (
+            innerBody.length === 1 &&
+            isRecord(first) &&
+            first.type === 'BreakStatement' &&
+            isRecord(first.label) &&
+            first.label.name === label
+          ) {
             arr.splice(i, 1);
             continue;
           }
@@ -2108,9 +2382,9 @@ function stripNoopLabeledStatements(node: unknown): void {
 }
 
 /**
- * Strip module-level call/new ExpressionStatements whose only identifiers are
- * import-only names that would become unused — the dead residue left after
- * stripUnusedCallBindings turns `const bar = foo()` into `foo()`.
+ * Strip module-level call/new ExpressionStatements whose only identifiers are import-only names
+ * that would become unused — the dead residue left after stripUnusedCallBindings turns `const bar =
+ * foo()` into `foo()`.
  */
 function stripOrphanedSideEffectCalls(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -2120,7 +2394,8 @@ function stripOrphanedSideEffectCalls(program: AstCompatNode): void {
   for (const stmt of body) {
     if (!isRecord(stmt) || stmt.type !== 'ImportDeclaration') continue;
     for (const spec of asArray(stmt.specifiers) ?? []) {
-      const localName = isRecord(spec) && isRecord(spec.local) ? asString(spec.local.name) : undefined;
+      const localName =
+        isRecord(spec) && isRecord(spec.local) ? asString(spec.local.name) : undefined;
       if (localName) importedNames.add(localName);
     }
   }
@@ -2132,12 +2407,13 @@ function stripOrphanedSideEffectCalls(program: AstCompatNode): void {
       const stmt = body[i];
       if (!isRecord(stmt) || stmt.type !== 'ExpressionStatement') continue;
       const expr = stmt.expression;
-      if (!isRecord(expr) || (expr.type !== 'CallExpression' && expr.type !== 'NewExpression')) continue;
+      if (!isRecord(expr) || (expr.type !== 'CallExpression' && expr.type !== 'NewExpression'))
+        continue;
 
       const usedIdents = new Set<string>();
       collectAllIdents(expr, usedIdents);
 
-      const allImportOnly = [...usedIdents].every(name => {
+      const allImportOnly = [...usedIdents].every((name) => {
         if (!importedNames.has(name)) return false;
         for (let j = 0; j < body.length; j++) {
           if (j === i) continue;
@@ -2159,8 +2435,8 @@ function stripOrphanedSideEffectCalls(program: AstCompatNode): void {
 }
 
 /**
- * Strip top-level bare `qrl(...)` / `qrlDEV(...)` preload-registration
- * statements — position-only bookkeeping (chunk-fetch hints), not behaviour.
+ * Strip top-level bare `qrl(...)` / `qrlDEV(...)` preload-registration statements — position-only
+ * bookkeeping (chunk-fetch hints), not behaviour.
  */
 function stripBareQrlPreloadCalls(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -2170,8 +2446,10 @@ function stripBareQrlPreloadCalls(program: AstCompatNode): void {
     if (!isRecord(stmt) || stmt.type !== 'ExpressionStatement') continue;
     const expr = stmt.expression;
     if (
-      isRecord(expr) && expr.type === 'CallExpression' &&
-      isRecord(expr.callee) && expr.callee.type === 'Identifier' &&
+      isRecord(expr) &&
+      expr.type === 'CallExpression' &&
+      isRecord(expr.callee) &&
+      expr.callee.type === 'Identifier' &&
       (expr.callee.name === 'qrl' || expr.callee.name === 'qrlDEV')
     ) {
       body.splice(i, 1);
@@ -2189,7 +2467,10 @@ function stripUnusedModuleLevelDeclarations(program: AstCompatNode): void {
     // Count references from inits/bodies only, never the declared name itself.
     const referencedNames = new Set<string>();
     for (const stmt of body) {
-      if (!isRecord(stmt)) { collectAllIdents(stmt, referencedNames); continue; }
+      if (!isRecord(stmt)) {
+        collectAllIdents(stmt, referencedNames);
+        continue;
+      }
       if (stmt.type === 'VariableDeclaration') {
         for (const decl of asArray(stmt.declarations) ?? []) {
           if (isRecord(decl) && decl.init) collectAllIdents(decl.init, referencedNames);
@@ -2212,7 +2493,7 @@ function stripUnusedModuleLevelDeclarations(program: AstCompatNode): void {
         const allUnused = (asArray(stmt.declarations) ?? []).every((decl: unknown) => {
           const names = new Map<string, number>();
           collectDeclaredNames(isRecord(decl) ? decl.id : undefined, i, names);
-          return Array.from(names.keys()).every(n => !referencedNames.has(n));
+          return Array.from(names.keys()).every((n) => !referencedNames.has(n));
         });
         if (allUnused) {
           body.splice(i, 1);
@@ -2246,7 +2527,11 @@ function stripUnusedDeclsInBlock(block: unknown, params: unknown[]): void {
   while (changed) {
     changed = false;
 
-    const declStmtTypes = new Set(['VariableDeclaration', 'FunctionDeclaration', 'ClassDeclaration']);
+    const declStmtTypes = new Set([
+      'VariableDeclaration',
+      'FunctionDeclaration',
+      'ClassDeclaration',
+    ]);
 
     const referencedNames = new Set<string>();
     for (const p of params) {
@@ -2254,7 +2539,10 @@ function stripUnusedDeclsInBlock(block: unknown, params: unknown[]): void {
     }
     for (let i = 0; i < blockBody.length; i++) {
       const stmt = blockBody[i];
-      if (!isRecord(stmt)) { collectAllIdents(stmt, referencedNames); continue; }
+      if (!isRecord(stmt)) {
+        collectAllIdents(stmt, referencedNames);
+        continue;
+      }
       if (stmt.type === 'VariableDeclaration') {
         for (const decl of asArray(stmt.declarations) ?? []) {
           if (isRecord(decl) && decl.init) collectAllIdents(decl.init, referencedNames);
@@ -2279,7 +2567,7 @@ function stripUnusedDeclsInBlock(block: unknown, params: unknown[]): void {
         const allUnused = (asArray(stmt.declarations) ?? []).every((decl: unknown) => {
           const names = new Map<string, number>();
           collectDeclaredNames(isRecord(decl) ? decl.id : undefined, i, names);
-          return Array.from(names.keys()).every(n => !referencedNames.has(n));
+          return Array.from(names.keys()).every((n) => !referencedNames.has(n));
         });
         if (allUnused) {
           blockBody.splice(i, 1);
@@ -2299,7 +2587,9 @@ function stripUnusedDeclsInBlock(block: unknown, params: unknown[]): void {
         }
       } else if (stmt.type === 'TryStatement') {
         const tryBody = (isRecord(stmt.block) ? asArray(stmt.block.body) : undefined) ?? [];
-        const hasContent = tryBody.some((s: unknown) => !isRecord(s) || s.type !== 'EmptyStatement');
+        const hasContent = tryBody.some(
+          (s: unknown) => !isRecord(s) || s.type !== 'EmptyStatement'
+        );
         if (!hasContent) {
           blockBody.splice(i, 1);
           changed = true;
@@ -2337,7 +2627,10 @@ function collectDeclaredNames(pattern: unknown, stmtIndex: number, map: Map<stri
 
 function collectAllIdents(node: unknown, set: Set<string>): void {
   const arr = asArray(node);
-  if (arr) { arr.forEach(n => collectAllIdents(n, set)); return; }
+  if (arr) {
+    arr.forEach((n) => collectAllIdents(n, set));
+    return;
+  }
   if (!isRecord(node)) return;
   if (node.type === 'Identifier') {
     const name = asString(node.name);
@@ -2350,9 +2643,9 @@ function collectAllIdents(node: unknown, set: Set<string>): void {
 }
 
 /**
- * Strip `.w([...])` QRL capture-binding calls (`x.w([a, b])` to `x`, including
- * chained `.w()`). Capture bindings vary between outputs and are already
- * checked via metadata, so they're dropped from the code comparison.
+ * Strip `.w([...])` QRL capture-binding calls (`x.w([a, b])` to `x`, including chained `.w()`).
+ * Capture bindings vary between outputs and are already checked via metadata, so they're dropped
+ * from the code comparison.
  */
 function stripDotWCalls(node: unknown): void {
   const arr = asArray(node);
@@ -2386,14 +2679,18 @@ function unwrapDotW(node: unknown): unknown {
   if (!isRecord(node) || node.type !== 'CallExpression') return node;
   const callee = node.callee;
   if (!isRecord(callee) || callee.type !== 'MemberExpression') return node;
-  if (!isRecord(callee.property) || callee.property.type !== 'Identifier' || callee.property.name !== 'w') return node;
+  if (
+    !isRecord(callee.property) ||
+    callee.property.type !== 'Identifier' ||
+    callee.property.name !== 'w'
+  )
+    return node;
   return unwrapDotW(callee.object);
 }
 
 /**
- * Strip the body argument from `.s()` QRL calls (`q_X.s(fn)` to `q_X.s()`) in
- * parent modules — segment bodies are compared separately, so only the QRL
- * reference matters here.
+ * Strip the body argument from `.s()` QRL calls (`q_X.s(fn)` to `q_X.s()`) in parent modules —
+ * segment bodies are compared separately, so only the QRL reference matters here.
  */
 function stripDotSBodies(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -2407,7 +2704,12 @@ function stripDotSBodies(program: AstCompatNode): void {
     if (!isRecord(expr) || expr.type !== 'CallExpression') continue;
     const callee = expr.callee;
     if (!isRecord(callee) || callee.type !== 'MemberExpression') continue;
-    if (!isRecord(callee.property) || callee.property.type !== 'Identifier' || callee.property.name !== 's') continue;
+    if (
+      !isRecord(callee.property) ||
+      callee.property.type !== 'Identifier' ||
+      callee.property.name !== 's'
+    )
+      continue;
     if (!isRecord(callee.object) || callee.object.type !== 'Identifier') continue;
     const objName = asString(callee.object.name) || '';
     if (!objName.startsWith('q_')) continue;
@@ -2446,9 +2748,9 @@ function stripDotSBodies(program: AstCompatNode): void {
 }
 
 /**
- * Strip migrated declarations equivalent to imports: a non-exported function,
- * class, or destructuring declaration whose name is also imported — one side
- * inlines the binding, the other imports it.
+ * Strip migrated declarations equivalent to imports: a non-exported function, class, or
+ * destructuring declaration whose name is also imported — one side inlines the binding, the other
+ * imports it.
  */
 function stripMigratedDeclarations(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -2458,7 +2760,8 @@ function stripMigratedDeclarations(program: AstCompatNode): void {
   for (const stmt of body) {
     if (!isRecord(stmt) || stmt.type !== 'ImportDeclaration') continue;
     for (const spec of asArray(stmt.specifiers) ?? []) {
-      const localName = isRecord(spec) && isRecord(spec.local) ? asString(spec.local.name) : undefined;
+      const localName =
+        isRecord(spec) && isRecord(spec.local) ? asString(spec.local.name) : undefined;
       if (localName) importedNames.add(localName);
     }
   }
@@ -2466,17 +2769,31 @@ function stripMigratedDeclarations(program: AstCompatNode): void {
   const declaredNames = new Set<string>();
   for (const stmt of body) {
     if (!isRecord(stmt)) continue;
-    if (stmt.type === 'FunctionDeclaration' && isRecord(stmt.id) && stmt.id.name && !isExported(stmt, program)) {
+    if (
+      stmt.type === 'FunctionDeclaration' &&
+      isRecord(stmt.id) &&
+      stmt.id.name &&
+      !isExported(stmt, program)
+    ) {
       const name = asString(stmt.id.name);
       if (name) declaredNames.add(name);
     }
-    if (stmt.type === 'ClassDeclaration' && isRecord(stmt.id) && stmt.id.name && !isExported(stmt, program)) {
+    if (
+      stmt.type === 'ClassDeclaration' &&
+      isRecord(stmt.id) &&
+      stmt.id.name &&
+      !isExported(stmt, program)
+    ) {
       const name = asString(stmt.id.name);
       if (name) declaredNames.add(name);
     }
     if (stmt.type === 'VariableDeclaration' && !isExported(stmt, program)) {
       for (const decl of asArray(stmt.declarations) ?? []) {
-        if (isRecord(decl) && isRecord(decl.id) && (decl.id.type === 'ArrayPattern' || decl.id.type === 'ObjectPattern')) {
+        if (
+          isRecord(decl) &&
+          isRecord(decl.id) &&
+          (decl.id.type === 'ArrayPattern' || decl.id.type === 'ObjectPattern')
+        ) {
           collectPatternNames(decl.id, declaredNames);
         }
       }
@@ -2500,14 +2817,18 @@ function stripMigratedDeclarations(program: AstCompatNode): void {
     const idName = isRecord(stmt.id) ? asString(stmt.id.name) : undefined;
     if (stmt.type === 'FunctionDeclaration' && idName !== undefined && namesToStrip.has(idName)) {
       body.splice(i, 1);
-    } else if (stmt.type === 'ClassDeclaration' && idName !== undefined && namesToStrip.has(idName)) {
+    } else if (
+      stmt.type === 'ClassDeclaration' &&
+      idName !== undefined &&
+      namesToStrip.has(idName)
+    ) {
       body.splice(i, 1);
     } else if (stmt.type === 'VariableDeclaration') {
       const allNames: string[] = [];
       for (const decl of asArray(stmt.declarations) ?? []) {
         if (isRecord(decl)) collectPatternNames(decl.id, new Set(), allNames);
       }
-      if (allNames.length > 0 && allNames.every(n => namesToStrip.has(n))) {
+      if (allNames.length > 0 && allNames.every((n) => namesToStrip.has(n))) {
         body.splice(i, 1);
       }
     }
@@ -2533,7 +2854,8 @@ function collectPatternNames(pattern: unknown, nameSet: Set<string>, nameArr?: s
     for (const el of asArray(pattern.elements) ?? []) collectPatternNames(el, nameSet, nameArr);
   } else if (pattern.type === 'ObjectPattern') {
     for (const prop of asArray(pattern.properties) ?? []) {
-      if (isRecord(prop) && prop.type === 'RestElement') collectPatternNames(prop.argument, nameSet, nameArr);
+      if (isRecord(prop) && prop.type === 'RestElement')
+        collectPatternNames(prop.argument, nameSet, nameArr);
       else if (isRecord(prop)) collectPatternNames(prop.value, nameSet, nameArr);
     }
   } else if (pattern.type === 'AssignmentPattern') {
@@ -2544,9 +2866,9 @@ function collectPatternNames(pattern: unknown, nameSet: Set<string>, nameArr?: s
 }
 
 /**
- * Inline simple destructured bindings into their usage sites:
- * `const { "bind:value": v } = props; foo(v)` becomes `foo(props["bind:value"])`,
- * matching the direct property-access form produced by normalizeWrapProp.
+ * Inline simple destructured bindings into their usage sites: `const { "bind:value": v } = props;
+ * foo(v)` becomes `foo(props["bind:value"])`, matching the direct property-access form produced by
+ * normalizeWrapProp.
  */
 function inlineDestructuredBindings(program: AstCompatNode): void {
   function processFunctionBody(bodyInput: unknown, params: unknown[]): void {
@@ -2567,14 +2889,26 @@ function inlineDestructuredBindings(program: AstCompatNode): void {
       const bindings = new Map<string, unknown>();
       let canInline = true;
       for (const prop of asArray(decl.id.properties) ?? []) {
-        if (isRecord(prop) && prop.type === 'RestElement') { canInline = false; break; }
-        if (!isRecord(prop) || !isRecord(prop.value) || prop.value.type !== 'Identifier') { canInline = false; break; }
+        if (isRecord(prop) && prop.type === 'RestElement') {
+          canInline = false;
+          break;
+        }
+        if (!isRecord(prop) || !isRecord(prop.value) || prop.value.type !== 'Identifier') {
+          canInline = false;
+          break;
+        }
 
         const alias = asString(prop.value.name);
-        const keyName = isRecord(prop.key) ? (prop.key.name || prop.key.value) : undefined;
-        if (alias === undefined || !keyName) { canInline = false; break; }
+        const keyName = isRecord(prop.key) ? prop.key.name || prop.key.value : undefined;
+        if (alias === undefined || !keyName) {
+          canInline = false;
+          break;
+        }
         const keyStr = asString(keyName);
-        if (keyStr === undefined) { canInline = false; break; }
+        if (keyStr === undefined) {
+          canInline = false;
+          break;
+        }
 
         const isValidId = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyStr);
         const memberExpr = {
@@ -2590,10 +2924,15 @@ function inlineDestructuredBindings(program: AstCompatNode): void {
 
       if (!canInline || bindings.size === 0) continue;
 
-      const paramNames = new Set(params.map((p: unknown) => (isRecord(p) ? asString(p.name) : undefined)).filter(Boolean));
+      const paramNames = new Set(
+        params.map((p: unknown) => (isRecord(p) ? asString(p.name) : undefined)).filter(Boolean)
+      );
       let hasConflict = false;
       for (const alias of bindings.keys()) {
-        if (paramNames.has(alias)) { hasConflict = true; break; }
+        if (paramNames.has(alias)) {
+          hasConflict = true;
+          break;
+        }
       }
       if (hasConflict) continue;
 
@@ -2607,7 +2946,7 @@ function inlineDestructuredBindings(program: AstCompatNode): void {
 
   function replaceIdentifiers(node: unknown, bindings: Map<string, unknown>): unknown {
     const arr = asArray(node);
-    if (arr) return arr.map(n => replaceIdentifiers(n, bindings));
+    if (arr) return arr.map((n) => replaceIdentifiers(n, bindings));
     if (!isRecord(node)) return node;
     if (node.type === 'Identifier') {
       const name = asString(node.name);
@@ -2624,10 +2963,18 @@ function inlineDestructuredBindings(program: AstCompatNode): void {
 
   function visit(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) visit(item); return; }
+    if (arr) {
+      for (const item of arr) visit(item);
+      return;
+    }
     if (!isRecord(node)) return;
-    if ((node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' ||
-         node.type === 'FunctionDeclaration') && isRecord(node.body) && node.body.type === 'BlockStatement') {
+    if (
+      (node.type === 'ArrowFunctionExpression' ||
+        node.type === 'FunctionExpression' ||
+        node.type === 'FunctionDeclaration') &&
+      isRecord(node.body) &&
+      node.body.type === 'BlockStatement'
+    ) {
       processFunctionBody(node.body.body, asArray(node.params) ?? []);
     }
     for (const key of Object.keys(node)) {
@@ -2640,8 +2987,8 @@ function inlineDestructuredBindings(program: AstCompatNode): void {
 }
 
 /**
- * Strip TypeScript type annotations (typeAnnotation, returnType, typeParameters,
- * …) so residual types on one side don't cause false mismatches.
+ * Strip TypeScript type annotations (typeAnnotation, returnType, typeParameters, …) so residual
+ * types on one side don't cause false mismatches.
  */
 function stripTypeAnnotations(node: unknown): void {
   const arr = asArray(node);
@@ -2662,9 +3009,9 @@ function stripTypeAnnotations(node: unknown): void {
 }
 
 /**
- * Collapse a segment export function's props param that is always accessed
- * through a single field: `(_, _1, _rawProps) => _rawProps.data.X` becomes
- * `(_, _1, data) => data.X`, matching a side that receives the field directly.
+ * Collapse a segment export function's props param that is always accessed through a single field:
+ * `(_, _1, _rawProps) => _rawProps.data.X` becomes `(_, _1, data) => data.X`, matching a side that
+ * receives the field directly.
  */
 function destructureRawPropsParam(program: AstCompatNode): void {
   const body = asArray(program.body);
@@ -2694,8 +3041,12 @@ function destructureRawPropsParam(program: AstCompatNode): void {
       for (const ref of refs) {
         const parent = isRecord(ref) ? ref._parent : undefined;
         const refNode = isRecord(ref) ? ref._node : undefined;
-        if (!isRecord(parent) || parent.type !== 'MemberExpression' ||
-            parent.object !== refNode || parent.computed) {
+        if (
+          !isRecord(parent) ||
+          parent.type !== 'MemberExpression' ||
+          parent.object !== refNode ||
+          parent.computed
+        ) {
           allSingleField = false;
           break;
         }
@@ -2722,9 +3073,12 @@ function destructureRawPropsParam(program: AstCompatNode): void {
       param.name = fieldName;
       for (const ref of refs) {
         if (!isRecord(ref)) continue;
-        replaceNodeInParent(ref._grandparent, asString(ref._parentKey),
+        replaceNodeInParent(
+          ref._grandparent,
+          asString(ref._parentKey),
           typeof ref._parentIndex === 'number' ? ref._parentIndex : undefined,
-          { type: 'Identifier', name: fieldName });
+          { type: 'Identifier', name: fieldName }
+        );
       }
     }
   }
@@ -2743,8 +3097,13 @@ function getExportedSegmentFunction(stmt: unknown): unknown {
 }
 
 function collectIdentRefs(
-  node: unknown, name: string, refs: unknown[],
-  parent?: unknown, parentKey?: string, parentIndex?: number, grandparent?: unknown,
+  node: unknown,
+  name: string,
+  refs: unknown[],
+  parent?: unknown,
+  parentKey?: string,
+  parentIndex?: number,
+  grandparent?: unknown
 ): void {
   const arr = asArray(node);
   if (arr) {
@@ -2755,7 +3114,13 @@ function collectIdentRefs(
   }
   if (!isRecord(node)) return;
   if (node.type === 'Identifier' && node.name === name) {
-    refs.push({ _node: node, _parent: parent, _parentKey: parentKey, _parentIndex: parentIndex, _grandparent: grandparent });
+    refs.push({
+      _node: node,
+      _parent: parent,
+      _parentKey: parentKey,
+      _parentIndex: parentIndex,
+      _grandparent: grandparent,
+    });
     return;
   }
   for (const key of Object.keys(node)) {
@@ -2767,7 +3132,12 @@ function collectIdentRefs(
   }
 }
 
-function replaceNodeInParent(container: unknown, key: string | undefined, index: number | undefined, replacement: unknown): void {
+function replaceNodeInParent(
+  container: unknown,
+  key: string | undefined,
+  index: number | undefined,
+  replacement: unknown
+): void {
   if (!container || !key) return;
   const arr = asArray(container);
   if (arr) {
@@ -2778,10 +3148,10 @@ function replaceNodeInParent(container: unknown, key: string | undefined, index:
 }
 
 /**
- * Expand `_rawProps`-style capture bindings into direct field accesses: a
- * variable (or param) bound to `_captures[N]` whose every use is `var.field`
- * has each `var.field` replaced by `field`. stripCapturesDeclarations then
- * removes the now-unused binding, matching a side that captures fields directly.
+ * Expand `_rawProps`-style capture bindings into direct field accesses: a variable (or param) bound
+ * to `_captures[N]` whose every use is `var.field` has each `var.field` replaced by `field`.
+ * stripCapturesDeclarations then removes the now-unused binding, matching a side that captures
+ * fields directly.
  */
 function expandRawPropsCaptures(program: AstCompatNode): void {
   function processFunctionBody(fn: Record<string, unknown>): void {
@@ -2794,13 +3164,24 @@ function expandRawPropsCaptures(program: AstCompatNode): void {
     for (const stmt of stmts) {
       if (!isRecord(stmt) || stmt.type !== 'VariableDeclaration') continue;
       for (const decl of asArray(stmt.declarations) ?? []) {
-        if (!isRecord(decl) || !isRecord(decl.init) || !isRecord(decl.id) || decl.id.type !== 'Identifier') continue;
-        if (decl.init.type !== 'MemberExpression' ||
-            !isRecord(decl.init.object) || decl.init.object.type !== 'Identifier' ||
-            decl.init.object.name !== '_captures' ||
-            !decl.init.computed ||
-            !isRecord(decl.init.property) || decl.init.property.type !== 'Literal' ||
-            typeof decl.init.property.value !== 'number') continue;
+        if (
+          !isRecord(decl) ||
+          !isRecord(decl.init) ||
+          !isRecord(decl.id) ||
+          decl.id.type !== 'Identifier'
+        )
+          continue;
+        if (
+          decl.init.type !== 'MemberExpression' ||
+          !isRecord(decl.init.object) ||
+          decl.init.object.type !== 'Identifier' ||
+          decl.init.object.name !== '_captures' ||
+          !decl.init.computed ||
+          !isRecord(decl.init.property) ||
+          decl.init.property.type !== 'Literal' ||
+          typeof decl.init.property.value !== 'number'
+        )
+          continue;
 
         const varName = asString(decl.id.name);
         if (varName !== undefined) expandMemberAccessesInBody(body, varName);
@@ -2825,7 +3206,13 @@ function expandRawPropsCaptures(program: AstCompatNode): void {
   }
 
   function expandMemberAccessesInBody(body: unknown, varName: string): Set<string> | null {
-    const refs: Array<{ parent: unknown; key: string; index?: number; memberExpr: unknown; fieldName: string }> = [];
+    const refs: Array<{
+      parent: unknown;
+      key: string;
+      index?: number;
+      memberExpr: unknown;
+      fieldName: string;
+    }> = [];
     let hasNonMemberRef = false;
 
     function scan(node: unknown, parent: unknown, key: string, index?: number): void {
@@ -2835,12 +3222,22 @@ function expandRawPropsCaptures(program: AstCompatNode): void {
         return;
       }
       if (!isRecord(node)) return;
-      if (node.type === 'MemberExpression' &&
-          !node.computed &&
-          isRecord(node.object) && node.object.type === 'Identifier' &&
-          node.object.name === varName &&
-          isRecord(node.property) && node.property.type === 'Identifier') {
-        refs.push({ parent, key, index, memberExpr: node, fieldName: asString(node.property.name) ?? '' });
+      if (
+        node.type === 'MemberExpression' &&
+        !node.computed &&
+        isRecord(node.object) &&
+        node.object.type === 'Identifier' &&
+        node.object.name === varName &&
+        isRecord(node.property) &&
+        node.property.type === 'Identifier'
+      ) {
+        refs.push({
+          parent,
+          key,
+          index,
+          memberExpr: node,
+          fieldName: asString(node.property.name) ?? '',
+        });
         return;
       }
       if (node.type === 'Identifier' && node.name === varName) {
@@ -2885,10 +3282,16 @@ function expandRawPropsCaptures(program: AstCompatNode): void {
 
   function visit(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) visit(item); return; }
+    if (arr) {
+      for (const item of arr) visit(item);
+      return;
+    }
     if (!isRecord(node)) return;
-    if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' ||
-        node.type === 'FunctionDeclaration') {
+    if (
+      node.type === 'ArrowFunctionExpression' ||
+      node.type === 'FunctionExpression' ||
+      node.type === 'FunctionDeclaration'
+    ) {
       processFunctionBody(node);
     }
     for (const key of Object.keys(node)) {
@@ -2901,8 +3304,8 @@ function expandRawPropsCaptures(program: AstCompatNode): void {
 }
 
 /**
- * Strip `const X = _captures[N]` declarations from function bodies — the binding
- * name varies between outputs, so removing it lets the bodies compare equal.
+ * Strip `const X = _captures[N]` declarations from function bodies — the binding name varies
+ * between outputs, so removing it lets the bodies compare equal.
  */
 function stripCapturesDeclarations(program: AstCompatNode): void {
   function processBody(bodyInput: unknown): void {
@@ -2915,12 +3318,16 @@ function stripCapturesDeclarations(program: AstCompatNode): void {
       if (!decls || decls.length === 0) continue;
       const allCaptures = decls.every((d: unknown) => {
         if (!isRecord(d) || !isRecord(d.init)) return false;
-        return d.init.type === 'MemberExpression' &&
-               isRecord(d.init.object) && d.init.object.type === 'Identifier' &&
-               d.init.object.name === '_captures' &&
-               d.init.computed === true &&
-               isRecord(d.init.property) && d.init.property.type === 'Literal' &&
-               typeof d.init.property.value === 'number';
+        return (
+          d.init.type === 'MemberExpression' &&
+          isRecord(d.init.object) &&
+          d.init.object.type === 'Identifier' &&
+          d.init.object.name === '_captures' &&
+          d.init.computed === true &&
+          isRecord(d.init.property) &&
+          d.init.property.type === 'Literal' &&
+          typeof d.init.property.value === 'number'
+        );
       });
       if (allCaptures) {
         body.splice(i, 1);
@@ -2930,10 +3337,18 @@ function stripCapturesDeclarations(program: AstCompatNode): void {
 
   function visit(node: unknown): void {
     const arr = asArray(node);
-    if (arr) { for (const item of arr) visit(item); return; }
+    if (arr) {
+      for (const item of arr) visit(item);
+      return;
+    }
     if (!isRecord(node)) return;
-    if ((node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' ||
-         node.type === 'FunctionDeclaration') && isRecord(node.body) && node.body.type === 'BlockStatement') {
+    if (
+      (node.type === 'ArrowFunctionExpression' ||
+        node.type === 'FunctionExpression' ||
+        node.type === 'FunctionDeclaration') &&
+      isRecord(node.body) &&
+      node.body.type === 'BlockStatement'
+    ) {
       processBody(node.body.body);
     }
     for (const key of Object.keys(node)) {

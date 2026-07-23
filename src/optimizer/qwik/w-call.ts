@@ -1,7 +1,7 @@
 /**
- * Builders for the `.w([captures])` "with-captures" call appended to a QRL
- * reference so the runtime injects the bound values into the segment. The
- * capture list is laid out one-per-line with symmetric indentation.
+ * Builders for the `.w([captures])` "with-captures" call appended to a QRL reference so the runtime
+ * injects the bound values into the segment. The capture list is laid out one-per-line with
+ * symmetric indentation.
  */
 
 import type { AstNode } from '../../ast-types.js';
@@ -21,7 +21,7 @@ export function isCaptureWrappingQrlCall(node: AstNode): boolean {
 export function wCallSuffix(
   captures: readonly string[],
   innerIndent: string,
-  closeIndent: string,
+  closeIndent: string
 ): string {
   return `.w([\n${innerIndent}${captures.join(',\n' + innerIndent)}\n${closeIndent}])`;
 }
@@ -30,15 +30,15 @@ export function formatWCall(
   qrlVar: string,
   captures: readonly string[],
   innerIndent: string,
-  closeIndent: string,
+  closeIndent: string
 ): string {
   return qrlVar + wCallSuffix(captures, innerIndent, closeIndent);
 }
 
 /**
- * Split a bracketed array-literal string into top-level element texts. Commas
- * inside nested `()`/`[]`/`{}` or string literals don't split, so a capture that
- * is itself a call survives intact.
+ * Split a bracketed array-literal string into top-level element texts. Commas inside nested
+ * `()`/`[]`/`{}` or string literals don't split, so a capture that is itself a call survives
+ * intact.
  */
 export function parseArrayItems(arrayText: string): string[] {
   let inner = arrayText.trim();

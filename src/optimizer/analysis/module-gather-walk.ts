@@ -1,27 +1,20 @@
 /**
- * Canonical per-module gather walk: one traversal over the parsed program —
- * building the ScopeTracker as it goes — produces every per-module fact
- * (free identifiers, lexical scopes, loop contexts, scope entries, segment/root
- * usage, passive-directive conflicts, scope-aware JSX bindings) plus the
- * Phase-1 extraction set. Each fact is a projection; the standalone functions
+ * Canonical per-module gather walk: one traversal over the parsed program — building the
+ * ScopeTracker as it goes — produces every per-module fact (free identifiers, lexical scopes, loop
+ * contexts, scope entries, segment/root usage, passive-directive conflicts, scope-aware JSX
+ * bindings) plus the Phase-1 extraction set. Each fact is a projection; the standalone functions
  * they replace are retained as differential oracles.
  *
- * Projections needing whole-program knowledge before they can act (segment
- * usage must see hoisted declarations; free-identifier resolution needs the
- * complete scope tree) buffer during enter and resolve after the walk returns.
- * That post-walk resolution is what lets the tracker build during this walk
- * rather than in a separate pass before it.
+ * Projections needing whole-program knowledge before they can act (segment usage must see hoisted
+ * declarations; free-identifier resolution needs the complete scope tree) buffer during enter and
+ * resolve after the walk returns. That post-walk resolution is what lets the tracker build during
+ * this walk rather than in a separate pass before it.
  */
 
 import { isBindingIdentifier } from 'oxc-walker';
 import type { ScopeTrackerNode } from 'oxc-walker';
 import { ScopeQueryTracker } from './scope-query-tracker.js';
-import type {
-  AstEcmaScriptModule,
-  AstFunction,
-  AstNode,
-  AstProgram,
-} from '../../ast-types.js';
+import type { AstEcmaScriptModule, AstFunction, AstNode, AstProgram } from '../../ast-types.js';
 import {
   createExtractionCollector,
   type ExtractedSegment,
@@ -63,8 +56,10 @@ export interface CallExtractionRange {
   readonly callEnd: number;
 }
 
-/** One passive:/preventdefault: conflict site; emission is deferred to Phase 4
- * to preserve diagnostic order. */
+/**
+ * One passive:/preventdefault: conflict site; emission is deferred to Phase 4 to preserve
+ * diagnostic order.
+ */
 export interface PassiveConflict {
   readonly eventName: string;
   readonly start: number;
@@ -82,12 +77,11 @@ export interface ExtractionGatherInputs {
 }
 
 /**
- * Which facts to gather: each projection runs iff its input field is present —
- * an empty array/map still runs it. Two host modes: standalone-facts (caller
- * passes `closureNodes` / `usageExtractions` / `loopExtractions` for existing
- * extractions) and fused-extraction (`extraction` is set; the walk hosts the
- * Phase-1 collector and the projections key off the discovered set, so the
- * three standalone inputs must be omitted).
+ * Which facts to gather: each projection runs iff its input field is present — an empty array/map
+ * still runs it. Two host modes: standalone-facts (caller passes `closureNodes` /
+ * `usageExtractions` / `loopExtractions` for existing extractions) and fused-extraction
+ * (`extraction` is set; the walk hosts the Phase-1 collector and the projections key off the
+ * discovered set, so the three standalone inputs must be omitted).
  */
 export interface ModuleGatherInputs {
   readonly program: AstProgram;
@@ -102,9 +96,8 @@ export interface ModuleGatherInputs {
 }
 
 /**
- * Every gathered fact; fields for disabled projections are empty. The
- * closure-keyed maps key by node identity, not symbolName — names aren't final
- * until post-walk disambiguation.
+ * Every gathered fact; fields for disabled projections are empty. The closure-keyed maps key by
+ * node identity, not symbolName — names aren't final until post-walk disambiguation.
  */
 export interface ModuleGatherFacts {
   readonly extractions: readonly ExtractedSegment[];
@@ -120,9 +113,9 @@ export interface ModuleGatherFacts {
 }
 
 /**
- * Scope-key containment: is `scope` equal to or nested under `ancestor`? Keys
- * are dash-joined index paths; root is `""`. Segment-wise, not a bare
- * `startsWith`, which would make `"0-11"` a child of `"0-1"`.
+ * Scope-key containment: is `scope` equal to or nested under `ancestor`? Keys are dash-joined index
+ * paths; root is `""`. Segment-wise, not a bare `startsWith`, which would make `"0-11"` a child of
+ * `"0-1"`.
  */
 function isScopeWithin(scope: string, ancestor: string): boolean {
   if (ancestor === '') return true;
@@ -144,10 +137,9 @@ interface LexicalScopeFrame {
 }
 
 /**
- * A closure whose free identifiers are being buffered. `ownScope` (its
- * outermost pushed scope key) treats a `FunctionExpression`'s own name as
- * internal — it sits above the param scope. `seen` dedups `(scopeKey, name)`
- * pairs without disturbing first-occurrence order.
+ * A closure whose free identifiers are being buffered. `ownScope` (its outermost pushed scope key)
+ * treats a `FunctionExpression`'s own name as internal — it sits above the param scope. `seen`
+ * dedups `(scopeKey, name)` pairs without disturbing first-occurrence order.
  */
 interface OpenClosure {
   readonly fn: AstFunction;
@@ -213,8 +205,8 @@ interface GatherExitContext extends GatherEnterContext {
 }
 
 /**
- * Run the canonical gather walk — one program traversal. The ScopeTracker is
- * attached unfrozen and frozen on return before free-identifier resolution.
+ * Run the canonical gather walk — one program traversal. The ScopeTracker is attached unfrozen and
+ * frozen on return before free-identifier resolution.
  */
 export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts {
   const { program } = inputs;
@@ -232,20 +224,17 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   const openClosures: OpenClosure[] = [];
   const pendingResolutions: PendingResolution[] = [];
 
-  const lexicalEnabled =
-    inputs.closureNodes !== undefined || inputs.extraction !== undefined;
-  const lexicalClosureNodes = new Set<AstFunction>(
-    inputs.closureNodes?.values() ?? [],
-  );
+  const lexicalEnabled = inputs.closureNodes !== undefined || inputs.extraction !== undefined;
+  const lexicalClosureNodes = new Set<AstFunction>(inputs.closureNodes?.values() ?? []);
   const closureLexicalScopes = new Map<AstFunction, Set<string>>();
-  const pendingLexicalUnions: Array<{ node: AstFunction; frames: readonly LexicalScopeFrame[] }> = [];
+  const pendingLexicalUnions: Array<{ node: AstFunction; frames: readonly LexicalScopeFrame[] }> =
+    [];
   const scopeStack: LexicalScopeFrame[] = [];
   if (lexicalEnabled) {
     scopeStack.push({ node: null, set: new Set() });
   }
 
-  const loopEnabled =
-    inputs.loopExtractions !== undefined || inputs.extraction !== undefined;
+  const loopEnabled = inputs.loopExtractions !== undefined || inputs.extraction !== undefined;
   const loopExtractions = inputs.loopExtractions ?? [];
   const repairedCode = inputs.repairedCode ?? '';
   const loopStack: LoopContext[] = [];
@@ -256,8 +245,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
   const scopeEntryNodes: AstNode[] = [];
   const allScopeEntries: ScopeEntry[] = [];
 
-  const usageEnabled =
-    inputs.usageExtractions !== undefined || inputs.extraction !== undefined;
+  const usageEnabled = inputs.usageExtractions !== undefined || inputs.extraction !== undefined;
   const usageExtractions = inputs.usageExtractions ?? [];
   const segmentUsage = new Map<string, Set<string>>();
   const rootUsage = new Set<string>();
@@ -303,27 +291,32 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     freeIdentNames,
     freeIdentDedupes,
     openClosures,
-    pushOpenClosure: (oc) => { openClosures.push(oc); },
+    pushOpenClosure: (oc) => {
+      openClosures.push(oc);
+    },
     pendingResolutions,
     lexicalEnabled,
     lexicalClosureNodes,
     program,
     scopeStack,
-    pushScope: (frame) => { scopeStack.push(frame); },
+    pushScope: (frame) => {
+      scopeStack.push(frame);
+    },
     closureLexicalScopes,
     pendingLexicalUnions,
     loopEnabled,
     loopExtractions,
     repairedCode,
     loopStack,
-    pushLoop: (loopCtx) => { loopStack.push(loopCtx); },
+    pushLoop: (loopCtx) => {
+      loopStack.push(loopCtx);
+    },
     extractionLoopMap,
     loopBodyVarDecls,
     scopeEntriesEnabled,
     scopeEntryNodes,
     usageEnabled,
-    bufferDeclVisits:
-      usageExtractions.length > 0 || inputs.extraction !== undefined,
+    bufferDeclVisits: usageExtractions.length > 0 || inputs.extraction !== undefined,
     identifierVisits,
     declVisits,
     passiveEnabled,
@@ -343,10 +336,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
       if (isFunctionLike(node)) scopeStack.pop();
     },
     popLoopIfMatches: (node) => {
-      if (
-        loopStack.length > 0 &&
-        loopStack[loopStack.length - 1].loopNode === node
-      ) {
+      if (loopStack.length > 0 && loopStack[loopStack.length - 1].loopNode === node) {
         loopStack.pop();
       }
     },
@@ -375,7 +365,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
         ctx.scopeBindingsCollector?.leave(node);
       },
     },
-    { scopeTracker: tracker },
+    { scopeTracker: tracker }
   );
 
   const extractions = extractionCollector?.finish() ?? [];
@@ -383,10 +373,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     extractionLoopMap.set(ext.symbolName, stack);
   }
 
-  if (
-    scopeEntriesEnabled &&
-    (inputs.extraction === undefined || extractions.length > 0)
-  ) {
+  if (scopeEntriesEnabled && (inputs.extraction === undefined || extractions.length > 0)) {
     for (const node of scopeEntryNodes) {
       if (isFunctionLike(node)) {
         allScopeEntries.push(buildFunctionScopeEntry(node));
@@ -409,8 +396,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
     closureLexicalScopes.set(node, union);
   }
 
-  const classifyUsage =
-    usageEnabled && (inputs.extraction === undefined || extractions.length > 0);
+  const classifyUsage = usageEnabled && (inputs.extraction === undefined || extractions.length > 0);
   if (classifyUsage) {
     const usageRanges: ReadonlyArray<UsageExtractionRange> =
       inputs.extraction !== undefined ? extractions : usageExtractions;
@@ -426,7 +412,7 @@ export function gatherModuleFacts(inputs: ModuleGatherInputs): ModuleGatherFacts
       extractionLocals,
       collectRootDeclPositions(program),
       segmentUsage,
-      rootUsage,
+      rootUsage
     );
   }
 
@@ -463,15 +449,14 @@ function isComputedKeyReference(node: AstNode, parent: AstNode | null): boolean 
 }
 
 /**
- * Free-identifier projection: buffer `(name, scopeKey)` per open closure;
- * resolution happens post-walk in {@link resolveFreeIdentifiers}. The same name
- * can resolve free at one reference and internal at another (shadowing), so the
- * buffer keys on the scope key, not the name alone.
+ * Free-identifier projection: buffer `(name, scopeKey)` per open closure; resolution happens
+ * post-walk in {@link resolveFreeIdentifiers}. The same name can resolve free at one reference and
+ * internal at another (shadowing), so the buffer keys on the scope key, not the name alone.
  */
 function enterFreeIdentifiers(
   node: AstNode,
   parent: AstNode | null,
-  ctx: GatherEnterContext,
+  ctx: GatherEnterContext
 ): void {
   const { tracker, openClosures } = ctx;
 
@@ -507,13 +492,13 @@ function enterFreeIdentifiers(
 }
 
 /**
- * Resolve the buffered free-identifier visits in occurrence order against the
- * frozen tracker. Memoized per `(name, scopeKey)`: the chain-walk is the
- * expensive step and identical pairs resolve identically.
+ * Resolve the buffered free-identifier visits in occurrence order against the frozen tracker.
+ * Memoized per `(name, scopeKey)`: the chain-walk is the expensive step and identical pairs resolve
+ * identically.
  */
 function resolveFreeIdentifiers(
   pending: readonly PendingResolution[],
-  tracker: ScopeQueryTracker,
+  tracker: ScopeQueryTracker
 ): void {
   const memo = new Map<string, ScopeTrackerNode | null>();
   for (const { oc, name, scopeKey } of pending) {
@@ -575,8 +560,14 @@ function enterLoopMap(node: AstNode, ctx: GatherEnterContext): void {
   }
   if (node.type === 'VariableDeclaration' && ctx.loopStack.length > 0 && node.start !== undefined) {
     const innermost = ctx.loopStack[ctx.loopStack.length - 1];
-    if (node.start >= innermost.loopBodyStart && node.end !== undefined && node.end <= innermost.loopBodyEnd) {
-      const bucket = ctx.loopBodyVarDecls.get(loopBodyKey(innermost.loopBodyStart, innermost.loopBodyEnd))!;
+    if (
+      node.start >= innermost.loopBodyStart &&
+      node.end !== undefined &&
+      node.end <= innermost.loopBodyEnd
+    ) {
+      const bucket = ctx.loopBodyVarDecls.get(
+        loopBodyKey(innermost.loopBodyStart, innermost.loopBodyEnd)
+      )!;
       for (const decl of node.declarations ?? []) {
         if (decl.id?.type === 'Identifier') {
           bucket.push({ name: decl.id.name, declStart: decl.start ?? node.start });
@@ -584,11 +575,7 @@ function enterLoopMap(node: AstNode, ctx: GatherEnterContext): void {
       }
     }
   }
-  if (
-    node.start !== undefined &&
-    node.end !== undefined &&
-    ctx.loopStack.length > 0
-  ) {
+  if (node.start !== undefined && node.end !== undefined && ctx.loopStack.length > 0) {
     for (const ext of ctx.loopExtractions) {
       if (node.start <= ext.callStart && node.end >= ext.callEnd) {
         if (
@@ -603,9 +590,8 @@ function enterLoopMap(node: AstNode, ctx: GatherEnterContext): void {
 }
 
 /**
- * Scope-entry projection: buffer nodes; entry records build post-walk, skipped
- * when a fused walk found no extractions (the sole consumer iterates
- * extractions).
+ * Scope-entry projection: buffer nodes; entry records build post-walk, skipped when a fused walk
+ * found no extractions (the sole consumer iterates extractions).
  */
 function enterScopeEntries(node: AstNode, ctx: GatherEnterContext): void {
   if (!ctx.scopeEntriesEnabled) return;
@@ -622,13 +608,11 @@ function enterScopeEntries(node: AstNode, ctx: GatherEnterContext): void {
   }
 }
 
-/** Segment-usage projection: buffer decl/identifier visits; attribution happens
- * post-walk in {@link classifySegmentUsage}. */
-function enterSegmentUsage(
-  node: AstNode,
-  parent: AstNode | null,
-  ctx: GatherEnterContext,
-): void {
+/**
+ * Segment-usage projection: buffer decl/identifier visits; attribution happens post-walk in
+ * {@link classifySegmentUsage}.
+ */
+function enterSegmentUsage(node: AstNode, parent: AstNode | null, ctx: GatherEnterContext): void {
   if (!ctx.usageEnabled) return;
 
   if (ctx.bufferDeclVisits && DECLARATION_TYPES.has(node.type)) {
@@ -671,10 +655,9 @@ function enterPassiveConflicts(node: AstNode, ctx: GatherEnterContext): void {
 }
 
 /**
- * A sweep cursor over extraction arg ranges: fed ascending positions, it keeps
- * the stack of ranges containing the current position. Arg ranges are AST node
- * ranges, so they nest or are disjoint — the stack top is always the innermost
- * containing range.
+ * A sweep cursor over extraction arg ranges: fed ascending positions, it keeps the stack of ranges
+ * containing the current position. Arg ranges are AST node ranges, so they nest or are disjoint —
+ * the stack top is always the innermost containing range.
  */
 class ExtractionRangeSweep {
   private readonly sorted: UsageExtractionRange[];
@@ -684,13 +667,13 @@ class ExtractionRangeSweep {
   constructor(extractions: ReadonlyArray<UsageExtractionRange>) {
     // Ascending argStart; ties open the wider (outer) range first so the
     // stack stays outer-below-inner.
-    this.sorted = [...extractions].sort(
-      (a, b) => a.argStart - b.argStart || b.argEnd - a.argEnd,
-    );
+    this.sorted = [...extractions].sort((a, b) => a.argStart - b.argStart || b.argEnd - a.argEnd);
   }
 
-  /** Advance to `pos`; afterwards `stack` holds exactly the ranges with
-   * `argStart <= pos < argEnd`, innermost on top. */
+  /**
+   * Advance to `pos`; afterwards `stack` holds exactly the ranges with `argStart <= pos < argEnd`,
+   * innermost on top.
+   */
   advanceTo(pos: number): void {
     const { sorted, stack } = this;
     while (stack.length > 0 && stack[stack.length - 1].argEnd <= pos) {
@@ -705,12 +688,11 @@ class ExtractionRangeSweep {
 }
 
 /**
- * Post-walk classification of buffered declaration and identifier visits.
- * Attribution waits for the full locals map because in DFS order an identifier
- * reference can be visited before its hoisted declaration
- * (`function f() { g(); function g() {} }`), so visits are buffered and
- * classified post-walk. Both buffers are classified by a sorted range-stack
- * sweep, so the sweep is independent of walker visit order.
+ * Post-walk classification of buffered declaration and identifier visits. Attribution waits for the
+ * full locals map because in DFS order an identifier reference can be visited before its hoisted
+ * declaration (`function f() { g(); function g() {} }`), so visits are buffered and classified
+ * post-walk. Both buffers are classified by a sorted range-stack sweep, so the sweep is independent
+ * of walker visit order.
  */
 function classifySegmentUsage(
   declVisits: readonly AstNode[],
@@ -719,7 +701,7 @@ function classifySegmentUsage(
   extractionLocals: ReadonlyMap<string, Set<string>>,
   rootDeclPositions: ReadonlySet<number>,
   segmentUsage: Map<string, Set<string>>,
-  rootUsage: Set<string>,
+  rootUsage: Set<string>
 ): void {
   const declSweep = new ExtractionRangeSweep(extractions);
   const sortedDecls = [...declVisits].sort((a, b) => a.start - b.start);

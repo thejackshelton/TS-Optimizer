@@ -13,16 +13,16 @@ describe('buildQrlDevDeclaration', () => {
       '/user/qwik/src/test.tsx',
       88,
       200,
-      'test.tsx_App_component',
+      'test.tsx_App_component'
     );
 
     expect(result).toBe(
       'const q_App_component_ckEPmXZlub0 = /*#__PURE__*/ qrlDEV(()=>import("./test.tsx_App_component_ckEPmXZlub0"), "App_component_ckEPmXZlub0", {\n' +
-      '    file: "/user/qwik/src/test.tsx",\n' +
-      '    lo: 88,\n' +
-      '    hi: 200,\n' +
-      '    displayName: "test.tsx_App_component"\n' +
-      '});',
+        '    file: "/user/qwik/src/test.tsx",\n' +
+        '    lo: 88,\n' +
+        '    hi: 200,\n' +
+        '    displayName: "test.tsx_App_component"\n' +
+        '});'
     );
   });
 
@@ -33,7 +33,7 @@ describe('buildQrlDevDeclaration', () => {
       '/project/src/counter.tsx',
       10,
       50,
-      'src/counter.tsx_Counter_component_onClick',
+      'src/counter.tsx_Counter_component_onClick'
     );
 
     expect(result).toContain('qrlDEV(');
@@ -47,7 +47,7 @@ describe('buildQrlDevDeclaration', () => {
 describe('buildDevFilePath', () => {
   it('returns devPath when provided', () => {
     expect(buildDevFilePath('test.tsx', '/src', '/custom/dev/path/test.tsx')).toBe(
-      '/custom/dev/path/test.tsx',
+      '/custom/dev/path/test.tsx'
     );
   });
 

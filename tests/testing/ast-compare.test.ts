@@ -42,11 +42,7 @@ describe('compareAst', () => {
   });
 
   it('JSX works', () => {
-    const result = compareAst(
-      '<div onClick={handler}/>',
-      '<div onClick={handler} />',
-      'test.tsx',
-    );
+    const result = compareAst('<div onClick={handler}/>', '<div onClick={handler} />', 'test.tsx');
     expect(result.match).toBe(true);
   });
 

@@ -3,18 +3,18 @@ import type { AstFunction, AstProgram } from '../../ast-types.js';
 import { parseWithRawTransfer } from '../ast/parse.js';
 
 /**
- * Every session wraps the body identically (and parses under one filename) so the
- * parse memo can key on the wrapped source and share a parse across consecutive
- * helpers operating on the same text.
+ * Every session wraps the body identically (and parses under one filename) so the parse memo can
+ * key on the wrapped source and share a parse across consecutive helpers operating on the same
+ * text.
  */
 const WRAPPER_PREFIX = 'const __seg__ = ';
 const SESSION_FILENAME = '__session__.tsx';
 
 /**
- * Parse memo keyed by the exact wrapped source string, so a text change between
- * helpers produces a different key and staleness is impossible. Sharing a parsed
- * AST is safe: raw-transfer parses materialize plain JS objects (no buffer
- * aliasing) and consumers read without mutating; each session gets its own MagicString.
+ * Parse memo keyed by the exact wrapped source string, so a text change between helpers produces a
+ * different key and staleness is impossible. Sharing a parsed AST is safe: raw-transfer parses
+ * materialize plain JS objects (no buffer aliasing) and consumers read without mutating; each
+ * session gets its own MagicString.
  */
 const PARSE_MEMO_CAP = 16;
 const parseMemo = new Map<string, ReturnType<typeof parseWithRawTransfer>>();
@@ -53,17 +53,16 @@ export interface FunctionTransformSession extends TransformSession {
 
 interface TransformSessionOptions {
   /**
-   * Proceed with the recovered AST when the parse reports recoverable errors.
-   * Analysis call sites whose inputs legitimately contain recoverable shapes
-   * (e.g. `() => await api()` in non-async position) opt in; edit-applying sites
-   * stay strict and bail to their unchanged-text fallback.
+   * Proceed with the recovered AST when the parse reports recoverable errors. Analysis call sites
+   * whose inputs legitimately contain recoverable shapes (e.g. `() => await api()` in non-async
+   * position) opt in; edit-applying sites stay strict and bail to their unchanged-text fallback.
    */
   tolerateErrors?: boolean;
 }
 
 export function createTransformSession(
   sourceText: string,
-  options: TransformSessionOptions = {},
+  options: TransformSessionOptions = {}
 ): TransformSession | null {
   const wrappedSource = WRAPPER_PREFIX + sourceText;
   const parseResult = memoizedParse(wrappedSource);
@@ -91,7 +90,7 @@ export function createTransformSession(
       const transformed = edits.toString();
       return transformed.slice(
         this.wrapperPrefix.length,
-        transformed.length - this.wrapperSuffix.length,
+        transformed.length - this.wrapperSuffix.length
       );
     },
   };
@@ -99,7 +98,7 @@ export function createTransformSession(
 
 export function createFunctionTransformSession(
   sourceText: string,
-  options: TransformSessionOptions = {},
+  options: TransformSessionOptions = {}
 ): FunctionTransformSession | null {
   const session = createTransformSession(sourceText, options);
   if (!session) return null;
@@ -121,7 +120,7 @@ export function createFunctionTransformSession(
 export function insertFunctionBodyPrologue(
   session: TransformSession,
   fn: AstFunction,
-  line: string,
+  line: string
 ): void {
   if (!fn.body) return;
   if (fn.body.type === 'BlockStatement') {
@@ -130,17 +129,13 @@ export function insertFunctionBodyPrologue(
   }
 
   const expressionText = session.wrappedSource.slice(fn.body.start, fn.body.end);
-  session.edits.overwrite(
-    fn.body.start,
-    fn.body.end,
-    `{\n${line}\nreturn ${expressionText};\n}`,
-  );
+  session.edits.overwrite(fn.body.start, fn.body.end, `{\n${line}\nreturn ${expressionText};\n}`);
 }
 
 export function replaceFunctionParams(
   session: TransformSession,
   fn: AstFunction,
-  paramNames: string[],
+  paramNames: string[]
 ): boolean {
   if (!fn.body) return false;
   const paramList = paramNames.join(', ');
@@ -153,7 +148,7 @@ export function replaceFunctionParams(
     session.edits.overwrite(
       firstParam.start,
       lastParam.end,
-      hasParens ? paramList : `(${paramList})`,
+      hasParens ? paramList : `(${paramList})`
     );
     return true;
   }

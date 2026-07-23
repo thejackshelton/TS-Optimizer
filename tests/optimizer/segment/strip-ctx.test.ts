@@ -50,13 +50,13 @@ describe('strip-ctx', () => {
   describe('generateStrippedSegmentCode', () => {
     it('generates null export for symbol name', () => {
       expect(generateStrippedSegmentCode('s_r1qAHX7Opp0')).toBe(
-        'export const s_r1qAHX7Opp0 = null;',
+        'export const s_r1qAHX7Opp0 = null;'
       );
     });
 
     it('generates null export for different symbol name', () => {
       expect(generateStrippedSegmentCode('s_ddV1irobfWI')).toBe(
-        'export const s_ddV1irobfWI = null;',
+        'export const s_ddV1irobfWI = null;'
       );
     });
   });

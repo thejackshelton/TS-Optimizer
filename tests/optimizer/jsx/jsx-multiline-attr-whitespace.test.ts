@@ -19,7 +19,7 @@ function classValueAfterTransform(rawClassValue: string): string {
     `});\n`;
   const result = transform(source);
   const seg = result.modules.find(
-    (m) => m.kind === 'segment' && m.segment.name.startsWith('C_component_'),
+    (m) => m.kind === 'segment' && m.segment.name.startsWith('C_component_')
   );
   if (seg?.kind !== 'segment') throw new Error('expected component segment');
   const parsed = parseSync('seg.js', seg.code, { lang: 'tsx' });
@@ -42,7 +42,7 @@ describe('multi-line JSX attribute string whitespace folding', () => {
       `});\n`;
     const result = transform(source);
     const seg = result.modules.find(
-      (m) => m.kind === 'segment' && m.segment.name.startsWith('Decor_component_'),
+      (m) => m.kind === 'segment' && m.segment.name.startsWith('Decor_component_')
     );
     if (seg?.kind !== 'segment') throw new Error('expected component segment');
     const parsed = parseSync('seg.js', seg.code, { lang: 'tsx' });

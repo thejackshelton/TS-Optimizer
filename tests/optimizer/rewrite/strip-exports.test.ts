@@ -114,7 +114,9 @@ export const baz = () => { return 3; };
 }
 `;
     const result = runStrip(source, ['onGet']);
-    expect(result.code).toContain('throw "Symbol removed by Qwik Optimizer, it can not be called from current platform"');
+    expect(result.code).toContain(
+      'throw "Symbol removed by Qwik Optimizer, it can not be called from current platform"'
+    );
     expect(result.strippedNames).toEqual(['onGet']);
   });
 });

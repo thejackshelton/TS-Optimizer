@@ -1,6 +1,4 @@
-/**
- * Const literal propagation and inlining utilities.
- */
+/** Const literal propagation and inlining utilities. */
 
 import { forEachAstChild } from '../ast/guards.js';
 import { applyReplacements, isReplaceableIdentifierPosition } from '../edit/range-replace.js';
@@ -19,7 +17,7 @@ function collectConstLiteralValues(
   source: string,
   offset: number,
   captureSet: Set<string>,
-  result: Map<string, string>,
+  result: Map<string, string>
 ): void {
   function walkNode(node: AstNode | null | undefined): void {
     if (!node) return;
@@ -46,7 +44,10 @@ function collectConstLiteralValues(
   walkNode(root);
 }
 
-export function resolveConstLiterals(parentBody: string, captureNames: string[]): Map<string, string> {
+export function resolveConstLiterals(
+  parentBody: string,
+  captureNames: string[]
+): Map<string, string> {
   const result = new Map<string, string>();
   if (captureNames.length === 0) return result;
 
@@ -58,19 +59,19 @@ export function resolveConstLiterals(parentBody: string, captureNames: string[])
     parentBody,
     session.offset,
     new Set(captureNames),
-    result,
+    result
   );
   return result;
 }
 
 /**
- * Walks an already-parsed closure node directly. `init.start`/`init.end` on
- * each node are source-absolute offsets into `source`, not body-relative.
+ * Walks an already-parsed closure node directly. `init.start`/`init.end` on each node are
+ * source-absolute offsets into `source`, not body-relative.
  */
 export function resolveConstLiteralsInClosure(
   closureNode: AstFunction,
   source: string,
-  captureNames: string[],
+  captureNames: string[]
 ): Map<string, string> {
   const result = new Map<string, string>();
   if (captureNames.length === 0) return result;
@@ -80,10 +81,7 @@ export function resolveConstLiteralsInClosure(
   return result;
 }
 
-/**
- * AST-based (not textual) so property names sharing a captured identifier's
- * name are not replaced.
- */
+/** AST-based (not textual) so property names sharing a captured identifier's name are not replaced. */
 export function inlineConstCaptures(body: string, constValues: Map<string, string>): string {
   const session = createTransformSession(body);
   if (!session) return body;
@@ -91,7 +89,11 @@ export function inlineConstCaptures(body: string, constValues: Map<string, strin
   const offset = session.offset;
   const replacements: Array<{ start: number; end: number; replacement: string }> = [];
 
-  function walkNode(node: AstNode | null | undefined, parentKey?: string, parentNode?: AstNode): void {
+  function walkNode(
+    node: AstNode | null | undefined,
+    parentKey?: string,
+    parentNode?: AstNode
+  ): void {
     if (!node) return;
 
     if (node.type === 'Identifier' && constValues.has(node.name)) {
@@ -155,7 +157,10 @@ function collectIdentifiers(node: AstNode): string[] {
   const ids: string[] = [];
   function walk(n: AstNode | null | undefined): void {
     if (!n) return;
-    if (n.type === 'Identifier') { ids.push(n.name); return; }
+    if (n.type === 'Identifier') {
+      ids.push(n.name);
+      return;
+    }
     forEachAstChild(n, (child) => walk(child));
   }
   walk(node);
@@ -169,8 +174,8 @@ function memberRootName(member: AstNode): string | null {
 }
 
 /**
- * Inlining a member read of a mutated object is unsound: `const i = ctx.n`
- * before `ctx.n++` must not fold into `return ctx.n` after it.
+ * Inlining a member read of a mutated object is unsound: `const i = ctx.n` before `ctx.n++` must
+ * not fold into `return ctx.n` after it.
  */
 function readsMutatedObject(node: AstNode, mutatedObjects: ReadonlySet<string>): boolean {
   if (mutatedObjects.size === 0) return false;
@@ -179,7 +184,10 @@ function readsMutatedObject(node: AstNode, mutatedObjects: ReadonlySet<string>):
     if (!n || found) return;
     if (n.type === 'MemberExpression') {
       const root = memberRootName(n);
-      if (root && mutatedObjects.has(root)) { found = true; return; }
+      if (root && mutatedObjects.has(root)) {
+        found = true;
+        return;
+      }
     }
     forEachAstChild(n, (child) => walk(child));
   }
@@ -200,7 +208,11 @@ export function propagateConstLiteralsInBody(body: string): string {
 
   let currentDeclName: string | null = null;
 
-  function walkCollect(node: AstNode | null | undefined, parentKey?: string, parentNode?: AstNode): void {
+  function walkCollect(
+    node: AstNode | null | undefined,
+    parentKey?: string,
+    parentNode?: AstNode
+  ): void {
     if (!node) return;
 
     if (node.type === 'VariableDeclaration' && (node.kind === 'let' || node.kind === 'var')) {
@@ -218,8 +230,11 @@ export function propagateConstLiteralsInBody(body: string): string {
       if (root) mutatedObjects.add(root);
     }
 
-    if (node.type === 'VariableDeclaration' && node.kind === 'const' &&
-        node.declarations.length === 1) {
+    if (
+      node.type === 'VariableDeclaration' &&
+      node.kind === 'const' &&
+      node.declarations.length === 1
+    ) {
       const decl = node.declarations[0];
       if (decl.id.type === 'Identifier' && decl.init) {
         const init = decl.init;
@@ -265,7 +280,11 @@ export function propagateConstLiteralsInBody(body: string): string {
     });
   }
 
-  function collectReferencesInInitializer(init: AstNode, declNode: AstNode, declName: string): void {
+  function collectReferencesInInitializer(
+    init: AstNode,
+    declNode: AstNode,
+    declName: string
+  ): void {
     const savedDeclName = currentDeclName;
     currentDeclName = declName;
     walkCollect(init, 'init', declNode);
@@ -331,7 +350,7 @@ export function propagateConstLiteralsInBody(body: string): string {
     if (!decl.isSideEffectFree) continue;
     if (decl.isLiteral) continue;
 
-    const referencesMutable = decl.initRefersTo.some(id => mutableVars.has(id));
+    const referencesMutable = decl.initRefersTo.some((id) => mutableVars.has(id));
     if (referencesMutable) continue;
 
     if (readsMutatedObject(decl.initNode, mutatedObjects)) continue;
@@ -359,17 +378,19 @@ export function propagateConstLiteralsInBody(body: string): string {
     const refs = externalRefCounts.get(name) ?? 0;
     if (refs === 1) {
       let initText = decl.initText;
-      const refsInInit = identRefs.filter(r => r.insideDeclOf === name && resolvedValues.has(r.name));
+      const refsInInit = identRefs.filter(
+        (r) => r.insideDeclOf === name && resolvedValues.has(r.name)
+      );
       if (refsInInit.length > 0) {
         // Ref positions are body-relative; initText starts at the decl's init position.
         const initOffset = decl.initNode.start - offset;
         const initReplacements = refsInInit
-          .map(r => ({
+          .map((r) => ({
             start: r.start - initOffset,
             end: r.end - initOffset,
             replacement: resolvedValues.get(r.name)!,
           }))
-          .filter(rep => rep.start >= 0 && rep.end <= initText.length);
+          .filter((rep) => rep.start >= 0 && rep.end <= initText.length);
         initText = applyReplacements(initText, initReplacements);
       }
       toInline.set(name, initText);
@@ -397,7 +418,8 @@ export function propagateConstLiteralsInBody(body: string): string {
     const decl = constDecls.get(name)!;
     let start = decl.stmtStart;
     let end = decl.stmtEnd;
-    while (end < body.length && (body[end] === ';' || body[end] === ' ' || body[end] === '\t')) end++;
+    while (end < body.length && (body[end] === ';' || body[end] === ' ' || body[end] === '\t'))
+      end++;
     if (end < body.length && body[end] === '\n') end++;
     while (start > 0 && (body[start - 1] === ' ' || body[start - 1] === '\t')) start--;
     edits.push({

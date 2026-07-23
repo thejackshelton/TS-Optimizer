@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { parseSync } from 'oxc-parser';
 import { walk } from 'oxc-walker';
@@ -138,18 +137,12 @@ describe('eventHandlerQpParams', () => {
 
   it('returns capture params after the prefix in positional order', () => {
     expect(eventHandlerQpParams(['_', '_1', 'item'])).toEqual(['item']);
-    expect(eventHandlerQpParams(['_', '_1', 'item', 'idx'])).toEqual([
-      'item',
-      'idx',
-    ]);
+    expect(eventHandlerQpParams(['_', '_1', 'item', 'idx'])).toEqual(['item', 'idx']);
   });
 
   it('skips numbered padding params from unused slots', () => {
     expect(eventHandlerQpParams(['_', '_1', '_2', 'idx'])).toEqual(['idx']);
-    expect(eventHandlerQpParams(['_', '_1', 'item', '_3', 'key'])).toEqual([
-      'item',
-      'key',
-    ]);
+    expect(eventHandlerQpParams(['_', '_1', 'item', '_3', 'key'])).toEqual(['item', 'key']);
     expect(eventHandlerQpParams(['_', '_1', '_2', '_3'])).toEqual([]);
   });
 
@@ -160,10 +153,7 @@ describe('eventHandlerQpParams', () => {
   });
 
   it('keeps underscore-prefixed identifiers that are not padding-shaped', () => {
-    expect(eventHandlerQpParams(['_', '_1', '_foo', '_bar2'])).toEqual([
-      '_foo',
-      '_bar2',
-    ]);
+    expect(eventHandlerQpParams(['_', '_1', '_foo', '_bar2'])).toEqual(['_foo', '_bar2']);
   });
 });
 

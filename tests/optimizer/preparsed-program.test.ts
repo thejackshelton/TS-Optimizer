@@ -3,10 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { transformModule } from '../../src/index.js';
 import { RAW_TRANSFER_PARSER_OPTIONS } from '../../src/ast-types.js';
-import {
-  mkFilePath,
-  mkSourceText,
-} from '../../src/optimizer/types/brands.js';
+import { mkFilePath, mkSourceText } from '../../src/optimizer/types/brands.js';
 
 const FIXTURE_SOURCE = `
 import { component$ } from '@qwik.dev/core';

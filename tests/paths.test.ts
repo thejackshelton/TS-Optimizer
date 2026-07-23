@@ -20,8 +20,12 @@ describe('path-utils', () => {
   });
 
   it('preserves current computeRelPath behavior for paths outside srcDir', () => {
-    expect(computeRelPath(mkFilePath('src/routes/index.tsx'), mkFilePath('src'))).toBe('routes/index.tsx');
-    expect(computeRelPath(mkFilePath('other/index.tsx'), mkFilePath('src'))).toBe('other/index.tsx');
+    expect(computeRelPath(mkFilePath('src/routes/index.tsx'), mkFilePath('src'))).toBe(
+      'routes/index.tsx'
+    );
+    expect(computeRelPath(mkFilePath('other/index.tsx'), mkFilePath('src'))).toBe(
+      'other/index.tsx'
+    );
     expect(computeRelPath(mkFilePath('src'), mkFilePath('src'))).toBe('src');
   });
 
@@ -31,9 +35,13 @@ describe('path-utils', () => {
     // the contract the `RelativePath` brand validates. Without the strip,
     // `mkRelativePath(computeRelPath(...))` would throw at construction.
     expect(computeRelPath(mkFilePath('/abs/foo.tsx'), mkFilePath('src'))).toBe('abs/foo.tsx');
-    expect(computeRelPath(mkFilePath('/some/other/path.tsx'), mkFilePath('.'))).toBe('some/other/path.tsx');
+    expect(computeRelPath(mkFilePath('/some/other/path.tsx'), mkFilePath('.'))).toBe(
+      'some/other/path.tsx'
+    );
     // Non-absolute input is unaffected.
-    expect(computeRelPath(mkFilePath('relative/path.tsx'), mkFilePath('src'))).toBe('relative/path.tsx');
+    expect(computeRelPath(mkFilePath('relative/path.tsx'), mkFilePath('src'))).toBe(
+      'relative/path.tsx'
+    );
   });
 
   it('emits a `../`-relative path when both input and srcDir are absolute and input is outside srcDir', () => {
@@ -44,21 +52,27 @@ describe('path-utils', () => {
     expect(
       computeRelPath(
         mkFilePath('/proj/node_modules/@qwik.dev/router/lib/index.qwik.mjs'),
-        mkFilePath('/proj/fixtures/app'),
-      ),
+        mkFilePath('/proj/fixtures/app')
+      )
     ).toBe('../../node_modules/@qwik.dev/router/lib/index.qwik.mjs');
-    expect(
-      computeRelPath(mkFilePath('/proj/node_modules/dep/x.mjs'), mkFilePath('/proj')),
-    ).toBe('node_modules/dep/x.mjs');
+    expect(computeRelPath(mkFilePath('/proj/node_modules/dep/x.mjs'), mkFilePath('/proj'))).toBe(
+      'node_modules/dep/x.mjs'
+    );
     // Mixed operands (relative srcDir) still fall back to slash-stripping, since
     // `relative()` is only trustworthy when both paths are absolute.
     expect(computeRelPath(mkFilePath('/abs/foo.tsx'), mkFilePath('src'))).toBe('abs/foo.tsx');
   });
 
   it('detects whether a relative import stays within the srcDir-relative tree', () => {
-    expect(isRelativePathInsideBase('./styles.css', mkRelativePath('routes/app/index.tsx'))).toBe(true);
-    expect(isRelativePathInsideBase('../shared/theme.css', mkRelativePath('routes/app/index.tsx'))).toBe(true);
-    expect(isRelativePathInsideBase('../../../global.css', mkRelativePath('routes/app/index.tsx'))).toBe(false);
+    expect(isRelativePathInsideBase('./styles.css', mkRelativePath('routes/app/index.tsx'))).toBe(
+      true
+    );
+    expect(
+      isRelativePathInsideBase('../shared/theme.css', mkRelativePath('routes/app/index.tsx'))
+    ).toBe(true);
+    expect(
+      isRelativePathInsideBase('../../../global.css', mkRelativePath('routes/app/index.tsx'))
+    ).toBe(false);
     expect(isRelativePathInsideBase('../outside.css', mkRelativePath('index.tsx'))).toBe(false);
   });
 });

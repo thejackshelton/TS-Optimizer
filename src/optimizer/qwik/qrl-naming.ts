@@ -9,9 +9,9 @@ export function getQrlCalleeName(markerName: string): string {
 }
 
 /**
- * A `$`-suffixed marker other than the bare `$`. Lib mode preserves these imports
- * so downstream consumers can re-import the markers; the bare `$` has no marker
- * semantics after extraction and is dropped.
+ * A `$`-suffixed marker other than the bare `$`. Lib mode preserves these imports so downstream
+ * consumers can re-import the markers; the bare `$` has no marker semantics after extraction and is
+ * dropped.
  */
 export function isLibModePreservedMarker(importedName: string): boolean {
   return importedName.length > 1 && importedName.endsWith('$');

@@ -25,9 +25,7 @@ export const App = component$(() => {
   return <div onClick$={handler}>x</div>;
 });
 `);
-      const handler = result.modules.find(
-        (m) => m.kind === 'segment' && m.segment.ctxName === '$',
-      );
+      const handler = result.modules.find((m) => m.kind === 'segment' && m.segment.ctxName === '$');
       if (handler?.kind !== 'segment') throw new Error('$ handler segment missing');
       expect(handler.code).not.toMatch(/\(id:\s*number\s*\)/);
       expect(handler.code).toMatch(/=\s*\(\s*id\s*\)\s*=>/);
@@ -41,9 +39,7 @@ export const App = component$(() => {
   return <div onClick$={handler}>x</div>;
 });
 `);
-      const handler = result.modules.find(
-        (m) => m.kind === 'segment' && m.segment.ctxName === '$',
-      );
+      const handler = result.modules.find((m) => m.kind === 'segment' && m.segment.ctxName === '$');
       if (handler?.kind !== 'segment') throw new Error('$ handler segment missing');
       expect(handler.code).not.toMatch(/:\s*number/);
       expect(handler.code).not.toMatch(/:\s*string/);
@@ -61,9 +57,7 @@ export const App = component$(() => {
   return <div onClick$={handler}>x</div>;
 });
 `);
-      const handler = result.modules.find(
-        (m) => m.kind === 'segment' && m.segment.ctxName === '$',
-      );
+      const handler = result.modules.find((m) => m.kind === 'segment' && m.segment.ctxName === '$');
       if (handler?.kind !== 'segment') throw new Error('$ handler segment missing');
       expect(handler.code).not.toMatch(/\(items:\s*number\[\]\)/);
       expect(handler.code).not.toMatch(/\(x:\s*number\)/);
@@ -80,9 +74,7 @@ export const App = component$(() => {
   return <div onClick$={handler}>x</div>;
 });
 `);
-      const handler = result.modules.find(
-        (m) => m.kind === 'segment' && m.segment.ctxName === '$',
-      );
+      const handler = result.modules.find((m) => m.kind === 'segment' && m.segment.ctxName === '$');
       if (handler?.kind !== 'segment') throw new Error('$ handler segment missing');
       expect(handler.code).toMatch(/=\s*\(\s*id\s*\)\s*=>/);
       expect(handler.code).not.toMatch(/\(\s*\)\s*=>\s*console\.log\(id\)/);

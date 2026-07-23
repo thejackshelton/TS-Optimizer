@@ -25,7 +25,7 @@ export const Greet = component$((props) => <div>{props.name}</div>);
 
     const code = findParent(result).code;
     expect(code).toMatch(
-      /export const Greet = \/\*\s*[#@]__PURE__\s*\*\/ componentQrl\(\/\*\s*[#@]__PURE__\s*\*\/ inlinedQrl\(/,
+      /export const Greet = \/\*\s*[#@]__PURE__\s*\*\/ componentQrl\(\/\*\s*[#@]__PURE__\s*\*\/ inlinedQrl\(/
     );
     expect(code).toMatch(/, "Greet_component_[A-Za-z0-9_]+"\)\)/);
     expect(code).not.toMatch(/_noopQrl/);
@@ -50,7 +50,9 @@ export const C = component$(() => {
     });
 
     const code = findParent(result).code;
-    expect(code).toMatch(/inlinedQrl\(\(\)\s*=>\s*\{[\s\S]*?\}, "C_component_useTask_[A-Za-z0-9_]+", \[sig\]\)/);
+    expect(code).toMatch(
+      /inlinedQrl\(\(\)\s*=>\s*\{[\s\S]*?\}, "C_component_useTask_[A-Za-z0-9_]+", \[sig\]\)/
+    );
     expect(code).not.toMatch(/\.w\(\[/);
   });
 
@@ -72,7 +74,9 @@ const STYLES = '.class {}';
     });
 
     const code = findParent(result).code;
-    expect(code).toMatch(/useStyleQrl\(\/\*[^*]*\*\/ inlinedQrl\(STYLES, "Works_component_useStyle_[A-Za-z0-9_]+"\)\)/);
+    expect(code).toMatch(
+      /useStyleQrl\(\/\*[^*]*\*\/ inlinedQrl\(STYLES, "Works_component_useStyle_[A-Za-z0-9_]+"\)\)/
+    );
     expect(code).toMatch(/const STYLES = ['"]\.class \{\}['"]/);
   });
 

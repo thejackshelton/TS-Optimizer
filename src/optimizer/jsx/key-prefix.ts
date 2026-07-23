@@ -1,6 +1,6 @@
 /**
- * Compute a 2-character JSX key prefix: the first 2 base64 chars of the
- * SipHash-1-3 (zero-key) of the relative file path's little-endian hash bytes.
+ * Compute a 2-character JSX key prefix: the first 2 base64 chars of the SipHash-1-3 (zero-key) of
+ * the relative file path's little-endian hash bytes.
  */
 
 import SipHash13 from 'siphash/lib/siphash13.js';

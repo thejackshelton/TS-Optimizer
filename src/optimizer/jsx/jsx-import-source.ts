@@ -1,8 +1,7 @@
 /**
- * Detect an `@jsxImportSource` pragma naming a non-Qwik runtime (`react`,
- * `preact`, …), meaning the file's JSX should be compiled by that runtime,
- * not Qwik. Pragmas naming Qwik's own runtime (`@qwik.dev/core`,
- * `@builder.io/qwik`) are NOT foreign.
+ * Detect an `@jsxImportSource` pragma naming a non-Qwik runtime (`react`, `preact`, …), meaning the
+ * file's JSX should be compiled by that runtime, not Qwik. Pragmas naming Qwik's own runtime
+ * (`@qwik.dev/core`, `@builder.io/qwik`) are NOT foreign.
  */
 export function detectForeignJsxRuntime(source: string): {
   hasForeignJsxRuntime: boolean;

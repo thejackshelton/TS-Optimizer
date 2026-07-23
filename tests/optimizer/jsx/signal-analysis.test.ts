@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import {
   analyzeSignalExpression,
@@ -138,7 +137,7 @@ describe('signal-analysis', () => {
       if (result.type === 'fnSignal') {
         expect(result.deps).toEqual(['store']);
         expect(result.hoistedFn).toContain('p0.address.city.name');
-        expect(result.hoistedStr).toContain("p0.address.city.name?");
+        expect(result.hoistedStr).toContain('p0.address.city.name?');
         expect(result.hoistedStr).toContain("'true'");
         expect(result.hoistedStr).toContain("'false'");
       }

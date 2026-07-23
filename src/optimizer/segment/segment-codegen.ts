@@ -4,7 +4,12 @@ import { rewriteImportSource } from '../rewrite/rewrite-imports.js';
 import { inlineConstCaptures } from '../rewrite/index.js';
 import { hasUnderscorePlaceholderParams } from '../rewrite/predicates.js';
 import type { ConsolidatedSegment } from '../extraction/extract.js';
-import { transformAllJsx, collectScopeAwareBindings, JsxKeyCounter, type DevSuffixOptions } from '../jsx/jsx.js';
+import {
+  transformAllJsx,
+  collectScopeAwareBindings,
+  JsxKeyCounter,
+  type DevSuffixOptions,
+} from '../jsx/jsx.js';
 import { transformJsxCalls, collectJsxFunctionNames } from '../jsx/jsx-call-transform.js';
 import { SignalHoister } from '../jsx/signal-analysis.js';
 import { computeKeyPrefix } from '../jsx/key-prefix.js';
@@ -38,22 +43,30 @@ import {
 import { recollectPostTransformImports } from './import-collection.js';
 
 const qrlConstName = createRegExp(
-  exactly('const').and(oneOrMore(whitespace)).and(exactly('q_').and(oneOrMore(charNotIn(' \t\n\r'))).grouped()),
+  exactly('const')
+    .and(oneOrMore(whitespace))
+    .and(
+      exactly('q_')
+        .and(oneOrMore(charNotIn(' \t\n\r')))
+        .grouped()
+    )
 );
 
 /**
- * Capture/migration payloads for one segment. `skipCaptureInjection` means the
- * body already contains `_captures[i]` references (e.g. an `inlinedQrl`), so the
- * unpacking prologue is not re-injected. `propsFieldCaptures` are names
- * consolidated into `_rawProps` (field local → prop key); `propsFieldDefaults`
- * carries their destructure-time defaults so defaulted fields emit
- * `(_rawProps.<key> ?? <default>)`. `constLiterals` (captured name → literal
- * source) are inlined into the body.
+ * Capture/migration payloads for one segment. `skipCaptureInjection` means the body already
+ * contains `_captures[i]` references (e.g. an `inlinedQrl`), so the unpacking prologue is not
+ * re-injected. `propsFieldCaptures` are names consolidated into `_rawProps` (field local → prop
+ * key); `propsFieldDefaults` carries their destructure-time defaults so defaulted fields emit
+ * `(_rawProps.<key> ?? <default>)`. `constLiterals` (captured name → literal source) are inlined
+ * into the body.
  */
 export interface SegmentCaptureInfo {
   captureNames: string[];
   autoImports: Array<{ varName: string; parentModulePath: string }>;
-  movedDeclarations: Array<{ text: string; importDeps: Array<{ localName: string; importedName: string; source: string }> }>;
+  movedDeclarations: Array<{
+    text: string;
+    importDeps: Array<{ localName: string; importedName: string; source: string }>;
+  }>;
   skipCaptureInjection?: boolean;
   propsFieldCaptures?: Map<string, string>;
   propsFieldDefaults?: Map<string, string>;
@@ -61,7 +74,12 @@ export interface SegmentCaptureInfo {
 }
 
 export interface SegmentImportData {
-  moduleImports: Array<{ localName: string; importedName: string; source: string; importAttributes?: Record<string, string> }>;
+  moduleImports: Array<{
+    localName: string;
+    importedName: string;
+    source: string;
+    importAttributes?: Record<string, string>;
+  }>;
   sameFileSymbols: Set<string>;
   defaultExportedNames?: Set<string>;
   renamedExports?: Map<string, string>;
@@ -70,11 +88,10 @@ export interface SegmentImportData {
 }
 
 /**
- * `source` (the original module string) and `bodyOriginOffset` (the body's byte
- * offset, `ext.loc[0]`) together yield source-relative dev-info positions:
- * default-strategy segments wrap the body as `(${bodyText})` before parsing, so
- * without them dev-info `lineNumber:` lands body-relative. Both are honored only
- * when `devOptions` is set.
+ * `source` (the original module string) and `bodyOriginOffset` (the body's byte offset,
+ * `ext.loc[0]`) together yield source-relative dev-info positions: default-strategy segments wrap
+ * the body as `(${bodyText})` before parsing, so without them dev-info `lineNumber:` lands
+ * body-relative. Both are honored only when `devOptions` is set.
  */
 export interface SegmentJsxOptions {
   enableJsx: boolean;
@@ -113,7 +130,7 @@ interface SegmentImportSpec {
 function replacePropsFieldReferences(
   bodyText: string,
   fieldMap: Map<string, string>,
-  defaultValues?: ReadonlyMap<string, string>,
+  defaultValues?: ReadonlyMap<string, string>
 ): string {
   return rewritePropsFieldReferences(bodyText, fieldMap, {
     memberPropertyMode: 'all',
@@ -124,7 +141,7 @@ function replacePropsFieldReferences(
 function buildSegmentImports(
   extraction: ConsolidatedSegment,
   capturedNames: Set<string>,
-  importContext: SegmentImportData | undefined,
+  importContext: SegmentImportData | undefined
 ): { parts: string[]; importsBySource: Map<string, SegmentImportSpec[]> } {
   const parts: string[] = [];
   const importsBySource = new Map<string, SegmentImportSpec[]>();
@@ -150,7 +167,7 @@ function buildSegmentImports(
     let importAttrsSuffix = '';
     if (importContext) {
       const anySpec = specs[0];
-      const moduleImp = importContext.moduleImports.find(m => m.localName === anySpec.localName);
+      const moduleImp = importContext.moduleImports.find((m) => m.localName === anySpec.localName);
       if (moduleImp?.importAttributes) {
         const attrs = Object.entries(moduleImp.importAttributes)
           .map(([k, v]) => `${k}: "${v}"`)
@@ -164,7 +181,9 @@ function buildSegmentImports(
       importStmt = `import * as ${nsSpec.localName} from "${source}"${importAttrsSuffix};`;
     } else if (namedSpecs.length > 0) {
       const namedStr = namedSpecs
-        .map((s) => s.importedName !== s.localName ? `${s.importedName} as ${s.localName}` : s.localName)
+        .map((s) =>
+          s.importedName !== s.localName ? `${s.importedName} as ${s.localName}` : s.localName
+        )
         .join(', ');
       if (defaultSpec) {
         importStmt = `import ${defaultSpec.localName}, { ${namedStr} } from "${source}"${importAttrsSuffix};`;
@@ -182,7 +201,7 @@ function buildSegmentImports(
 
 function addCaptureAndMigrationImports(
   parts: string[],
-  captureInfo: SegmentCaptureInfo | undefined,
+  captureInfo: SegmentCaptureInfo | undefined
 ): void {
   if (captureInfo && captureInfo.captureNames.length > 0 && !captureInfo.skipCaptureInjection) {
     const qwikCoreImportIdx = parts.findIndex((p) => p.includes('"@qwik.dev/core"'));
@@ -190,7 +209,8 @@ function addCaptureAndMigrationImports(
       const existing = parts[qwikCoreImportIdx];
       const braceStart = existing.indexOf('{');
       if (braceStart >= 0) {
-        parts[qwikCoreImportIdx] = existing.slice(0, braceStart + 2) + '_captures, ' + existing.slice(braceStart + 2);
+        parts[qwikCoreImportIdx] =
+          existing.slice(0, braceStart + 2) + '_captures, ' + existing.slice(braceStart + 2);
       } else if (existing.includes('* as')) {
         parts.push(`import { _captures } from "@qwik.dev/core";`);
       } else {
@@ -203,7 +223,9 @@ function addCaptureAndMigrationImports(
 
   if (captureInfo && captureInfo.autoImports.length > 0) {
     for (const autoImp of captureInfo.autoImports) {
-      parts.push(`import { _auto_${autoImp.varName} as ${autoImp.varName} } from "${autoImp.parentModulePath}";`);
+      parts.push(
+        `import { _auto_${autoImp.varName} as ${autoImp.varName} } from "${autoImp.parentModulePath}";`
+      );
     }
   }
 
@@ -221,7 +243,9 @@ function addCaptureAndMigrationImports(
         } else {
           importLine = `import { ${dep.importedName} as ${dep.localName} } from "${rewrittenSource}";`;
         }
-        if (!parts.some(p => p.includes(`${dep.localName}`) && p.includes(`"${rewrittenSource}"`))) {
+        if (
+          !parts.some((p) => p.includes(`${dep.localName}`) && p.includes(`"${rewrittenSource}"`))
+        ) {
           insertImportBeforeSeparator(parts, importLine);
         }
       }
@@ -236,10 +260,17 @@ function addNestedQrlDeclarations(parts: string[], nestedQrlDecls: string[] | un
   if (!nestedQrlDecls || nestedQrlDecls.length === 0) return;
 
   const neededSymbols: string[] = [];
-  if (nestedQrlDecls.some(d => d.includes('qrlDEV(') && !d.includes('_noopQrlDEV('))) neededSymbols.push('qrlDEV');
-  if (nestedQrlDecls.some(d => d.includes('qrl(') && !d.includes('_noopQrl(') && !d.includes('qrlDEV('))) neededSymbols.push('qrl');
-  if (nestedQrlDecls.some(d => d.includes('_noopQrlDEV('))) neededSymbols.push('_noopQrlDEV');
-  if (nestedQrlDecls.some(d => d.includes('_noopQrl(') && !d.includes('_noopQrlDEV('))) neededSymbols.push('_noopQrl');
+  if (nestedQrlDecls.some((d) => d.includes('qrlDEV(') && !d.includes('_noopQrlDEV(')))
+    neededSymbols.push('qrlDEV');
+  if (
+    nestedQrlDecls.some(
+      (d) => d.includes('qrl(') && !d.includes('_noopQrl(') && !d.includes('qrlDEV(')
+    )
+  )
+    neededSymbols.push('qrl');
+  if (nestedQrlDecls.some((d) => d.includes('_noopQrlDEV('))) neededSymbols.push('_noopQrlDEV');
+  if (nestedQrlDecls.some((d) => d.includes('_noopQrl(') && !d.includes('_noopQrlDEV(')))
+    neededSymbols.push('_noopQrl');
 
   for (const sym of neededSymbols) {
     if (!partsHaveImport(parts, sym)) {
@@ -263,10 +294,9 @@ function addNestedQrlDeclarations(parts: string[], nestedQrlDecls: string[] | un
 }
 
 /**
- * Rewrites peer-tool `jsx(Tag, propsObj, ...)` calls (e.g. from `qwik-react`
- * codegen) into `_jsxSorted(...)` form — complementary to `transformSegmentJsx`
- * (which handles `<JSX/>` syntax), because peer tools pre-process JSX to `jsx()`
- * calls that the syntax-based pass skips.
+ * Rewrites peer-tool `jsx(Tag, propsObj, ...)` calls (e.g. from `qwik-react` codegen) into
+ * `_jsxSorted(...)` form — complementary to `transformSegmentJsx` (which handles `<JSX/>` syntax),
+ * because peer tools pre-process JSX to `jsx()` calls that the syntax-based pass skips.
  */
 function transformSegmentJsxCalls(
   bodyText: string,
@@ -275,7 +305,7 @@ function transformSegmentJsxCalls(
   importContext: SegmentImportData,
   keyCounterStartOverride: number | undefined,
   qpByQrl?: ReadonlyMap<string, readonly string[]>,
-  paramNames?: readonly string[],
+  paramNames?: readonly string[]
 ): { bodyText: string; keyCounterValue?: number } {
   // Cheap fast-path: only parse if the body even mentions a candidate
   // jsx-function name. Most segments don't.
@@ -300,7 +330,7 @@ function transformSegmentJsxCalls(
     const keyCounter = new JsxKeyCounter(startAt, prefix);
 
     const neededImports = new Set<string>();
-    const importedNames = new Set(importContext.moduleImports.map(m => m.localName));
+    const importedNames = new Set(importContext.moduleImports.map((m) => m.localName));
     const signalHoister = new SignalHoister();
     transformJsxCalls(session.wrappedSource, session.edits, session.program, {
       jsxFunctions,
@@ -317,7 +347,7 @@ function transformSegmentJsxCalls(
     if (newBodyText === bodyText) return { bodyText };
 
     for (const sym of neededImports) {
-      if (!parts.some(p => p.includes(`{ ${sym} }`) || p.includes(`, ${sym}`))) {
+      if (!parts.some((p) => p.includes(`{ ${sym} }`) || p.includes(`, ${sym}`))) {
         const sepIdx = parts.indexOf('//');
         if (sepIdx >= 0) {
           parts.splice(sepIdx, 0, `import { ${sym} } from "@qwik.dev/core";`);
@@ -340,9 +370,9 @@ function transformSegmentJsx(
   parts: string[],
   jsxOptions: SegmentJsxOptions,
   nestedCallSites: NestedCallSiteInfo[] | undefined,
-  captureInfo: SegmentCaptureInfo | undefined,
+  captureInfo: SegmentCaptureInfo | undefined
 ): { bodyText: string; keyCounterValue?: number } {
-  if (!(/(?:<[A-Z_a-z\/]|JSX)/.test(bodyText))) return { bodyText };
+  if (!/(?:<[A-Z_a-z\/]|JSX)/.test(bodyText)) return { bodyText };
 
   try {
     const session = createTransformSession(bodyText, { tolerateErrors: true });
@@ -357,18 +387,15 @@ function transformSegmentJsx(
       // body entry; they're runtime-const but have no AST declaration in
       // this body. Inject as program-scope consts so any reference in the
       // segment classifies as const (unless shadowed by an inner binding).
-      for (const name of captureInfo.captureNames) segScopeBindings.bindings.addProgramScopeConst(name);
+      for (const name of captureInfo.captureNames)
+        segScopeBindings.bindings.addProgramScopeConst(name);
     }
 
     // The session wrapper adds a prefix; without `sourcePosition`
     // dev-info `lineNumber:` would be body-relative. Source-relative
     // requires the original module source + body's byte offset.
     let devOptionsForCall = jsxOptions.devOptions;
-    if (
-      devOptionsForCall &&
-      jsxOptions.source != null &&
-      jsxOptions.bodyOriginOffset != null
-    ) {
+    if (devOptionsForCall && jsxOptions.source != null && jsxOptions.bodyOriginOffset != null) {
       devOptionsForCall = {
         ...devOptionsForCall,
         sourcePosition: {
@@ -380,7 +407,12 @@ function transformSegmentJsx(
     }
 
     const jsxResult = transformAllJsx(
-      { source: session.wrappedSource, s: session.edits, program: session.program, importedNames: jsxOptions.importedNames },
+      {
+        source: session.wrappedSource,
+        s: session.edits,
+        program: session.program,
+        importedNames: jsxOptions.importedNames,
+      },
       {
         devOptions: devOptionsForCall,
         keyCounterStart: jsxOptions.keyCounterStart,
@@ -389,18 +421,22 @@ function transformSegmentJsx(
         paramNames: jsxOptions.paramNames,
         relPath: jsxOptions.relPath,
         precomputedScopeBindings: segScopeBindings,
-      },
+      }
     );
 
     bodyText = session.toSource();
 
     for (const sym of jsxResult.neededImports) {
-      if (!parts.some(p => p.includes(`{ ${sym} }`) || p.includes(`, ${sym}`))) {
+      if (!parts.some((p) => p.includes(`{ ${sym} }`) || p.includes(`, ${sym}`))) {
         parts.splice(parts.indexOf('//'), 0, `import { ${sym} } from "@qwik.dev/core";`);
       }
     }
-    if (jsxResult.needsFragment && !parts.some(p => p.includes('_Fragment'))) {
-      parts.splice(parts.indexOf('//'), 0, `import { Fragment as _Fragment } from "@qwik.dev/core/jsx-runtime";`);
+    if (jsxResult.needsFragment && !parts.some((p) => p.includes('_Fragment'))) {
+      parts.splice(
+        parts.indexOf('//'),
+        0,
+        `import { Fragment as _Fragment } from "@qwik.dev/core/jsx-runtime";`
+      );
     }
     if (jsxResult.hoistedDeclarations) {
       for (const decl of jsxResult.hoistedDeclarations) parts.push(decl);
@@ -412,7 +448,9 @@ function transformSegmentJsx(
   }
 }
 
-function buildQrlsWithCapturesSet(nestedCallSites: NestedCallSiteInfo[] | undefined): Set<string> | undefined {
+function buildQrlsWithCapturesSet(
+  nestedCallSites: NestedCallSiteInfo[] | undefined
+): Set<string> | undefined {
   if (!nestedCallSites) return undefined;
   const result = new Set<string>();
   for (const site of nestedCallSites) {
@@ -421,8 +459,7 @@ function buildQrlsWithCapturesSet(nestedCallSites: NestedCallSiteInfo[] | undefi
     // cross-scope-capture case (`hoistedSymbolName` set, no loop-local
     // padding). Both flow data per iteration; classifying the event
     // handler entry as var rather than const is correct for both.
-    const hasLoopLocal =
-      site.loopLocalParamNames && site.loopLocalParamNames.length > 0;
+    const hasLoopLocal = site.loopLocalParamNames && site.loopLocalParamNames.length > 0;
     const hasHoistedCaptures = !!site.hoistedSymbolName;
     if (hasLoopLocal || hasHoistedCaptures) {
       result.add(site.qrlVarName);
@@ -434,7 +471,7 @@ function buildQrlsWithCapturesSet(nestedCallSites: NestedCallSiteInfo[] | undefi
 
 function buildQpOverrides(
   nestedCallSites: NestedCallSiteInfo[] | undefined,
-  program: AstProgram,
+  program: AstProgram
 ): Map<number, string[]> | undefined {
   // Also fire when any nestedCallSite carries `elementQpParams` from
   // `buildElementCaptureMap` (covers the stripped-event-with-captures
@@ -443,9 +480,9 @@ function buildQpOverrides(
   if (
     !nestedCallSites ||
     !nestedCallSites.some(
-      s =>
+      (s) =>
         (s.loopLocalParamNames && s.loopLocalParamNames.length > 0) ||
-        (s.elementQpParams && s.elementQpParams.length > 0),
+        (s.elementQpParams && s.elementQpParams.length > 0)
     )
   ) {
     return undefined;
@@ -463,7 +500,9 @@ function buildQpOverrides(
   // name but carries no `elementQpParams` still falls back to the
   // loop-local params keyed under the same name.
   const resolveParams = (qrlName: string): readonly string[] | undefined => {
-    const site = nestedCallSites.find(s => s.qrlVarName === qrlName || s.hoistedSymbolName === qrlName);
+    const site = nestedCallSites.find(
+      (s) => s.qrlVarName === qrlName || s.hoistedSymbolName === qrlName
+    );
     return site?.elementQpParams ?? qrlParamMap.get(qrlName);
   };
 
@@ -472,7 +511,7 @@ function buildQpOverrides(
 }
 
 function normalizeSeparators(parts: string[]): void {
-  const allParts = parts.filter(p => p !== '//');
+  const allParts = parts.filter((p) => p !== '//');
   const imports: string[] = [];
   const hoisted: string[] = [];
   const qrlDecls: string[] = [];
@@ -500,7 +539,7 @@ function collectInitialImports(
   capturedNames: Set<string>,
   captureInfo: SegmentCaptureInfo | undefined,
   nestedQrlDecls: string[] | undefined,
-  importContext: SegmentImportData | undefined,
+  importContext: SegmentImportData | undefined
 ): { parts: string[]; importsBySource: Map<string, SegmentImportSpec[]> } {
   const { parts, importsBySource } = buildSegmentImports(extraction, capturedNames, importContext);
   addCaptureAndMigrationImports(parts, captureInfo);
@@ -509,16 +548,15 @@ function collectInitialImports(
 }
 
 /**
- * Returns the updated `captureInfo` because const-literal inlining filters
- * inlined names out of `captureNames`; downstream phases (JSX, captures
- * unpacking) need that filtered view.
+ * Returns the updated `captureInfo` because const-literal inlining filters inlined names out of
+ * `captureNames`; downstream phases (JSX, captures unpacking) need that filtered view.
  */
 function applyBodyTransforms(
   extraction: ConsolidatedSegment,
   parts: string[],
   captureInfo: SegmentCaptureInfo | undefined,
   nestedCallSites: NestedCallSiteInfo[] | undefined,
-  enumValueMap: Map<string, Map<string, string>> | undefined,
+  enumValueMap: Map<string, Map<string, string>> | undefined
 ): { bodyText: string; captureInfo: SegmentCaptureInfo | undefined } {
   // Internal helpers work on plain string; the BodyText brand applies only at
   // the ExtractionResult boundary.
@@ -551,7 +589,7 @@ function applyBodyTransforms(
     bodyText = replacePropsFieldReferences(
       bodyText,
       propsFieldCaptures,
-      captureInfo?.propsFieldDefaults,
+      captureInfo?.propsFieldDefaults
     );
   }
 
@@ -561,7 +599,7 @@ function applyBodyTransforms(
     bodyText = inlineConstCaptures(bodyText, constLiterals);
     liveCaptureInfo = {
       ...captureInfo,
-      captureNames: captureInfo.captureNames.filter(n => !constLiterals.has(n)),
+      captureNames: captureInfo.captureNames.filter((n) => !constLiterals.has(n)),
     };
   }
 
@@ -583,21 +621,35 @@ export function generateSegmentCode(
   jsxOptions?: SegmentJsxOptions,
   nestedCallSites?: NestedCallSiteInfo[],
   importContext?: SegmentImportData,
-  enumValueMap?: Map<string, Map<string, string>>,
+  enumValueMap?: Map<string, Map<string, string>>
 ): { code: string; keyCounterValue?: number } {
   const capturedNames = new Set<string>(captureInfo ? captureInfo.captureNames : []);
 
   const { parts, importsBySource } = collectInitialImports(
-    extraction, capturedNames, captureInfo, nestedQrlDecls, importContext,
+    extraction,
+    capturedNames,
+    captureInfo,
+    nestedQrlDecls,
+    importContext
   );
 
   let { bodyText, captureInfo: liveCaptureInfo } = applyBodyTransforms(
-    extraction, parts, captureInfo, nestedCallSites, enumValueMap,
+    extraction,
+    parts,
+    captureInfo,
+    nestedCallSites,
+    enumValueMap
   );
 
   let segmentKeyCounterValue: number | undefined;
   if (jsxOptions?.enableJsx) {
-    const jsxResult = transformSegmentJsx(bodyText, parts, jsxOptions, nestedCallSites, liveCaptureInfo);
+    const jsxResult = transformSegmentJsx(
+      bodyText,
+      parts,
+      jsxOptions,
+      nestedCallSites,
+      liveCaptureInfo
+    );
     bodyText = jsxResult.bodyText;
     segmentKeyCounterValue = jsxResult.keyCounterValue;
   }
@@ -619,9 +671,13 @@ export function generateSegmentCode(
       }
     }
     const jsxCallResult = transformSegmentJsxCalls(
-      bodyText, parts, extraction.origin, importContext, segmentKeyCounterValue,
+      bodyText,
+      parts,
+      extraction.origin,
+      importContext,
+      segmentKeyCounterValue,
       qpByQrl.size > 0 ? qpByQrl : undefined,
-      extraction.paramNames,
+      extraction.paramNames
     );
     bodyText = jsxCallResult.bodyText;
     if (jsxCallResult.keyCounterValue !== undefined) {
@@ -641,9 +697,8 @@ export function generateSegmentCode(
   // main body doesn't. The `//` separator may not yet be present when
   // `ensureCoreImports` runs (added later by `normalizeSeparators`), so include
   // a separator before calling so the early-return path doesn't bail out.
-  const scanText = bodyText + '\n' + parts
-    .filter(p => !p.startsWith('import') && p !== '//')
-    .join('\n');
+  const scanText =
+    bodyText + '\n' + parts.filter((p) => !p.startsWith('import') && p !== '//').join('\n');
   if (parts.indexOf('//') < 0) parts.push('//');
   ensureCoreImports(scanText, parts);
   bodyText = transformSyncCalls(bodyText, parts);
@@ -655,7 +710,14 @@ export function generateSegmentCode(
   }
 
   if (importContext) {
-    recollectPostTransformImports(bodyText, parts, importContext, importsBySource, capturedNames, nestedCallSites);
+    recollectPostTransformImports(
+      bodyText,
+      parts,
+      importContext,
+      importsBySource,
+      capturedNames,
+      nestedCallSites
+    );
   }
   normalizeSeparators(parts);
 

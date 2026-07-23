@@ -19,10 +19,17 @@ function bodyOf(program: unknown): readonly unknown[] {
 
 describe('convergence breakdown', () => {
   it('categorizes all failures', () => {
-    const files = readdirSync(SNAP_DIR).filter(f => f.endsWith('.snap')).sort();
+    const files = readdirSync(SNAP_DIR)
+      .filter((f) => f.endsWith('.snap'))
+      .sort();
 
-    let parentPass = 0, parentFail = 0, noInput = 0, parseError = 0;
-    let segPass = 0, segFail = 0, segMissing = 0;
+    let parentPass = 0,
+      parentFail = 0,
+      noInput = 0,
+      parseError = 0;
+    let segPass = 0,
+      segFail = 0,
+      segMissing = 0;
     const categories: Record<string, string[]> = {
       'off-by-1': [],
       'mostly-matching': [],
@@ -31,16 +38,23 @@ describe('convergence breakdown', () => {
     };
 
     for (const f of files) {
-      const name = f.replace('qwik_core__test__','').replace('.snap','');
+      const name = f.replace('qwik_core__test__', '').replace('.snap', '');
       const snap = readFileSync(join(SNAP_DIR, f), 'utf-8');
       const parsed = parseSnapshot(snap);
-      if (!parsed.input) { noInput++; continue; }
+      if (!parsed.input) {
+        noInput++;
+        continue;
+      }
 
       let result;
       try {
         const opts = getSnapshotTransformOptions(name, parsed.input);
         result = transformModule(opts);
-      } catch { parentFail++; categories['parse-error'].push(name); continue; }
+      } catch {
+        parentFail++;
+        categories['parse-error'].push(name);
+        continue;
+      }
 
       if (parsed.parentModules.length > 0) {
         const exp = parsed.parentModules[0].code;
@@ -68,14 +82,22 @@ describe('convergence breakdown', () => {
 
       for (const es of parsed.segments) {
         if (!es.metadata) continue;
-        const as = result.modules.find(m => m.kind === 'segment' && m.segment.name === es.metadata!.name);
-        if (!as) { segMissing++; continue; }
+        const as = result.modules.find(
+          (m) => m.kind === 'segment' && m.segment.name === es.metadata!.name
+        );
+        if (!as) {
+          segMissing++;
+          continue;
+        }
         if (es.code && as.code) {
           try {
             const ep = stripAstPositions(parseSync('test.tsx', es.code).program);
             const ap = stripAstPositions(parseSync('test.tsx', as.code).program);
-            if (equal(ep, ap)) segPass++; else segFail++;
-          } catch { segFail++; }
+            if (equal(ep, ap)) segPass++;
+            else segFail++;
+          } catch {
+            segFail++;
+          }
         }
       }
     }
@@ -85,12 +107,12 @@ describe('convergence breakdown', () => {
     console.log(`Segments: ${segPass} pass / ${segFail} fail / ${segMissing} missing-by-name`);
     console.log(`\nParent failure categories:`);
     console.log(`  off-by-1-stmt (close!): ${categories['off-by-1'].length}`);
-    categories['off-by-1'].slice(0, 10).forEach(n => console.log(`    - ${n}`));
+    categories['off-by-1'].slice(0, 10).forEach((n) => console.log(`    - ${n}`));
     console.log(`  mostly-matching (70%+): ${categories['mostly-matching'].length}`);
-    categories['mostly-matching'].slice(0, 10).forEach(n => console.log(`    - ${n}`));
+    categories['mostly-matching'].slice(0, 10).forEach((n) => console.log(`    - ${n}`));
     console.log(`  major-diff (<70%): ${categories['major-diff'].length}`);
-    categories['major-diff'].slice(0, 10).forEach(n => console.log(`    - ${n}`));
+    categories['major-diff'].slice(0, 10).forEach((n) => console.log(`    - ${n}`));
     console.log(`  parse-error: ${categories['parse-error'].length}`);
-    categories['parse-error'].slice(0, 5).forEach(n => console.log(`    - ${n}`));
+    categories['parse-error'].slice(0, 5).forEach((n) => console.log(`    - ${n}`));
   });
 });

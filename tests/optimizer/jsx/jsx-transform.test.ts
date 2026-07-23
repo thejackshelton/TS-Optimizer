@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from 'vitest';
 import { parseSync } from 'oxc-parser';
 import {
@@ -21,7 +20,7 @@ function makeCtx(
   source: string,
   s: MagicString,
   importedNames: Set<string>,
-  keyCounter: JsxKeyCounter,
+  keyCounter: JsxKeyCounter
 ): JsxTransformContext {
   return { source, s, importedNames, keyCounter, signalHoister: new SignalHoister() };
 }
@@ -297,10 +296,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result).toBeDefined();
     expect(result!.tag).toBe('"div"');
@@ -317,10 +313,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.constProps).toContain('title: "hello"');
     expect(result!.varProps).toBeNull();
@@ -333,10 +326,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.varProps).toContain('title: globalVar');
     expect(result!.constProps).toBeNull();
@@ -349,10 +339,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set(['styles']);
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.varProps).toContain('class: styles.foo');
     expect(result!.constProps).toBeNull();
@@ -365,10 +352,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.children).toBeNull();
     expect(result!.flags).toBe(3);
@@ -381,10 +365,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.tag).toBe('Cmp');
   });
@@ -396,10 +377,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.tag).toBe('"div"');
   });
@@ -411,10 +389,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.key).toBe('props.stuff');
     expect(result!.constProps).not.toContain('key');
@@ -427,10 +402,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.key).toBe('"stuff"');
   });
@@ -442,10 +414,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.children).toContain('[');
     expect(result!.children).toContain(']');
@@ -458,10 +427,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.children).not.toMatch(/^\[/);
   });
@@ -473,10 +439,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.callString).toContain('_jsxSplit');
     expect(result!.callString).toContain('_getVarProps(props)');
@@ -494,10 +457,7 @@ describe('transformJsxElement', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxElement(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxElement(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.tag).toBe('Foo.Bar');
   });
@@ -559,10 +519,7 @@ describe('transformJsxFragment', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxFragment(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxFragment(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result).toBeDefined();
     expect(result!.tag).toBe('_Fragment');
@@ -578,10 +535,7 @@ describe('transformJsxFragment', () => {
     const importedNames = new Set<string>();
     const keyCounter = new JsxKeyCounter();
 
-    const result = transformJsxFragment(
-      makeCtx(source, s, importedNames, keyCounter),
-      jsxNode,
-    );
+    const result = transformJsxFragment(makeCtx(source, s, importedNames, keyCounter), jsxNode);
 
     expect(result!.children).toContain('[');
   });

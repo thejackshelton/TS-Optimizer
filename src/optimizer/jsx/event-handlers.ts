@@ -38,16 +38,14 @@ function normalizeJsxEventName(name: string): string {
     return '-d-o-m-content-loaded';
   }
 
-  const processedName = name.startsWith('-')
-    ? name.slice(1)
-    : name.toLowerCase();
+  const processedName = name.startsWith('-') ? name.slice(1) : name.toLowerCase();
 
   return createEventName(processedName);
 }
 
 function getEventScopeData(
   propName: string,
-  isPassive: boolean,
+  isPassive: boolean
 ): [prefix: string, stripIndex: number] | null {
   if (propName.startsWith('window:on')) {
     return [isPassive ? 'q-wp:' : 'q-w:', 9];
@@ -63,7 +61,7 @@ function getEventScopeData(
 
 export function transformEventPropName(
   propName: string,
-  passiveEvents: Set<string>,
+  passiveEvents: Set<string>
 ): string | null {
   if (!propName.endsWith('$')) return null;
   if (propName.startsWith('host:')) return null;
@@ -82,25 +80,21 @@ export function transformEventPropName(
 }
 
 /**
- * The prop name an extracted event-handler call site is rewritten to.
- * Component-element events keep the author-form name (the runtime resolves
- * component props itself); HTML events get the serialized `q-*:` form. The
- * inline/hoist path passes an empty `passiveEvents` set — passive detection
- * runs only on the segment-codegen path (deliberate delta, see
- * `buildNestedCallSites`).
+ * The prop name an extracted event-handler call site is rewritten to. Component-element events keep
+ * the author-form name (the runtime resolves component props itself); HTML events get the
+ * serialized `q-*:` form. The inline/hoist path passes an empty `passiveEvents` set — passive
+ * detection runs only on the segment-codegen path (deliberate delta, see `buildNestedCallSites`).
  */
 export function eventHandlerPropName(
   rawName: string,
   isComponentEvent: boolean,
-  passiveEvents: Set<string>,
+  passiveEvents: Set<string>
 ): string {
   if (isComponentEvent) return rawName;
   return transformEventPropName(rawName, passiveEvents) ?? rawName;
 }
 
-export function collectPassiveDirectives(
-  attributes: readonly JSXAttributeItem[],
-): Set<string> {
+export function collectPassiveDirectives(attributes: readonly JSXAttributeItem[]): Set<string> {
   const passiveEvents = new Set<string>();
 
   for (const attr of attributes) {

@@ -1,8 +1,7 @@
 /**
- * API types for the Qwik optimizer — the public interface for
- * `transformModule` and related functions. The shape is a fixed compatibility
- * contract, so some fields exist for that contract without being read yet
- * (noted at the type level).
+ * API types for the Qwik optimizer — the public interface for `transformModule` and related
+ * functions. The shape is a fixed compatibility contract, so some fields exist for that contract
+ * without being read yet (noted at the type level).
  */
 
 import type { AstEcmaScriptModule, AstProgram } from '../../ast-types.js';
@@ -23,10 +22,9 @@ import type {
 } from './brands.js';
 
 /**
- * Options for the `transformModule` batch transform. Some fields are accepted
- * for API compatibility but not yet read by this optimizer (`rootDir`,
- * `sourceMaps`, `preserveFilenames`). Defaults: `entryStrategy` smart,
- * `minify` simplify, `mode` prod, `transpileJsx` on.
+ * Options for the `transformModule` batch transform. Some fields are accepted for API compatibility
+ * but not yet read by this optimizer (`rootDir`, `sourceMaps`, `preserveFilenames`). Defaults:
+ * `entryStrategy` smart, `minify` simplify, `mode` prod, `transpileJsx` on.
  */
 export interface TransformModulesOptions {
   readonly input: readonly TransformModuleInput[];
@@ -65,10 +63,10 @@ export interface TransformModulesOptions {
 }
 
 /**
- * One source file passed to `transformModule` (transformed independently into
- * a parent module plus zero-or-more segment modules). When `program` (and its
- * optional sibling `module`) is supplied, the optimizer skips its internal
- * parse and trusts the AST without re-validating it against `code`.
+ * One source file passed to `transformModule` (transformed independently into a parent module plus
+ * zero-or-more segment modules). When `program` (and its optional sibling `module`) is supplied,
+ * the optimizer skips its internal parse and trusts the AST without re-validating it against
+ * `code`.
  */
 export interface TransformModuleInput {
   readonly path: FilePath;
@@ -83,9 +81,8 @@ export interface TransformModuleInput {
 }
 
 /**
- * Result of a `transformModule` invocation: rewritten parent modules and their
- * extracted segment modules (in dependency-friendly order) plus a flat
- * diagnostics list.
+ * Result of a `transformModule` invocation: rewritten parent modules and their extracted segment
+ * modules (in dependency-friendly order) plus a flat diagnostics list.
  */
 export interface TransformOutput {
   readonly modules: readonly TransformModule[];
@@ -98,9 +95,8 @@ export interface TransformOutput {
 }
 
 /**
- * One emitted module — a rewritten parent shell or an extracted segment,
- * discriminated on `kind`. Source maps are not yet wired, so every `map`
- * field is always `null`.
+ * One emitted module — a rewritten parent shell or an extracted segment, discriminated on `kind`.
+ * Source maps are not yet wired, so every `map` field is always `null`.
  */
 export type TransformModule = TransformModuleParent | TransformModuleSegment;
 
@@ -119,7 +115,10 @@ export interface TransformModuleParent {
   readonly origPath: string;
 }
 
-/** Extracted segment module — a single `$()` body lifted into its own lazy-loadable file (`code` is empty for inline-strategy segments). */
+/**
+ * Extracted segment module — a single `$()` body lifted into its own lazy-loadable file (`code` is
+ * empty for inline-strategy segments).
+ */
 export interface TransformModuleSegment {
   readonly kind: 'segment';
 
@@ -135,11 +134,10 @@ export interface TransformModuleSegment {
 }
 
 /**
- * Per-segment metadata emitted alongside each extracted segment module and
- * used by the runtime to wire `qrl(...)` references to the correct file.
- * `captures` is derived from `captureNames` at extraction time and can diverge
- * from it during later filtering (props consolidation, const inline,
- * migration).
+ * Per-segment metadata emitted alongside each extracted segment module and used by the runtime to
+ * wire `qrl(...)` references to the correct file. `captures` is derived from `captureNames` at
+ * extraction time and can diverge from it during later filtering (props consolidation, const
+ * inline, migration).
  */
 export interface SegmentAnalysis {
   readonly origin: Origin;
@@ -168,10 +166,9 @@ export interface SegmentAnalysis {
 }
 
 /**
- * `SegmentAnalysis` plus the snapshot-only fields (`paramNames`,
- * `captureNames`) that appear in metadata blocks but aren't part of the public
- * API. `captureNames` is mutated across Phase 4–5 (props consolidation, const
- * inline, migration filtering) before being snapshotted.
+ * `SegmentAnalysis` plus the snapshot-only fields (`paramNames`, `captureNames`) that appear in
+ * metadata blocks but aren't part of the public API. `captureNames` is mutated across Phase 4–5
+ * (props consolidation, const inline, migration filtering) before being snapshotted.
  */
 export interface SegmentMetadataInternal extends SegmentAnalysis {
   readonly paramNames?: readonly string[];
@@ -180,20 +177,19 @@ export interface SegmentMetadataInternal extends SegmentAnalysis {
 }
 
 /**
- * Per-symbol override map mixin for the `EntryStrategy` variants that emit
- * separate segment files. `inline`/`hoist` deliberately omit it — they emit
- * bodies inside the parent, so there is no per-segment file path to override.
+ * Per-symbol override map mixin for the `EntryStrategy` variants that emit separate segment files.
+ * `inline`/`hoist` deliberately omit it — they emit bodies inside the parent, so there is no
+ * per-segment file path to override.
  */
 export interface WithManualEntryMap {
   readonly manual?: Record<string, string>;
 }
 
 /**
- * How the optimizer lays out lazy-load boundaries. `smart`/`segment`/`hook`
- * emit one file per segment; `inline`/`hoist` keep bodies in the parent;
- * `single` bundles every segment into one `entry_hooks` file; `component`
- * groups by enclosing `component$`. The file-emitting variants accept a
- * per-symbol manual override via {@link WithManualEntryMap}.
+ * How the optimizer lays out lazy-load boundaries. `smart`/`segment`/`hook` emit one file per
+ * segment; `inline`/`hoist` keep bodies in the parent; `single` bundles every segment into one
+ * `entry_hooks` file; `component` groups by enclosing `component$`. The file-emitting variants
+ * accept a per-symbol manual override via {@link WithManualEntryMap}.
  */
 export type EntryStrategy =
   | { type: 'inline' }
@@ -204,9 +200,7 @@ export type EntryStrategy =
   | (WithManualEntryMap & { type: 'component' })
   | (WithManualEntryMap & { type: 'smart' });
 
-export function hasManualEntryMap(
-  s: EntryStrategy,
-): s is EntryStrategy & WithManualEntryMap {
+export function hasManualEntryMap(s: EntryStrategy): s is EntryStrategy & WithManualEntryMap {
   return s.type !== 'inline' && s.type !== 'hoist';
 }
 
@@ -214,17 +208,16 @@ export function hasManualEntryMap(
 export type MinifyMode = 'simplify' | 'none';
 
 /**
- * Build flavor for the emit pipeline: `prod` rewrites symbols to short
- * `s_<hash>` form; `dev` keeps long names and emits `qrlDEV(...)` metadata;
- * `hmr` adds `useHmr(devFile)` injection on `component$` segments; `lib`
- * inlines bodies as `inlinedQrl(body, name)` in a single module; `test`
- * applies no special handling.
+ * Build flavor for the emit pipeline: `prod` rewrites symbols to short `s_<hash>` form; `dev` keeps
+ * long names and emits `qrlDEV(...)` metadata; `hmr` adds `useHmr(devFile)` injection on
+ * `component$` segments; `lib` inlines bodies as `inlinedQrl(body, name)` in a single module;
+ * `test` applies no special handling.
  */
 export type EmitMode = 'dev' | 'prod' | 'lib' | 'hmr' | 'test';
 
 /**
- * Source-range descriptor for diagnostics: byte offsets (`lo` inclusive, `hi`
- * exclusive) plus line/column pairs. Lines are 1-based; columns are 0-based.
+ * Source-range descriptor for diagnostics: byte offsets (`lo` inclusive, `hi` exclusive) plus
+ * line/column pairs. Lines are 1-based; columns are 0-based.
  */
 export interface DiagnosticHighlightFlat {
   readonly lo: ByteOffset;
@@ -236,10 +229,9 @@ export interface DiagnosticHighlightFlat {
 }
 
 /**
- * One error or warning surfaced by the optimizer, collected into
- * `TransformOutput.diagnostics`. Suppressible from source via
- * `// @qwik-disable-next-line <code>` directives. `suggestions` is always
- * `null` (not yet wired).
+ * One error or warning surfaced by the optimizer, collected into `TransformOutput.diagnostics`.
+ * Suppressible from source via `// @qwik-disable-next-line <code>` directives. `suggestions` is
+ * always `null` (not yet wired).
  */
 export interface Diagnostic {
   readonly category: 'error' | 'warning';

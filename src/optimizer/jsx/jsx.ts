@@ -35,11 +35,10 @@ export interface JsxTransformOutput {
 }
 
 /**
- * Coordinate-conversion info for JSX dev-info under wrapped-body callers. The
- * inline-strategy and segment-file paths parse the extracted body wrapped in a
- * prefix, so AST-reported JSX positions are offsets in that wrapped body, not
- * the module source. Without conversion, `lineNumber:` ends up body-relative
- * instead of source-relative. Module-level callers (parent rewrite) leave this
+ * Coordinate-conversion info for JSX dev-info under wrapped-body callers. The inline-strategy and
+ * segment-file paths parse the extracted body wrapped in a prefix, so AST-reported JSX positions
+ * are offsets in that wrapped body, not the module source. Without conversion, `lineNumber:` ends
+ * up body-relative instead of source-relative. Module-level callers (parent rewrite) leave this
  * undefined.
  */
 export interface DevInfoSourcePosition {
@@ -59,32 +58,31 @@ export interface JsxTransformContext {
   importedNames: Set<string>;
   keyCounter: JsxKeyCounter;
   signalHoister: SignalHoister;
-  /** Scope-aware binding lookup. `classify(name, atPosition)` resolves to the
-   * innermost enclosing scope's kind so shadowed names (arrow param over a
-   * for-of binding) classify correctly; a flat `Set` cannot disambiguate. */
+  /**
+   * Scope-aware binding lookup. `classify(name, atPosition)` resolves to the innermost enclosing
+   * scope's kind so shadowed names (arrow param over a for-of binding) classify correctly; a flat
+   * `Set` cannot disambiguate.
+   */
   bindings?: ScopeAwareBindings;
   allDeclaredNames?: Set<string>;
   paramNames?: Set<string>;
   qrlsWithCaptures?: Set<string>;
-  /** Exact-range log of every `writeJsxCall` overwrite, keyed by range start;
-   * lets readers recover a rewritten subtree's text without the chunk-list walk
-   * `MagicString.slice` pays on a heavily edited buffer (see `sliceTransformed`). */
+  /**
+   * Exact-range log of every `writeJsxCall` overwrite, keyed by range start; lets readers recover a
+   * rewritten subtree's text without the chunk-list walk `MagicString.slice` pays on a heavily
+   * edited buffer (see `sliceTransformed`).
+   */
   jsxWriteMemo?: ReadonlyMap<number, { end: number; content: string }>;
 }
 
 /**
- * Read a byte range from the in-progress transform buffer, preferring an
- * exact-range hit in the JSX write memo over `MagicString.slice`. Sound because
- * the JSX walk rewrites bottom-up through the single `writeJsxCall` path, so a
- * child's recorded write is the last edit inside its range by the time an
- * ancestor reads it; the only pass that revisits recorded ranges (post-walk
- * signal-hoist rename) runs after all reads.
+ * Read a byte range from the in-progress transform buffer, preferring an exact-range hit in the JSX
+ * write memo over `MagicString.slice`. Sound because the JSX walk rewrites bottom-up through the
+ * single `writeJsxCall` path, so a child's recorded write is the last edit inside its range by the
+ * time an ancestor reads it; the only pass that revisits recorded ranges (post-walk signal-hoist
+ * rename) runs after all reads.
  */
-export function sliceTransformed(
-  ctx: JsxTransformContext,
-  start: number,
-  end: number,
-): string {
+export function sliceTransformed(ctx: JsxTransformContext, start: number, end: number): string {
   const hit = ctx.jsxWriteMemo?.get(start);
   if (hit !== undefined && hit.end === end) return hit.content;
   return ctx.s.slice(start, end);
@@ -124,9 +122,10 @@ export interface ProcessPropsOptions {
   tagIsHtml: boolean;
   passiveEvents: Set<string>;
   inLoop?: boolean;
-  /** Skip signal analysis for prop values; set when lowering to `_createElement`
-   * (spread + key), whose path emits prop values verbatim so any `_fnSignal`
-   * hoists would be unreachable. */
+  /**
+   * Skip signal analysis for prop values; set when lowering to `_createElement` (spread + key),
+   * whose path emits prop values verbatim so any `_fnSignal` hoists would be unreachable.
+   */
   skipSignalAnalysis?: boolean;
 }
 
@@ -134,7 +133,7 @@ export function isConstBindingName(
   name: string | null,
   importedNames: Set<string>,
   bindings: ScopeAwareBindings | undefined,
-  atPosition: number,
+  atPosition: number
 ): boolean {
   if (!name) {
     return false;
@@ -144,9 +143,8 @@ export function isConstBindingName(
 }
 
 /**
- * A closure parameter counts as a const-stable dep only on component elements:
- * on an HTML element a param-dependent prop stays var because the DOM node
- * re-renders on every prop change.
+ * A closure parameter counts as a const-stable dep only on component elements: on an HTML element a
+ * param-dependent prop stays var because the DOM node re-renders on every prop change.
  */
 export function fnSignalDepsAllConst(
   deps: readonly string[],
@@ -154,12 +152,11 @@ export function fnSignalDepsAllConst(
   bindings: ScopeAwareBindings | undefined,
   atPosition: number,
   tagIsHtml: boolean,
-  isParam: (dep: string) => boolean,
+  isParam: (dep: string) => boolean
 ): boolean {
   return deps.every(
     (dep) =>
-      isConstBindingName(dep, importedNames, bindings, atPosition) ||
-      (!tagIsHtml && isParam(dep)),
+      isConstBindingName(dep, importedNames, bindings, atPosition) || (!tagIsHtml && isParam(dep))
   );
 }
 
@@ -180,12 +177,11 @@ function isReturnStatic(init: Expression | null | undefined): boolean {
 }
 
 /**
- * Scope-aware binding classification: a reference to `item` at position P
- * resolves to the innermost enclosing scope that declares `item`, and
- * classification follows that scope's binding kind. Per-name index
- * `nameToScopes: Map<name, scope-range[]>`; lookup picks the smallest range
- * containing `atPosition`. Synthetic program-scope bindings
- * (`addProgramScopeConst`) use range `[0, MAX]` so any inner scope's binding wins.
+ * Scope-aware binding classification: a reference to `item` at position P resolves to the innermost
+ * enclosing scope that declares `item`, and classification follows that scope's binding kind.
+ * Per-name index `nameToScopes: Map<name, scope-range[]>`; lookup picks the smallest range
+ * containing `atPosition`. Synthetic program-scope bindings (`addProgramScopeConst`) use range `[0,
+ * MAX]` so any inner scope's binding wins.
  */
 interface ScopeRange {
   readonly start: number;
@@ -194,22 +190,25 @@ interface ScopeRange {
 }
 
 export interface ScopeAwareBindings {
-  /** Innermost enclosing scope's binding kind for `name` at `atPosition`, or
-   * undefined when no scope binds it (caller falls through to imports/undeclared). */
+  /**
+   * Innermost enclosing scope's binding kind for `name` at `atPosition`, or undefined when no scope
+   * binds it (caller falls through to imports/undeclared).
+   */
   classify(name: string, atPosition: number): 'const' | 'var' | undefined;
-  /** Register `name` as const everywhere — for names that aren't AST-declared
-   * but are runtime-const (e.g. `_captures[i]` unpacking bindings). Inner-scope
-   * bindings still shadow. */
+  /**
+   * Register `name` as const everywhere — for names that aren't AST-declared but are runtime-const
+   * (e.g. `_captures[i]` unpacking bindings). Inner-scope bindings still shadow.
+   */
   addProgramScopeConst(name: string): void;
 }
 
 class ScopeAwareBindingsImpl implements ScopeAwareBindings {
   private nameToScopes = new Map<string, ScopeRange[]>();
   /**
-   * Names that classify as `'const'` everywhere, overriding AST-derived binding.
-   * Populated by `addProgramScopeConst` for `_captures[N]` unpacking names:
-   * those appear as `const X = _captures[N]` whose MemberExpression initializer
-   * wouldn't pass `isReturnStatic`, so the AST-derived kind would wrongly be `'var'`.
+   * Names that classify as `'const'` everywhere, overriding AST-derived binding. Populated by
+   * `addProgramScopeConst` for `_captures[N]` unpacking names: those appear as `const X =
+   * _captures[N]` whose MemberExpression initializer wouldn't pass `isReturnStatic`, so the
+   * AST-derived kind would wrongly be `'var'`.
    */
   private alwaysConst = new Set<string>();
 
@@ -247,15 +246,18 @@ class ScopeAwareBindingsImpl implements ScopeAwareBindings {
 
 export interface ScopeAwareCollectResult {
   bindings: ScopeAwareBindings;
-  /** Every locally declared name (any binding kind), flat/scope-unaware —
-   * signal-analysis uses it to skip names declared locally. */
+  /**
+   * Every locally declared name (any binding kind), flat/scope-unaware — signal-analysis uses it to
+   * skip names declared locally.
+   */
   allLocalNames: Set<string>;
 }
 
-/** Enter/leave view of the bindings collection so the canonical gather walk
- * (`analysis/module-gather-walk.ts`) can drive it as a projection.
- * `collectScopeAwareBindings` remains the standalone walk and the projection's
- * differential oracle. */
+/**
+ * Enter/leave view of the bindings collection so the canonical gather walk
+ * (`analysis/module-gather-walk.ts`) can drive it as a projection. `collectScopeAwareBindings`
+ * remains the standalone walk and the projection's differential oracle.
+ */
 export interface ScopeBindingsCollector {
   readonly enter: (node: AstNode) => void;
   readonly leave: (node: AstNode) => void;
@@ -295,7 +297,10 @@ export function createScopeBindingsCollector(program: AstProgram): ScopeBindings
     }
   }
 
-  function walkPatternInit(id: AstNode | null | undefined, init: Expression | null | undefined): void {
+  function walkPatternInit(
+    id: AstNode | null | undefined,
+    init: Expression | null | undefined
+  ): void {
     if (!id) return;
     if (id.type === 'Identifier') {
       addBindingIdent(id, isReturnStatic(init) ? 'const' : 'var');
@@ -370,9 +375,8 @@ export function createScopeBindingsCollector(program: AstProgram): ScopeBindings
     // FunctionDeclaration/ClassDeclaration names bind in the enclosing scope,
     // not the new body scope — record them in the scope above the just-pushed frame.
     if (node.type === 'FunctionDeclaration' && node.id) {
-      const targetScope = pushed && scopeStack.length >= 2
-        ? scopeStack[scopeStack.length - 2]
-        : currentScope();
+      const targetScope =
+        pushed && scopeStack.length >= 2 ? scopeStack[scopeStack.length - 2] : currentScope();
       allLocalNames.add(node.id.name);
       bindings.add(node.id.name, targetScope.start, targetScope.end, 'var');
     }
@@ -384,8 +388,12 @@ export function createScopeBindingsCollector(program: AstProgram): ScopeBindings
       bindings.add(node.id.name, scope.start, scope.end, 'var');
     }
 
-    if ((node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' ||
-         node.type === 'ArrowFunctionExpression') && node.params) {
+    if (
+      (node.type === 'FunctionDeclaration' ||
+        node.type === 'FunctionExpression' ||
+        node.type === 'ArrowFunctionExpression') &&
+      node.params
+    ) {
       for (const param of node.params) {
         addBindingIdent(param, 'var');
       }
@@ -408,7 +416,6 @@ export function createScopeBindingsCollector(program: AstProgram): ScopeBindings
         }
       }
     }
-
   }
 
   function leave(node: AstNode): void {
@@ -441,15 +448,14 @@ export function collectScopeAwareBindings(program: AstProgram): ScopeAwareCollec
 }
 
 /**
- * Classify an expression as immutable (const) or mutable (var). Takes the AST
- * position so identifier references resolve through scope-aware lookup and
- * shadowed names classify correctly.
+ * Classify an expression as immutable (const) or mutable (var). Takes the AST position so
+ * identifier references resolve through scope-aware lookup and shadowed names classify correctly.
  */
 export function classifyConstness(
   exprNode: AstNode | null | undefined,
   importedNames: Set<string>,
   bindings: ScopeAwareBindings | undefined,
-  atPosition: number,
+  atPosition: number
 ): 'const' | 'var' {
   if (!exprNode) return 'const';
 
@@ -490,10 +496,7 @@ export function classifyConstness(
       // A hoisted `_fnSignal(_hf<n>, [deps], ...)` has a stable callee;
       // classifying it const puts it in the const-props bag so the runtime skips
       // re-computing the prop record on re-render.
-      if (
-        exprNode.callee.type === 'Identifier' &&
-        exprNode.callee.name === '_fnSignal'
-      ) {
+      if (exprNode.callee.type === 'Identifier' && exprNode.callee.name === '_fnSignal') {
         return 'const';
       }
       if (isCaptureWrappingQrlCall(exprNode)) {
@@ -521,9 +524,11 @@ export function classifyConstness(
     case 'ObjectExpression': {
       for (const prop of exprNode.properties) {
         if (prop.type === 'SpreadElement') {
-          if (classifyConstness(prop.argument, importedNames, bindings, atPosition) === 'var') return 'var';
+          if (classifyConstness(prop.argument, importedNames, bindings, atPosition) === 'var')
+            return 'var';
         } else if (prop.value) {
-          if (classifyConstness(prop.value, importedNames, bindings, atPosition) === 'var') return 'var';
+          if (classifyConstness(prop.value, importedNames, bindings, atPosition) === 'var')
+            return 'var';
         }
       }
       return 'const';
@@ -533,7 +538,8 @@ export function classifyConstness(
       for (const el of exprNode.elements) {
         if (el === null) continue;
         if (el.type === 'SpreadElement') {
-          if (classifyConstness(el.argument, importedNames, bindings, atPosition) === 'var') return 'var';
+          if (classifyConstness(el.argument, importedNames, bindings, atPosition) === 'var')
+            return 'var';
         } else {
           if (classifyConstness(el, importedNames, bindings, atPosition) === 'var') return 'var';
         }
@@ -563,15 +569,14 @@ export function classifyConstness(
 /**
  * Compute the flags bitmask for a JSX element.
  *
- * Bit 0 (1): static_listeners -- all event handler props are const
- * Bit 1 (2): static_subtree -- children are static or none
- * Bit 2 (4): moved_captures -- loop context (q:p/q:ps)
+ * Bit 0 (1): static_listeners -- all event handler props are const Bit 1 (2): static_subtree --
+ * children are static or none Bit 2 (4): moved_captures -- loop context (q:p/q:ps)
  */
 export function computeJsxFlags(
   hasVarProps: boolean,
   childrenType: 'none' | 'static' | 'dynamic',
   inLoop: boolean = false,
-  hasVarEventHandler: boolean = false,
+  hasVarEventHandler: boolean = false
 ): number {
   let flags = 0;
   if (!hasVarEventHandler && (!inLoop || !hasVarProps)) {
@@ -614,7 +619,13 @@ export function isHtmlElement(tagName: string): boolean {
 
 /** Text-only HTML elements whose children should NOT be signal-wrapped. */
 const TEXT_ONLY_TAGS = new Set([
-  'text', 'textarea', 'title', 'option', 'script', 'style', 'noscript',
+  'text',
+  'textarea',
+  'title',
+  'option',
+  'script',
+  'style',
+  'noscript',
 ]);
 
 export function isTextOnlyElement(tagName: string): boolean {
@@ -651,14 +662,13 @@ export function processJsxTag(nameNode: JSXElementName | null | undefined): stri
 }
 
 /**
- * Build a binary-searchable index over skip ranges: sort by start (descending
- * end tie-break), drop ranges contained in an already-kept range (lossless — a
- * node inside a dropped range is inside its container). Kept ranges have
- * strictly increasing starts AND ends, which makes `isInSkipRange`'s
+ * Build a binary-searchable index over skip ranges: sort by start (descending end tie-break), drop
+ * ranges contained in an already-kept range (lossless — a node inside a dropped range is inside its
+ * container). Kept ranges have strictly increasing starts AND ends, which makes `isInSkipRange`'s
  * single-probe query sound.
  */
 export function buildSkipRangeIndex(
-  skipRanges: ReadonlyArray<{ start: number; end: number }>,
+  skipRanges: ReadonlyArray<{ start: number; end: number }>
 ): ReadonlyArray<{ start: number; end: number }> {
   if (skipRanges.length <= 1) return skipRanges;
   const sorted = [...skipRanges].sort((a, b) => a.start - b.start || b.end - a.end);
@@ -673,17 +683,15 @@ export function buildSkipRangeIndex(
 }
 
 /**
- * Probing only the rightmost kept range with `start <= nodeStart` is
- * sound: suppose the node is contained in some kept range A but the
- * probe picked B (so B.start >= A.start). B kept means B is not
- * contained in A, hence B.end > A.end >= nodeEnd — and nodeStart >=
- * B.start by the probe — so the node is contained in B too and the
- * check still succeeds.
+ * Probing only the rightmost kept range with `start <= nodeStart` is sound: suppose the node is
+ * contained in some kept range A but the probe picked B (so B.start >= A.start). B kept means B is
+ * not contained in A, hence B.end > A.end >= nodeEnd — and nodeStart >= B.start by the probe — so
+ * the node is contained in B too and the check still succeeds.
  */
 export function isInSkipRange(
   nodeStart: number,
   nodeEnd: number,
-  index: ReadonlyArray<{ start: number; end: number }>,
+  index: ReadonlyArray<{ start: number; end: number }>
 ): boolean {
   let lo = 0;
   let hi = index.length - 1;
@@ -701,8 +709,8 @@ export function isInSkipRange(
 }
 
 /**
- * Two-phase rename (old → temp → new) so renumbering `_hf` variables to
- * top-down source order can't collide.
+ * Two-phase rename (old → temp → new) so renumbering `_hf` variables to top-down source order can't
+ * collide.
  */
 function renameSignalHoistNames(text: string, renameMap: Map<string, string>): string {
   let renamed = text;
@@ -730,16 +738,15 @@ interface RecordedJsxWrite {
 }
 
 /**
- * Renumber `_hf` occurrences by re-overwriting exactly the recorded JSX write
- * ranges (every `_hf<n>` lives inside walk-inserted content). Replaying in
- * recorded bottom-up order reproduces the walk's overwrite nesting without
- * touching untouched chunks, so original-source offsets stay valid for later
- * passes that `s.slice` at original AST positions and error on replaced anchors.
+ * Renumber `_hf` occurrences by re-overwriting exactly the recorded JSX write ranges (every
+ * `_hf<n>` lives inside walk-inserted content). Replaying in recorded bottom-up order reproduces
+ * the walk's overwrite nesting without touching untouched chunks, so original-source offsets stay
+ * valid for later passes that `s.slice` at original AST positions and error on replaced anchors.
  */
 function applySignalHoistRenames(
   s: MagicString,
   renameMap: Map<string, string>,
-  writes: ReadonlyArray<RecordedJsxWrite>,
+  writes: ReadonlyArray<RecordedJsxWrite>
 ): void {
   for (const write of writes) {
     const renamed = renameSignalHoistNames(write.content, renameMap);
@@ -780,7 +787,7 @@ export interface TransformAllJsxOptions {
 
 export function transformAllJsx(
   input: TransformAllJsxInput,
-  opts: TransformAllJsxOptions = {},
+  opts: TransformAllJsxOptions = {}
 ): JsxTransformOutput {
   const { source, s, program, importedNames } = input;
   const {
@@ -836,7 +843,8 @@ export function transformAllJsx(
       ? devOptions.sourcePosition.bodyOriginOffset +
         (nodeStart - devOptions.sourcePosition.wrapperPrefixLen)
       : nodeStart;
-    let lo = 0, hi = lineStarts.length - 1;
+    let lo = 0,
+      hi = lineStarts.length - 1;
     while (lo < hi) {
       const mid = (lo + hi + 1) >> 1;
       if (lineStarts[mid] <= effectiveOffset) lo = mid;
@@ -867,7 +875,9 @@ export function transformAllJsx(
     qpOverrides,
     neededImports,
     getDevSourceSuffix,
-    setNeedsFragment: () => { needsFragment = true; },
+    setNeedsFragment: () => {
+      needsFragment = true;
+    },
     writeJsxCall: (start, end, content) => {
       s.overwrite(start, end, content);
       jsxWrites.push({ start, end, content });
@@ -897,8 +907,7 @@ export function transformAllJsx(
 
       if (ctx.ranges.length > 0 && isInSkipRange(node.start, node.end, ctx.ranges)) return;
 
-      const currentLoop =
-        ctx.loopStack.length > 0 ? ctx.loopStack[ctx.loopStack.length - 1] : null;
+      const currentLoop = ctx.loopStack.length > 0 ? ctx.loopStack[ctx.loopStack.length - 1] : null;
 
       if (node.type === 'JSXElement') {
         const passiveEvents = collectPassiveDirectives(node.openingElement?.attributes ?? []);
@@ -934,5 +943,10 @@ export function transformAllJsx(
   }
 
   const hoistedDeclarations = signalHoister.getDeclarations();
-  return { neededImports, needsFragment, hoistedDeclarations, keyCounterValue: keyCounter.current() };
+  return {
+    neededImports,
+    needsFragment,
+    hoistedDeclarations,
+    keyCounterValue: keyCounter.current(),
+  };
 }

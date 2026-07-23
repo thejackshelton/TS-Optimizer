@@ -1,4 +1,12 @@
-import { createRegExp, exactly, oneOrMore, anyOf, digit, whitespace, charNotIn } from 'magic-regexp';
+import {
+  createRegExp,
+  exactly,
+  oneOrMore,
+  anyOf,
+  digit,
+  whitespace,
+  charNotIn,
+} from 'magic-regexp';
 import { analyzeSignalExpression } from './signal-analysis.js';
 import {
   classifyConstness,
@@ -11,18 +19,28 @@ import type { JSXChild, JSXElement, JSXExpressionContainer, JSXFragment } from '
 type AnnotatedJSXChild = JSXChild & { _trimmedText?: string };
 
 const jsxFlagTail = createRegExp(
-  exactly(',').and(whitespace.times.any()).and(oneOrMore(digit).grouped())
-    .and(',').and(whitespace.times.any())
+  exactly(',')
+    .and(whitespace.times.any())
+    .and(oneOrMore(digit).grouped())
+    .and(',')
+    .and(whitespace.times.any())
     .and(anyOf(exactly('"').and(charNotIn('"').times.any()).and('"'), exactly('null')))
-    .and(whitespace.times.any()).and(')').at.lineEnd(),
+    .and(whitespace.times.any())
+    .and(')')
+    .at.lineEnd()
 );
 
 const jsxSortedVarProps = createRegExp(
-  exactly('_jsxSorted(').and(oneOrMore(charNotIn(','))).and(',').and(whitespace.times.any())
-    .and(anyOf('{', 'null').grouped()),
+  exactly('_jsxSorted(')
+    .and(oneOrMore(charNotIn(',')))
+    .and(',')
+    .and(whitespace.times.any())
+    .and(anyOf('{', 'null').grouped())
 );
 
-export function normalizeJsxChildren(children: JSXChild[]): (JSXChild & { _trimmedText?: string })[] {
+export function normalizeJsxChildren(
+  children: JSXChild[]
+): (JSXChild & { _trimmedText?: string })[] {
   const meaningful: (JSXChild & { _trimmedText?: string })[] = [];
 
   for (let i = 0; i < children.length; i++) {
@@ -67,9 +85,9 @@ export function normalizeJsxChildren(children: JSXChild[]): (JSXChild & { _trimm
       } else {
         normalized = raw.replace(/^\s+/, '');
       }
-      const nextNonWhitespace = children.slice(i + 1).find(
-        (c: JSXChild) => c.type !== 'JSXText' || (c.type === 'JSXText' && c.value?.trim()),
-      );
+      const nextNonWhitespace = children
+        .slice(i + 1)
+        .find((c: JSXChild) => c.type !== 'JSXText' || (c.type === 'JSXText' && c.value?.trim()));
       if (!nextNonWhitespace) {
         normalized = normalized.trimEnd();
       }
@@ -82,11 +100,12 @@ export function normalizeJsxChildren(children: JSXChild[]): (JSXChild & { _trimm
 
     if (!hasNewline) {
       const prevSibling = meaningful.length > 0 ? meaningful[meaningful.length - 1] : null;
-      const nextSibling = children.slice(i + 1).find(
-        (c: JSXChild) => c.type !== 'JSXText' || c.value.trim(),
-      );
+      const nextSibling = children
+        .slice(i + 1)
+        .find((c: JSXChild) => c.type !== 'JSXText' || c.value.trim());
       if (
-        prevSibling && nextSibling &&
+        prevSibling &&
+        nextSibling &&
         prevSibling.type === 'JSXExpressionContainer' &&
         nextSibling.type === 'JSXExpressionContainer'
       ) {
@@ -101,7 +120,7 @@ export function normalizeJsxChildren(children: JSXChild[]): (JSXChild & { _trimm
 export function processChildren(
   ctx: JsxTransformContext,
   children: JSXChild[],
-  opts: ProcessChildrenOptions,
+  opts: ProcessChildrenOptions
 ): { text: string | null; type: 'none' | 'static' | 'dynamic' } {
   if (!children || children.length === 0) {
     return { text: null, type: 'none' };
@@ -142,7 +161,7 @@ function hasStaticSubtreeFlag(transformedText: string): boolean {
 
 function classifyNestedJsxChild(
   child: JSXElement | JSXFragment,
-  childText: string,
+  childText: string
 ): 'static' | 'dynamic' {
   if (child.type === 'JSXFragment') {
     return hasStaticSubtreeFlag(childText) ? 'static' : 'dynamic';
@@ -150,7 +169,10 @@ function classifyNestedJsxChild(
 
   const tagName = child.openingElement.name;
   const tagStr = tagName.type === 'JSXIdentifier' ? tagName.name : '';
-  const isComponent = tagStr.length > 0 && tagStr[0] === tagStr[0].toUpperCase() && tagStr[0] !== tagStr[0].toLowerCase();
+  const isComponent =
+    tagStr.length > 0 &&
+    tagStr[0] === tagStr[0].toUpperCase() &&
+    tagStr[0] !== tagStr[0].toLowerCase();
   if (isComponent) return 'dynamic';
 
   const varPropsMatch = childText.match(jsxSortedVarProps);
@@ -162,7 +184,7 @@ function classifyNestedJsxChild(
 function processOneChild(
   ctx: JsxTransformContext,
   child: AnnotatedJSXChild,
-  opts: ProcessChildrenOptions,
+  opts: ProcessChildrenOptions
 ): { text: string | null; type: 'none' | 'static' | 'dynamic' } {
   if (child._trimmedText) {
     return { text: `"${child._trimmedText}"`, type: 'static' };
@@ -190,7 +212,7 @@ function processOneChild(
 function processExpressionChild(
   ctx: JsxTransformContext,
   child: JSXExpressionContainer,
-  opts: ProcessChildrenOptions,
+  opts: ProcessChildrenOptions
 ): { text: string | null; type: 'none' | 'static' | 'dynamic' } {
   const expr = child.expression;
   if (!expr || expr.type === 'JSXEmptyExpression') {
@@ -232,11 +254,15 @@ function processExpressionChild(
   }
 
   if (signalResult.type === 'fnSignal') {
-    const hfName = signalHoister.hoist(signalResult.hoistedFn, signalResult.hoistedStr, expr.start ?? 0);
+    const hfName = signalHoister.hoist(
+      signalResult.hoistedFn,
+      signalResult.hoistedStr,
+      expr.start ?? 0
+    );
     const fnSignalCall = `_fnSignal(${hfName}, [${signalResult.deps.join(', ')}], ${hfName}_str)`;
     neededImports.add('_fnSignal');
-    const depsConst = signalResult.deps.every(dep =>
-      importedNames.has(dep) || (bindings?.classify(dep, expr.start) === 'const')
+    const depsConst = signalResult.deps.every(
+      (dep) => importedNames.has(dep) || bindings?.classify(dep, expr.start) === 'const'
     );
     return { text: fnSignalCall, type: depsConst ? 'static' : 'dynamic' };
   }

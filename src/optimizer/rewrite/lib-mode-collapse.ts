@@ -1,32 +1,27 @@
 /**
  * Lib-mode emission collapse.
  *
- * Post-pass that runs on the assembled inline-strategy output and collapses
- * the three-statement triple
+ * Post-pass that runs on the assembled inline-strategy output and collapses the three-statement
+ * triple
  *
- *   const q_X = _noopQrl("X");
- *   const X_BODY = (...args) => { ...body... };
- *   q_X.s(X_BODY);
+ * Const q_X = _noopQrl("X"); const X_BODY = (...args) => { ...body... }; q_X.s(X_BODY);
  *
- * (plus any `q_X` / `q_X.w([captures])` references in the parent module body)
- * into a single inlined `inlinedQrl(body, "X", [captures])` literal at every
- * reference site. The decls + `.s()` call disappear.
+ * (plus any `q_X` / `q_X.w([captures])` references in the parent module body) into a single inlined
+ * `inlinedQrl(body, "X", [captures])` literal at every reference site. The decls + `.s()` call
+ * disappear.
  *
- * Used when `RewriteContext.isLibMode` is true. Re-uses the inline-strategy
- * machinery for body emission + capture wiring (extraction, capture analysis,
- * `q_X.s(body)` synthesis); only the final emission shape differs.
+ * Used when `RewriteContext.isLibMode` is true. Re-uses the inline-strategy machinery for body
+ * emission + capture wiring (extraction, capture analysis, `q_X.s(body)` synthesis); only the final
+ * emission shape differs.
  *
  * Emits library-mode form:
  *
- *   export const Works = componentQrl(inlinedQrl((props) => {
- *     useStyleQrl(inlinedQrl(STYLES, "Works_component_useStyle_..."));
- *     ...
- *     useTaskQrl(inlinedQrl(() => { ... }, "Works_...", [sig]));
- *     ...
- *   }, "Works_component_..."));
+ * Export const Works = componentQrl(inlinedQrl((props) => { useStyleQrl(inlinedQrl(STYLES,
+ * "Works_component_useStyle_...")); ... useTaskQrl(inlinedQrl(() => { ... }, "Works_...", [sig]));
+ * ... }, "Works_component_..."));
  *
- * Bodies are substituted bottom-up: each q_X's body has inner q_Y references
- * replaced first, so the outer literal already contains the collapsed inner ones.
+ * Bodies are substituted bottom-up: each q_X's body has inner q_Y references replaced first, so the
+ * outer literal already contains the collapsed inner ones.
  *
  * Import side: removes `_noopQrl`, adds `inlinedQrl`; `_captures` stays.
  */
@@ -53,8 +48,8 @@ interface SCallStatement {
 }
 
 /**
- * Collapse the inline-strategy output into lib-mode emit shape. Returns the
- * source unchanged when no `_noopQrl(...)` decls are found.
+ * Collapse the inline-strategy output into lib-mode emit shape. Returns the source unchanged when
+ * no `_noopQrl(...)` decls are found.
  */
 export function collapseToLibInlinedQrl(source: string): string {
   const parsed = parseSync('lib-collapse.tsx', source, RAW_TRANSFER_PARSER_OPTIONS);
@@ -97,13 +92,18 @@ export function collapseToLibInlinedQrl(source: string): string {
   // those are folded into the body strings via `substituteInnerQVarsInText`.
   const skipRanges = collectSkipRanges(noopDecls, sCalls);
   const referenceRanges = collectQVarReferenceRanges(
-    program, source, inlinedLiteralsByVar, skipRanges, noopDecls,
+    program,
+    source,
+    inlinedLiteralsByVar,
+    skipRanges,
+    noopDecls
   );
   for (const ref of referenceRanges) {
     const literal = inlinedLiteralsByVar.get(ref.qVar)!;
-    const replacement = ref.captureArgsText !== undefined
-      ? insertCapturesIntoInlinedQrl(literal, ref.captureArgsText)
-      : literal;
+    const replacement =
+      ref.captureArgsText !== undefined
+        ? insertCapturesIntoInlinedQrl(literal, ref.captureArgsText)
+        : literal;
     edits.overwrite(ref.start, ref.end, replacement);
   }
 
@@ -126,19 +126,20 @@ export function collapseToLibInlinedQrl(source: string): string {
 }
 
 /**
- * Substitute inner `q_Y`/`q_Y.w([...])` references in `bodyText` with their
- * collapsed inlinedQrl literals.
+ * Substitute inner `q_Y`/`q_Y.w([...])` references in `bodyText` with their collapsed inlinedQrl
+ * literals.
  */
 function substituteInnerQVarsInText(
   bodyText: string,
-  buildInlinedLiteral: (qVar: string) => string | null,
+  buildInlinedLiteral: (qVar: string) => string | null
 ): string {
   const session = createTransformSession(bodyText);
   if (!session) return bodyText;
 
   const edits = session.edits;
   const wrappedSource = session.wrappedSource;
-  const decl = (session.program.body[0] as { declarations?: Array<{ init?: AstNode }> })?.declarations?.[0];
+  const decl = (session.program.body[0] as { declarations?: Array<{ init?: AstNode }> })
+    ?.declarations?.[0];
   const bodyNode = decl?.init;
   if (!bodyNode) return bodyText;
 
@@ -158,12 +159,12 @@ function substituteInnerQVarsInText(
       if (literal) {
         const args = node.arguments ?? [];
         const captureArg = args[0];
-        const captureText = captureArg && captureArg.type !== 'SpreadElement'
-          ? wrappedSource.slice(captureArg.start, captureArg.end)
-          : undefined;
-        const replacement = captureText !== undefined
-          ? insertCapturesIntoInlinedQrl(literal, captureText)
-          : literal;
+        const captureText =
+          captureArg && captureArg.type !== 'SpreadElement'
+            ? wrappedSource.slice(captureArg.start, captureArg.end)
+            : undefined;
+        const replacement =
+          captureText !== undefined ? insertCapturesIntoInlinedQrl(literal, captureText) : literal;
         edits.overwrite(node.start, node.end, replacement);
         return;
       }
@@ -178,7 +179,15 @@ function substituteInnerQVarsInText(
     }
 
     for (const key in node) {
-      if (key === 'type' || key === 'start' || key === 'end' || key === 'loc' || key === 'range' || key === 'parent') continue;
+      if (
+        key === 'type' ||
+        key === 'start' ||
+        key === 'end' ||
+        key === 'loc' ||
+        key === 'range' ||
+        key === 'parent'
+      )
+        continue;
       const child = (node as unknown as Record<string, unknown>)[key];
       if (child == null) continue;
       if (Array.isArray(child)) {
@@ -226,9 +235,12 @@ function collectNoopQrlDecls(program: AstProgram, source: string): Map<string, N
 function collectSCallStatements(
   program: AstProgram,
   source: string,
-  noopDecls: Map<string, NoopQrlDecl>,
+  noopDecls: Map<string, NoopQrlDecl>
 ): Map<string, SCallStatement> {
-  const constDeclByName = new Map<string, { name: string; bodyText: string; start: number; end: number }>();
+  const constDeclByName = new Map<
+    string,
+    { name: string; bodyText: string; start: number; end: number }
+  >();
   for (const stmt of program.body ?? []) {
     if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') continue;
     if (stmt.declarations?.length !== 1) continue;
@@ -257,8 +269,11 @@ function collectSCallStatements(
     if (!expr || expr.type !== 'CallExpression') continue;
     const callee = expr.callee;
     if (
-      !callee || callee.type !== 'MemberExpression' || callee.computed ||
-      callee.object?.type !== 'Identifier' || callee.property?.type !== 'Identifier' ||
+      !callee ||
+      callee.type !== 'MemberExpression' ||
+      callee.computed ||
+      callee.object?.type !== 'Identifier' ||
+      callee.property?.type !== 'Identifier' ||
       callee.property.name !== 's'
     ) {
       continue;
@@ -278,8 +293,8 @@ function collectSCallStatements(
       // binding `q_X.s(STYLES)` — keep the identifier and preserve the decl.
       const decl = constDeclByName.get(bodyArg.name);
       const noopDecl = noopDecls.get(qVarName);
-      const isSyntheticBody = decl != null && noopDecl != null &&
-        bodyArg.name === noopDecl.qrlSymbolName;
+      const isSyntheticBody =
+        decl != null && noopDecl != null && bodyArg.name === noopDecl.qrlSymbolName;
       if (isSyntheticBody && decl) {
         bodyText = decl.bodyText;
         bodyDecl = { name: decl.name, start: decl.start, end: decl.end };
@@ -308,12 +323,12 @@ interface QVarReferenceRange {
 }
 
 /**
- * Ranges to skip when walking for q_X references — the decls/statements
- * deleted or replaced by separate codepaths.
+ * Ranges to skip when walking for q_X references — the decls/statements deleted or replaced by
+ * separate codepaths.
  */
 function collectSkipRanges(
   noopDecls: Map<string, NoopQrlDecl>,
-  sCalls: Map<string, SCallStatement>,
+  sCalls: Map<string, SCallStatement>
 ): readonly { start: number; end: number }[] {
   const out: { start: number; end: number }[] = [];
   for (const decl of noopDecls.values()) out.push({ start: decl.start, end: decl.end });
@@ -324,10 +339,7 @@ function collectSkipRanges(
   return out;
 }
 
-function isInsideAnyRange(
-  pos: number,
-  ranges: readonly { start: number; end: number }[],
-): boolean {
+function isInsideAnyRange(pos: number, ranges: readonly { start: number; end: number }[]): boolean {
   for (const r of ranges) {
     if (pos >= r.start && pos < r.end) return true;
   }
@@ -339,7 +351,7 @@ function collectQVarReferenceRanges(
   source: string,
   buildersByVar: ReadonlyMap<string, string>,
   skipRanges: readonly { start: number; end: number }[],
-  noopDecls: ReadonlyMap<string, NoopQrlDecl>,
+  noopDecls: ReadonlyMap<string, NoopQrlDecl>
 ): readonly QVarReferenceRange[] {
   const out: QVarReferenceRange[] = [];
 
@@ -359,9 +371,8 @@ function collectQVarReferenceRanges(
       const args = node.arguments ?? [];
       if (args.length === 1 && args[0]) {
         const arg = args[0];
-        const captureArgsText = arg.type !== 'SpreadElement'
-          ? source.slice(arg.start, arg.end)
-          : undefined;
+        const captureArgsText =
+          arg.type !== 'SpreadElement' ? source.slice(arg.start, arg.end) : undefined;
         out.push({
           qVar: node.callee.object.name,
           start: node.start,
@@ -379,7 +390,15 @@ function collectQVarReferenceRanges(
     }
 
     for (const key in node) {
-      if (key === 'type' || key === 'start' || key === 'end' || key === 'loc' || key === 'range' || key === 'parent') continue;
+      if (
+        key === 'type' ||
+        key === 'start' ||
+        key === 'end' ||
+        key === 'loc' ||
+        key === 'range' ||
+        key === 'parent'
+      )
+        continue;
       const child = (node as unknown as Record<string, unknown>)[key];
       if (child == null) continue;
       if (Array.isArray(child)) {
@@ -401,7 +420,7 @@ function rewriteImports(edits: MagicString, source: string): void {
     edits.overwrite(
       match.index,
       match.index + match[0].length,
-      `import { inlinedQrl } from "@qwik.dev/core";\n`,
+      `import { inlinedQrl } from "@qwik.dev/core";\n`
     );
   }
 }

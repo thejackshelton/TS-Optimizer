@@ -1,7 +1,7 @@
 /**
- * Character-level scanning for cases where the AST is unavailable or stale:
- * post-transform text, iterative rewrites, and pre-parse repair. Each helper
- * skips string literals to avoid matching inside quoted content.
+ * Character-level scanning for cases where the AST is unavailable or stale: post-transform text,
+ * iterative rewrites, and pre-parse repair. Each helper skips string literals to avoid matching
+ * inside quoted content.
  */
 
 export function isInsideString(text: string, offset: number): boolean {
@@ -11,10 +11,7 @@ export function isInsideString(text: string, offset: number): boolean {
   let templateDepth = 0;
   for (let i = 0; i < offset; i++) {
     const ch = text[i];
-    if (
-      ch === '\\' &&
-      (inSingle || inDouble || (inTemplate && templateDepth === 0))
-    ) {
+    if (ch === '\\' && (inSingle || inDouble || (inTemplate && templateDepth === 0))) {
       i++;
       continue;
     }
@@ -38,11 +35,10 @@ export function isInsideString(text: string, offset: number): boolean {
 const PURE_ANNOTATION_AT_END = /\/\*\s*[#@]__PURE__\s*\*\/$/;
 
 /**
- * Given the start of a call about to become a bare identifier, return the offset
- * to overwrite from so a preceding PURE annotation is consumed with it. Left in
- * front of a bare identifier the annotation is meaningless, and once a downstream
- * transform reflows it onto its own line Rolldown aborts with INVALID_ANNOTATION.
- * Whitespace before the annotation is preserved.
+ * Given the start of a call about to become a bare identifier, return the offset to overwrite from
+ * so a preceding PURE annotation is consumed with it. Left in front of a bare identifier the
+ * annotation is meaningless, and once a downstream transform reflows it onto its own line Rolldown
+ * aborts with INVALID_ANNOTATION. Whitespace before the annotation is preserved.
  */
 export function pureAwareOverwriteStart(source: string, callStart: number): number {
   let j = callStart;
@@ -93,7 +89,10 @@ export function scanMatchingParenForward(text: string, start: number): number {
       const quote = ch;
       j++;
       while (j < text.length) {
-        if (text[j] === '\\') { j += 2; continue; }
+        if (text[j] === '\\') {
+          j += 2;
+          continue;
+        }
         if (text[j] === quote) break;
         j++;
       }
@@ -116,9 +115,9 @@ export function scanMatchingParenBackward(text: string, start: number): number {
 }
 
 /**
- * Find the end of an expression at `start`, respecting nested parens, braces,
- * JSX angle brackets, and string literals. Terminates at a depth-0 newline,
- * semicolon, or comma, or at an unmatched closing delimiter.
+ * Find the end of an expression at `start`, respecting nested parens, braces, JSX angle brackets,
+ * and string literals. Terminates at a depth-0 newline, semicolon, or comma, or at an unmatched
+ * closing delimiter.
  */
 export function findExpressionEnd(code: string, start: number): number {
   let i = start;

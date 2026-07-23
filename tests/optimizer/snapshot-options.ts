@@ -60,7 +60,10 @@ export const SNAPSHOT_OPTIONS: Record<string, SnapshotOptions> = {
   example_11: { filename: 'project/test.tsx', entryStrategy: { type: 'single' } },
   example_exports: { filename: 'project/test.tsx', transpileTs: true },
   issue_117: { filename: 'project/test.tsx', entryStrategy: { type: 'single' } },
-  example_fix_dynamic_import: { filename: 'project/folder/test.tsx', entryStrategy: { type: 'single' } },
+  example_fix_dynamic_import: {
+    filename: 'project/folder/test.tsx',
+    entryStrategy: { type: 'single' },
+  },
   example_default_export: {
     filename: 'src/routes/_repl/[id]/[[...slug]].tsx',
     transpileTs: true,
@@ -370,10 +373,16 @@ export const SNAPSHOT_OPTIONS: Record<string, SnapshotOptions> = {
   should_convert_rest_props: { transpileTs: true, transpileJsx: true },
   should_destructure_args: { transpileTs: true, transpileJsx: true },
   should_disable_multiple_rules_from_single_directive: { transpileTs: true, transpileJsx: true },
-  should_disable_passive_warning_with_qwik_disable_next_line: { transpileTs: true, transpileJsx: true },
+  should_disable_passive_warning_with_qwik_disable_next_line: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_disable_qwik_transform_error_by_code: { transpileTs: true, transpileJsx: true },
   should_extract_multiple_qrls_with_item_and_index: { transpileTs: true, transpileJsx: true },
-  should_extract_multiple_qrls_with_item_and_index_and_capture_ref: { transpileTs: true, transpileJsx: true },
+  should_extract_multiple_qrls_with_item_and_index_and_capture_ref: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_extract_single_qrl: { transpileTs: true, transpileJsx: true },
   should_extract_single_qrl_2: { transpileTs: true, transpileJsx: true },
   should_extract_single_qrl_with_index: { transpileTs: true, transpileJsx: true },
@@ -382,30 +391,57 @@ export const SNAPSHOT_OPTIONS: Record<string, SnapshotOptions> = {
   should_ignore_passive_jsx_events_without_handlers: { transpileTs: true, transpileJsx: true },
   should_ignore_preventdefault_with_passive: { transpileTs: true, transpileJsx: true },
   should_keep_module_level_var_used_in_both_main_and_qrl: { transpileTs: true, transpileJsx: true },
-  should_keep_non_migrated_binding_from_shared_array_destructuring_declarator: { transpileTs: true, transpileJsx: true },
-  should_keep_non_migrated_binding_from_shared_destructuring_declarator: { transpileTs: true, transpileJsx: true },
-  should_keep_non_migrated_binding_from_shared_destructuring_with_default: { transpileTs: true, transpileJsx: true },
-  should_keep_non_migrated_binding_from_shared_destructuring_with_rest: { transpileTs: true, transpileJsx: true },
+  should_keep_non_migrated_binding_from_shared_array_destructuring_declarator: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
+  should_keep_non_migrated_binding_from_shared_destructuring_declarator: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
+  should_keep_non_migrated_binding_from_shared_destructuring_with_default: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
+  should_keep_non_migrated_binding_from_shared_destructuring_with_rest: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_keep_root_var_used_by_export_decl_and_qrl: { transpileTs: true, transpileJsx: true },
   should_keep_root_var_used_by_exported_function_and_qrl: { transpileTs: true, transpileJsx: true },
   should_make_component_jsx_split_with_bind: { transpileTs: true, transpileJsx: true },
   should_mark_props_as_var_props_for_inner_cmp: { transpileTs: true, transpileJsx: true },
   should_merge_attributes_with_spread_props: { transpileTs: true, transpileJsx: true },
-  should_merge_attributes_with_spread_props_before_and_after: { transpileTs: true, transpileJsx: true },
+  should_merge_attributes_with_spread_props_before_and_after: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_merge_bind_checked_and_on_input: { transpileTs: true, transpileJsx: true },
   should_merge_bind_value_and_on_input: { transpileTs: true, transpileJsx: true },
   should_merge_on_input_and_bind_checked: { transpileTs: true, transpileJsx: true },
   should_merge_on_input_and_bind_value: { transpileTs: true, transpileJsx: true },
-  should_migrate_destructured_binding_with_imported_dependency: { transpileTs: true, transpileJsx: true },
+  should_migrate_destructured_binding_with_imported_dependency: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_move_bind_value_to_var_props: { transpileTs: true, transpileJsx: true },
-  should_move_props_related_to_iteration_variables_to_var_props: { transpileTs: true, transpileJsx: true },
+  should_move_props_related_to_iteration_variables_to_var_props: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_not_auto_export_var_shadowed_in_catch: { transpileTs: true, transpileJsx: true },
   should_not_auto_export_var_shadowed_in_do_while: { transpileTs: true, transpileJsx: true },
   should_not_auto_export_var_shadowed_in_labeled_block: { transpileTs: true, transpileJsx: true },
   should_not_auto_export_var_shadowed_in_switch: { transpileTs: true, transpileJsx: true },
   should_not_inline_exported_var_into_segment: { transpileTs: true, transpileJsx: true },
-  should_not_transform_bind_checked_in_var_props_for_jsx_split: { transpileTs: true, transpileJsx: true },
-  should_not_transform_bind_value_in_var_props_for_jsx_split: { transpileTs: true, transpileJsx: true },
+  should_not_transform_bind_checked_in_var_props_for_jsx_split: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
+  should_not_transform_bind_value_in_var_props_for_jsx_split: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_not_wrap_fn: { transpileTs: true, transpileJsx: true },
   should_not_wrap_ternary_function_operator_with_fn: { transpileTs: true, transpileJsx: true },
   should_not_wrap_var_template_string: { transpileTs: true, transpileJsx: true },
@@ -416,22 +452,49 @@ export const SNAPSHOT_OPTIONS: Record<string, SnapshotOptions> = {
   should_split_spread_props_with_additional_prop3: { transpileTs: true, transpileJsx: true },
   should_split_spread_props_with_additional_prop4: { transpileTs: true, transpileJsx: true },
   should_split_spread_props_with_additional_prop5: { transpileTs: true, transpileJsx: true },
-  should_transform_block_scoped_variables_and_item_index_in_loop: { transpileTs: true, transpileJsx: true },
+  should_transform_block_scoped_variables_and_item_index_in_loop: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_transform_block_scoped_variables_in_loop: { transpileTs: true, transpileJsx: true },
   should_transform_component_with_normal_function: { transpileTs: true, transpileJsx: true },
   should_transform_handler_in_for_of_loop: { transpileTs: true, transpileJsx: true },
-  should_transform_handlers_capturing_cross_scope_in_nested_loops: { transpileTs: true, transpileJsx: true },
-  should_transform_loop_multiple_handler_with_different_captures: { transpileTs: true, transpileJsx: true },
-  should_transform_multiple_block_scoped_variables_and_item_index_in_loop: { transpileTs: true, transpileJsx: true },
-  should_transform_multiple_block_scoped_variables_in_loop: { transpileTs: true, transpileJsx: true },
+  should_transform_handlers_capturing_cross_scope_in_nested_loops: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
+  should_transform_loop_multiple_handler_with_different_captures: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
+  should_transform_multiple_block_scoped_variables_and_item_index_in_loop: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
+  should_transform_multiple_block_scoped_variables_in_loop: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_transform_multiple_event_handlers: { transpileTs: true, transpileJsx: true },
   should_transform_multiple_event_handlers_case2: { transpileTs: true, transpileJsx: true },
   should_transform_nested_loops: { transpileTs: true, transpileJsx: true },
-  should_transform_nested_loops_handler_captures_only_inner_scope: { transpileTs: true, transpileJsx: true },
+  should_transform_nested_loops_handler_captures_only_inner_scope: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_transform_qrls_in_ternary_expression: { transpileTs: true, transpileJsx: true },
-  should_transform_same_element_one_handler_with_captures_one_without: { transpileTs: true, transpileJsx: true },
-  should_transform_three_nested_loops_handler_captures_outer_only: { transpileTs: true, transpileJsx: true },
-  should_transform_two_handlers_capturing_different_block_scope_in_loop: { transpileTs: true, transpileJsx: true },
+  should_transform_same_element_one_handler_with_captures_one_without: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
+  should_transform_three_nested_loops_handler_captures_outer_only: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
+  should_transform_two_handlers_capturing_different_block_scope_in_loop: {
+    transpileTs: true,
+    transpileJsx: true,
+  },
   should_work: { transpileTs: true, transpileJsx: true },
   should_wrap_inner_inline_component_prop: { transpileTs: true, transpileJsx: true },
   should_wrap_logical_expression_in_template: { transpileTs: true, transpileJsx: true },
@@ -458,9 +521,21 @@ export const SNAPSHOT_OPTIONS: Record<string, SnapshotOptions> = {
     entryStrategy: { type: 'hoist' },
   },
   example_lib_mode: { transpileTs: true, transpileJsx: true, mode: 'lib' },
-  should_ignore_null_inlined_qrl: { transpileTs: true, transpileJsx: true, entryStrategy: { type: 'inline' } },
-  should_not_generate_conflicting_props_identifiers: { transpileTs: true, transpileJsx: true, entryStrategy: { type: 'inline' } },
-  should_not_move_over_side_effects: { transpileTs: true, transpileJsx: true, entryStrategy: { type: 'inline' } },
+  should_ignore_null_inlined_qrl: {
+    transpileTs: true,
+    transpileJsx: true,
+    entryStrategy: { type: 'inline' },
+  },
+  should_not_generate_conflicting_props_identifiers: {
+    transpileTs: true,
+    transpileJsx: true,
+    entryStrategy: { type: 'inline' },
+  },
+  should_not_move_over_side_effects: {
+    transpileTs: true,
+    transpileJsx: true,
+    entryStrategy: { type: 'inline' },
+  },
 
   root_level_self_referential_qrl_inline: {
     filename: './node_modules/qwik-tree/index.qwik.jsx',
@@ -470,10 +545,26 @@ export const SNAPSHOT_OPTIONS: Record<string, SnapshotOptions> = {
     mode: 'dev',
   },
 
-  example_props_wrapping: { transpileTs: true, transpileJsx: true, entryStrategy: { type: 'hoist' } },
-  example_props_wrapping2: { transpileTs: true, transpileJsx: true, entryStrategy: { type: 'hoist' } },
-  example_props_wrapping_children: { transpileTs: true, transpileJsx: true, entryStrategy: { type: 'hoist' } },
-  example_props_wrapping_children2: { transpileTs: true, transpileJsx: true, entryStrategy: { type: 'hoist' } },
+  example_props_wrapping: {
+    transpileTs: true,
+    transpileJsx: true,
+    entryStrategy: { type: 'hoist' },
+  },
+  example_props_wrapping2: {
+    transpileTs: true,
+    transpileJsx: true,
+    entryStrategy: { type: 'hoist' },
+  },
+  example_props_wrapping_children: {
+    transpileTs: true,
+    transpileJsx: true,
+    entryStrategy: { type: 'hoist' },
+  },
+  example_props_wrapping_children2: {
+    transpileTs: true,
+    transpileJsx: true,
+    entryStrategy: { type: 'hoist' },
+  },
 
   example_qwik_router_client: {
     filename: '../node_modules/@qwik.dev/router/index.qwik.mjs',
@@ -482,7 +573,11 @@ export const SNAPSHOT_OPTIONS: Record<string, SnapshotOptions> = {
 
   example_self_referential_component_migration: { transpileJsx: true },
 
-  inlined_qrl_uses_identifier_reference_when_hoisted_snapshot: { transpileTs: true, transpileJsx: true, entryStrategy: { type: 'inline' } },
+  inlined_qrl_uses_identifier_reference_when_hoisted_snapshot: {
+    transpileTs: true,
+    transpileJsx: true,
+    entryStrategy: { type: 'inline' },
+  },
 
   relative_paths: {
     srcDir: '/path/to/app/src/thing',
@@ -495,14 +590,16 @@ export const SNAPSHOT_OPTIONS: Record<string, SnapshotOptions> = {
 
 export function getSnapshotTransformOptions(
   snapshotName: string,
-  inputCode: string,
+  inputCode: string
 ): TransformModulesOptions {
   const overrides = SNAPSHOT_OPTIONS[snapshotName] ?? {};
   const filename = overrides.filename ?? DEFAULT_OPTIONS.filename;
   const srcDir = overrides.srcDir ?? DEFAULT_OPTIONS.srcDir;
 
   return {
-    input: [{ path: mkFilePath(filename), code: mkSourceText(inputCode), devPath: overrides.devPath }],
+    input: [
+      { path: mkFilePath(filename), code: mkSourceText(inputCode), devPath: overrides.devPath },
+    ],
     srcDir: mkFilePath(srcDir),
     transpileTs: overrides.transpileTs ?? DEFAULT_OPTIONS.transpileTs,
     transpileJsx: overrides.transpileJsx ?? DEFAULT_OPTIONS.transpileJsx,

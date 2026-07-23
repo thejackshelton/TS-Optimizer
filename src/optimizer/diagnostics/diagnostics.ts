@@ -6,7 +6,7 @@ export function emitC02(
   identName: string,
   file: string,
   isClass: boolean,
-  highlightSpan?: DiagnosticHighlightFlat,
+  highlightSpan?: DiagnosticHighlightFlat
 ): Diagnostic {
   const kind = isClass ? 'class' : 'function';
   return {
@@ -24,7 +24,7 @@ export function emitC05(
   calleeName: string,
   qrlName: string,
   file: string,
-  highlightSpan?: DiagnosticHighlightFlat,
+  highlightSpan?: DiagnosticHighlightFlat
 ): Diagnostic {
   return {
     category: 'error',
@@ -40,7 +40,7 @@ export function emitC05(
 export function emitPassiveConflictWarning(
   eventName: string,
   file: string,
-  highlightSpan?: DiagnosticHighlightFlat,
+  highlightSpan?: DiagnosticHighlightFlat
 ): Diagnostic {
   return {
     category: 'warning',
@@ -56,7 +56,11 @@ export function emitPassiveConflictWarning(
 const DIRECTIVE_MARKER = '@qwik-disable-next-line';
 
 const TRAILING_COMMENT_CLOSER = createRegExp(
-  exactly('*/').and(whitespace.times.any()).and(maybe(exactly('}'))).and(whitespace.times.any()).at.lineEnd(),
+  exactly('*/')
+    .and(whitespace.times.any())
+    .and(maybe(exactly('}')))
+    .and(whitespace.times.any())
+    .at.lineEnd()
 );
 
 export function parseDisableDirectives(sourceCode: string): Map<number, Set<string>> {
@@ -71,7 +75,10 @@ export function parseDisableDirectives(sourceCode: string): Map<number, Set<stri
     const cleaned = afterMarker.replace(TRAILING_COMMENT_CLOSER, '').trim();
     if (!cleaned) continue;
 
-    const codes = cleaned.split(',').map((c) => c.trim()).filter(Boolean);
+    const codes = cleaned
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean);
     if (codes.length === 0) continue;
 
     // Line i (0-based) suppresses line i+2 (1-based)
@@ -86,7 +93,7 @@ export function parseDisableDirectives(sourceCode: string): Map<number, Set<stri
 
 export function filterSuppressedDiagnostics(
   diagnostics: Diagnostic[],
-  directives: Map<number, Set<string>>,
+  directives: Map<number, Set<string>>
 ): Diagnostic[] {
   if (directives.size === 0) return diagnostics;
 
@@ -104,10 +111,13 @@ export function classifyDeclarationType(program: AstProgram, identName: string):
   return classifyInStatements(program.body, identName);
 }
 
-/** Walks a closure body directly, avoiding a re-parse when the caller already holds the closure AST node. */
+/**
+ * Walks a closure body directly, avoiding a re-parse when the caller already holds the closure AST
+ * node.
+ */
 export function classifyDeclarationTypeInClosure(
   closure: AstFunction,
-  identName: string,
+  identName: string
 ): DeclKind {
   if (closure.body?.type === 'BlockStatement') {
     return classifyInStatements(closure.body.body ?? [], identName);

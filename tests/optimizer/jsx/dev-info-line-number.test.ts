@@ -25,7 +25,7 @@ export const App = component$((props) => <div>{props.x}</div>);
       entryStrategy: { type: 'inline' },
       mode: 'dev',
     });
-    const parent = result.modules.find(m => m.path === 'test.tsx')!;
+    const parent = result.modules.find((m) => m.path === 'test.tsx')!;
     const found = findDevInfo(parent.code);
     expect(found.length).toBeGreaterThan(0);
     expect(found[0].lineNumber).toBe(3);
@@ -49,10 +49,10 @@ export const App = component$((props) => {
       entryStrategy: { type: 'inline' },
       mode: 'dev',
     });
-    const parent = result.modules.find(m => m.path === 'test.tsx')!;
+    const parent = result.modules.find((m) => m.path === 'test.tsx')!;
     const found = findDevInfo(parent.code);
     expect(found.length).toBeGreaterThanOrEqual(2);
-    const lines = found.map(f => f.lineNumber).sort((a, b) => a - b);
+    const lines = found.map((f) => f.lineNumber).sort((a, b) => a - b);
     expect(lines).toEqual([5, 6]);
   });
 
@@ -69,7 +69,7 @@ export const App = component$((props) => {
       transpileJsx: true,
       mode: 'dev',
     });
-    const segment = result.modules.find(m => m !== result.modules[0]);
+    const segment = result.modules.find((m) => m !== result.modules[0]);
     expect(segment).toBeDefined();
     const found = findDevInfo(segment!.code);
     expect(found.length).toBeGreaterThan(0);
@@ -87,7 +87,7 @@ export const App = component$((props) => <div/>);
       entryStrategy: { type: 'inline' },
       mode: 'dev',
     });
-    const parent = result.modules.find(m => m.path === 'test.tsx')!;
+    const parent = result.modules.find((m) => m.path === 'test.tsx')!;
     const found = findDevInfo(parent.code);
     expect(found.length).toBeGreaterThan(0);
     expect(found[0].lineNumber).toBe(2);
@@ -104,7 +104,7 @@ export const App = component$((props) => <div>{props.x}</div>);
       transpileJsx: true,
       entryStrategy: { type: 'inline' },
     });
-    const parent = result.modules.find(m => m.path === 'test.tsx')!;
+    const parent = result.modules.find((m) => m.path === 'test.tsx')!;
     const found = findDevInfo(parent.code);
     expect(found).toEqual([]);
   });
@@ -127,13 +127,12 @@ export const App = component$(() => {
       transpileJsx: true,
       mode: 'dev',
     });
-    const segment = result.modules.find(m => m !== result.modules[0]);
+    const segment = result.modules.find((m) => m !== result.modules[0]);
     expect(segment).toBeDefined();
     const found = findDevInfo(segment!.code);
-    const lines = new Set(found.map(f => f.lineNumber));
+    const lines = new Set(found.map((f) => f.lineNumber));
     expect(lines.has(5)).toBe(true);
     expect(lines.has(6)).toBe(true);
     expect(lines.has(7)).toBe(true);
   });
 });
-

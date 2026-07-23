@@ -38,9 +38,7 @@ function transformHoist(source: string, extra: Record<string, unknown> = {}) {
 }
 
 function findComponentBodySegment(result: ReturnType<typeof transformModule>) {
-  return result.modules.find(
-    (m) => m.kind === 'segment' && m.segment.ctxName === 'component$',
-  );
+  return result.modules.find((m) => m.kind === 'segment' && m.segment.ctxName === 'component$');
 }
 
 describe('.w([captures]) on Component-prop QRL refs (default strategy)', () => {
@@ -56,9 +54,7 @@ export const App = component$(() => {
 `);
       const body = findComponentBodySegment(result);
       if (body?.kind !== 'segment') throw new Error('App body segment missing');
-      expect(body.code).toMatch(
-        /captured\$:\s*q_[A-Za-z_0-9]+\.w\(\s*\[\s*state\s*\]\s*\)/,
-      );
+      expect(body.code).toMatch(/captured\$:\s*q_[A-Za-z_0-9]+\.w\(\s*\[\s*state\s*\]\s*\)/);
       expect(body.code).not.toMatch(/captured\$:\s*q_[A-Za-z_0-9]+\s*[,}]/);
     });
 
@@ -74,9 +70,7 @@ export const App = component$(() => {
 `);
       const body = findComponentBodySegment(result);
       if (body?.kind !== 'segment') throw new Error('App body segment missing');
-      expect(body.code).toMatch(
-        /handler\$:\s*q_[A-Za-z_0-9]+\.w\(\s*\[\s*a\s*,\s*b\s*\]\s*\)/,
-      );
+      expect(body.code).toMatch(/handler\$:\s*q_[A-Za-z_0-9]+\.w\(\s*\[\s*a\s*,\s*b\s*\]\s*\)/);
     });
   });
 
@@ -140,9 +134,7 @@ export const Render = component$((props) => {
 });
 `);
         const parent = result.modules[0];
-        expect(parent.code).toMatch(
-          /ref:\s*q_[A-Za-z_0-9]+\.w\(\s*\[\s*props\s*\]\s*\)/,
-        );
+        expect(parent.code).toMatch(/ref:\s*q_[A-Za-z_0-9]+\.w\(\s*\[\s*props\s*\]\s*\)/);
         expect(parent.code).not.toMatch(/ref:\s*q_[A-Za-z_0-9]+\s*[,}]/);
       });
 
